@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { tokenize } from '../lib/tokenizer.mjs';
+import { tokText } from '../lib/migrate.mjs';
 import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -78,12 +80,21 @@ test('библиотека: пары кода и паспортов, JSON и ID 
         }
         if(Array.isArray(meta.wordNotes) && meta.wordNotes.length){
           if(sourceCode==null) sourceCode=(await fs.readFile(code,'utf8')).replace(/\r\n/g,'\n');
-          const codeLines=sourceCode.split('\n');
+          const tokenLines=tokenize(sourceCode,meta.lang||langDir);
           for(let i=0;i<meta.wordNotes.length;i++){
-            const note=meta.wordNotes[i], line=Number(note?.line), col=Number(note?.col), text=String(note?.text||'');
-            if(!Number.isInteger(line)||!Number.isInteger(col)||line<0||line>=codeLines.length||col<0||!text||codeLines[line].slice(col,col+text.length)!==text){
-              wordNoteProblems.push({file:relativeFile,index:i,line:note?.line,col:note?.col,text:note?.text});
+            const note=meta.wordNotes[i], line=Number(note?.line), col=Number(note?.col||0), text=String(note?.text||'');
+            const tokens=Number.isInteger(line)&&line>=0?tokenLines[line]:null;
+            let found=!!(tokens&&text&&tokens.some(token=>tokText(token)===text));
+            // Повторяем fallback placeNotes: составной старый токен может начинаться в сохранённой позиции.
+            if(!found&&tokens&&Number.isInteger(col)&&col>=0){
+              let currentCol=0;
+              for(const token of tokens){
+                const tokenText=tokText(token);
+                if(currentCol===col&&tokenText&&tokenText!==text&&text.startsWith(tokenText)){found=true;break;}
+                currentCol+=tokenText.length;
+              }
             }
+            if(!found) wordNoteProblems.push({file:relativeFile,index:i,line:note?.line,col:note?.col,text:note?.text,kind:note?.kind});
           }
         }
         if(meta.words && typeof meta.words==='object' && !Array.isArray(meta.words) && !Array.isArray(meta.wordNotes)) legacyWordMaps.push(relativeFile);
