@@ -91,6 +91,43 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
     const l = lines.find(x => x.toLowerCase().startsWith(pre)); return l ? l.slice(pre.length).trim().replace(/\\n/g, '\n').replace(/\\t/g, '  ') : ''; };
   const needOf = (L, term) => { const lines = (dict && dict.structure && dict.structure[L]) || []; const pre = String(term).toLowerCase().replace(/^<|>$/g, '') + ': обязательно ';
     return lines.filter(x => x.toLowerCase().startsWith(pre)).map(x => x.slice(pre.length).split(' — ')[0].trim()); };
+  // Связи продолжения и условия применения берём из существующих правил языка.
+  // «else: после if» разворачивается в подсказку для if; это не синонимы и не варианты написания.
+  const langRules = ((dict && dict.structure && dict.structure[L]) || []).map(raw => {
+    const m = String(raw).match(/^(.+):\\s*(после|можно|содержит|внутри|не внутри|требует|обязательно|заметка)\\s+(.+)$/i);
+    if(!m) return null;
+    const term = m[1].trim(), verb = m[2].toLowerCase();
+    const cut = m[3].split(/\\s+[—–]\\s+/);
+    const body = cut.shift().trim(), note = cut.join(' — ').trim();
+    const args = ['требует','заметка'].includes(verb) ? [body] : body.split(/\\s*[,|;]\\s*|\\s+или\\s+/).map(x => x.trim()).filter(Boolean);
+    return { term, verb, args, note };
+  }).filter(Boolean);
+  const termExists = t => Object.prototype.hasOwnProperty.call(langs[L] || {}, String(t).toLowerCase())
+    || langRules.some(r => norm(r.term) === norm(t));
+  const relationGroups = term => {
+    const key = norm(term), after = [], inside = [], context = [];
+    for(const r of langRules){
+      if(r.verb === 'после' && r.args.some(a => norm(a) === key)) after.push(r);
+      if(norm(r.term) === key && ['можно','содержит'].includes(r.verb)) inside.push(r);
+      if(norm(r.term) === key && ['внутри','не внутри','требует','обязательно','заметка'].includes(r.verb)) context.push(r);
+    }
+    const make = (r, relation) => {
+      const child = node(r.term, L, relation);
+      const extra = r.note || (r.verb === 'после' ? 'Допустимо после: ' + r.args.join(', ') : 'Связано правилом языка: ' + r.verb + ' ' + r.args.join(', '));
+      child.note = [child.note, extra].filter(Boolean).join(' — ');
+      return child;
+    };
+    const validAfter = after.filter(r => termExists(r.term));
+    const validInside = inside.flatMap(r => r.args.filter(termExists).map(term => ({ term, verb: r.verb, args:[term], note:r.note })));
+    const groups = [];
+    if(validAfter.length) groups.push({ group:true, label:'Что может идти дальше', note:'Следующие конструкции по правилам языка', lang:L,
+      children:[...new Map(validAfter.map(r => [norm(r.term), make(r, 'после')])).values()] });
+    if(validInside.length) groups.push({ group:true, label:'Что можно разместить внутри', note:'Допустимые части этой конструкции', lang:L,
+      children:[...new Map(validInside.map(r => [norm(r.term), make(r, 'внутри')])).values()] });
+    if(context.length) groups.push({ group:true, label:'Условия применения', note:'Ограничения и контекст конструкции', lang:L,
+      children:context.map(r => ({ show:r.verb + ': ' + r.args.join(', '), code:'', lang:L, label:'', note:r.note || '', children:[] })) });
+    return groups;
+  };
   const synLabel = term => { const p = synonyms[term]; return Array.isArray(p) && p.length ? p[0] : ''; };
   const node = (term, L, label) => {
     const D = langs[L] || {}; const own = D[term] || ((L === 'js' || L === 'ts') ? W[term] : '');
@@ -104,6 +141,7 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
   };
   const out = top.map(r => {
     const D = langs[r.lang] || {}; const root = node(r.term, r.lang, r.label);
+    root.children.push(...relationGroups(r.term));
     // разновидности по имени: каждая — под самым длинным уже существующим предком
     // разновидности по имени: margin → margin-inline → margin-inline-start.
     // сортируем по длине, чтобы родитель всегда шёл раньше детей. для каждого слова отрезаем хвост по дефису
