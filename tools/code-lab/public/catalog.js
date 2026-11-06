@@ -337,6 +337,7 @@ async function deleteById(id, label){
   if(!confirm('Удалить компонент «' + (label || id) + '» навсегда?')) return;
   const r = await fetch('/api/delete', { method:'POST', body: JSON.stringify({ id }) }).then(r=>r.json()).catch(()=>({}));
   if(r.ok){ ALL = ALL.filter(x => x.id !== id); if(selCardId === id) selCardId = null; renderCats(); render(); }
+  else alert(r.error || 'Не удалось удалить компонент.');
 }
 // клик по карточке выделяет её; Delete/Backspace удаляет выделенную
 document.addEventListener('keydown', e => {
