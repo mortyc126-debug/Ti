@@ -112,7 +112,7 @@
     main.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { simpleNow = b.dataset.s === '1'; setPref('codelab_tasks_simple', simpleNow); segs(); walk.setMode({ simple: simpleNow }); });
     $('#twReset').onclick = () => walk.reset();
     $('#twEdit').onclick = () => editTask(id);
-    $('#twDel').onclick = async () => { if(!confirm('Удалить задачу «' + t.title + '»? Куски в библиотеке останутся.')) return; await api('/api/tasks/delete', { id }); CUR = null; history.replaceState(null, '', '/tasks.html'); reload(); };
+    $('#twDel').onclick = async () => { if(!confirm('Удалить задачу «' + t.title + '»? Куски в библиотеке останутся.')) return; const result = await api('/api/tasks/delete', { id }); if(!result || !result.ok){ alert((result && result.error) || 'Не удалось удалить задачу.'); return; } CUR = null; history.replaceState(null, '', '/tasks.html'); reload(); };
 
     function drawAsm(asm){
       const box = $('#twAsm'); const parts = TaskWalk.joinAssembly(asm);
