@@ -335,6 +335,7 @@ export function buildUsage(dict, entries) {
     builtAt: Date.now(), ms: Date.now() - t0, pieceCount: pieces.length, sections, terms,
     piecesOf(sid, term) { return hits.get(sid + '\u0000' + term) || []; },
     pieceInfo(id) { const p = byId.get(id); return p ? { id: p.id, title: p.title, lang: p.lang, group: p.group } : null; },
+    pieceText(id) { const p = byId.get(id); return p ? p.text : ''; },
     termsOfPiece(id) {
       const arr = byPiece.get(id) || [];
       return arr.map(({ sid, term }) => {
