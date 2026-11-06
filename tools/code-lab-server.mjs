@@ -377,6 +377,10 @@ function slug(s){
   _slugCounter++;
   return base + '-' + Date.now().toString(36) + '-' + _slugCounter.toString(36) + '-' + Math.random().toString(36).slice(2, 7);
 }
+async function fileExists(file){
+  try { await fs.access(file); return true; }
+  catch(e){ if(e.code === 'ENOENT') return false; throw e; }
+}
 async function uniqueFileId(dir, name){
   await fs.mkdir(dir, { recursive: true });
   for(let attempt = 0; attempt < 100; attempt++){
@@ -1096,7 +1100,7 @@ const server = http.createServer(async (req, res) => {
     // ── сохранённые данные (JSON из архивов) ──────────────────────────────
     if(u.pathname === '/api/data/save' && req.method === 'POST'){
       const b = await readBody(req);
-      const id = slug(b.name || 'data');
+      const id = await uniqueFileId(DATA, b.name || 'data');
       const obj = { id, name: String(b.name || 'без имени').slice(0, 120), desc: String(b.desc || '').slice(0, 400), category: String(b.category || '').slice(0, 80), savedAt: new Date().toISOString(), data: b.data };
       await fs.mkdir(DATA, { recursive: true });
       await fs.writeFile(path.join(DATA, id + '.json'), JSON.stringify(obj), 'utf8');
@@ -1244,7 +1248,8 @@ const server = http.createServer(async (req, res) => {
     if(u.pathname === '/api/flows/save' && req.method === 'POST'){
       const b = await readBody(req);
       const graph = (b.graph && typeof b.graph === 'object') ? b.graph : { nodes: [], edges: [] };
-      const id = b.id && /^[\wа-яё.-]+$/iu.test(b.id) ? b.id : slug(b.name || 'схема');   // id содержит кириллицу — пропускаем её, иначе «дописать в ту же схему» создавало новый файл
+      const requestedId = b.id && /^[\wа-яё.-]+$/iu.test(b.id) ? b.id : '';
+      const id = requestedId && await fileExists(path.join(FLOWS, requestedId + '.json')) ? requestedId : await uniqueFileId(FLOWS, b.name || 'схема');
       const obj = { id, name: String(b.name || 'Моя схема').slice(0, 80), savedAt: Date.now(),
         graph: { nodes: Array.isArray(graph.nodes) ? graph.nodes : [], edges: Array.isArray(graph.edges) ? graph.edges : [] } };
       await fs.mkdir(FLOWS, { recursive: true });
@@ -1715,7 +1720,8 @@ const server = http.createServer(async (req, res) => {
     }
     if(u.pathname === '/api/recipes/save' && req.method === 'POST'){
       const b = await readBody(req);
-      const id = b.id && /^[\wа-яё.-]+$/iu.test(b.id) ? b.id : slug(b.title || 'рецепт');
+      const requestedId = b.id && /^[\wа-яё.-]+$/iu.test(b.id) ? b.id : '';
+      const id = requestedId && await fileExists(path.join(RECIPES, requestedId + '.json')) ? requestedId : await uniqueFileId(RECIPES, b.title || 'рецепт');
       const items = Array.isArray(b.items) ? b.items.slice(0, 200).map(x => ({ id: String(x.id || ''), title: String(x.title || '').slice(0, 120), note: String(x.note || '').slice(0, 300) })) : [];
       const obj = { id, title: String(b.title || 'Рецепт').slice(0, 120), desc: String(b.desc || '').slice(0, 2000), items, savedAt: Date.now() };
       await fs.mkdir(RECIPES, { recursive: true });
@@ -1767,7 +1773,7 @@ const server = http.createServer(async (req, res) => {
           if(it.title){ const hit = (await rowsOf()).find(x => (x.title || '').trim().toLowerCase() === String(it.title).trim().toLowerCase()); if(hit){ items.push({ id: hit.id, title: hit.title, note }); continue; } }
           items.push({ id: '', title: String(it.title || 'кусок').slice(0, 120), note }); itemsUnresolved++;
         }
-        const id = slug(title);
+        const id = await uniqueFileId(RECIPES, title);
         const obj = { id, title, desc, items: items.slice(0, 200), savedAt: Date.now() };
         await fs.mkdir(RECIPES, { recursive: true });
         await fs.writeFile(path.join(RECIPES, id + '.json'), JSON.stringify(obj, null, 2), 'utf8');
