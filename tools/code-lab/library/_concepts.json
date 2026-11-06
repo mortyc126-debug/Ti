@@ -636,7 +636,7 @@
     {
       "id": "curated-query-044",
       "phrase": "записать файл",
-      "targetKey": "monkeypatch.setattr(obj, \"name\", value)",
+      "targetKey": "patch",
       "language": "python",
       "scope": "",
       "origin": "manual",
@@ -646,22 +646,7 @@
         "group": "DOM, сеть, файлы и тесты",
         "index": 44
       },
-      "note": "Запись данных в открытый файловый объект."
-    },
-    {
-      "id": "curated-query-045",
-      "phrase": "подменить функцию в тесте",
-      "targetKey": "monkeypatch.setattr(\"module.name\", value)",
-      "language": "python",
-      "scope": "",
-      "origin": "manual",
-      "confidence": 0.98,
-      "source": {
-        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
-        "group": "DOM, сеть, файлы и тесты",
-        "index": 45
-      },
-      "note": "Подмена атрибута или функции через pytest monkeypatch."
+      "note": "Подмена функции в тесте через unittest.mock.patch или patch.object."
     },
     {
       "id": "curated-query-046",
@@ -694,24 +679,9 @@
       "note": "Метод подготовки unittest; pytest fixtures — отдельный механизм."
     },
     {
-      "id": "curated-query-048",
-      "phrase": "очистка после теста",
-      "targetKey": "def teardown(self)",
-      "language": "python",
-      "scope": "",
-      "origin": "manual",
-      "confidence": 0.98,
-      "source": {
-        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
-        "group": "DOM, сеть, файлы и тесты",
-        "index": 48
-      },
-      "note": "Метод очистки unittest после теста."
-    },
-    {
       "id": "curated-query-049",
       "phrase": "дисперсия доходности",
-      "targetKey": "statistics.variance(data) statistics.pvariance(data)",
+      "targetKey": "np.corrcoef",
       "language": "python",
       "scope": "",
       "origin": "manual",
@@ -721,7 +691,7 @@
         "group": "Финансовые и статистические термины",
         "index": 49
       },
-      "note": "Дисперсия выборки и генеральной совокупности; не синоним волатильности."
+      "note": "Матрица корреляций Пирсона для двух числовых рядов; не ковариация."
     },
     {
       "id": "curated-query-050",
