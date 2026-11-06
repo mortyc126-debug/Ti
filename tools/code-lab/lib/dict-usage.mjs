@@ -351,11 +351,15 @@ export function buildUsage(dict, entries) {
   return usage;
 }
 
-// быстрый отпечаток библиотеки: меняется, когда меняется код любого куска
+// быстрый отпечаток библиотеки: меняется при правке кода и поисковых метаданных фрагмента
 export function libraryFingerprint(entries) {
   let h = 2166136261 >>> 0, n = 0;
   for (const e of entries || []) {
-    const s = String(e.id) + '\u0001' + String(e.lang || '') + '\u0001' + String(e.code || '');
+    const meta = e.meta || {};
+    const s = [
+      e.id, e.lang || '', e.code || '', e.title || '', e.group || '',
+      meta.desc || '', JSON.stringify(meta.tags || []), JSON.stringify(meta.aliases || [])
+    ].map(value => String(value)).join('\u0001');
     for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
     n++;
   }
