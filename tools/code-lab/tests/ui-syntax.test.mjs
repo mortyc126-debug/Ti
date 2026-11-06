@@ -15,7 +15,7 @@ test('публичные JS-файлы и встроенные скрипты с
     assert.doesNotThrow(()=>new vm.Script(source,{filename:file.name}),file.name);
   }
   const html=await fs.readFile(path.join(PUBLIC,'schema-json.html'),'utf8');
-  const scripts=[...html.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/gi)].map(x=>x[1]).filter(x=>x.trim());
+  const scripts=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(x=>x[1]).filter(x=>x.trim());
   assert.ok(scripts.length>0,'в schema-json.html должны быть встроенные скрипты');
   scripts.forEach((source,i)=>assert.doesNotThrow(()=>new vm.Script(source,{filename:'schema-json.html#script-'+i}),'schema-json.html inline script '+i));
   console.log('ui-syntax:',JSON.stringify({publicJs:files.length,inlineScripts:scripts.length}));
