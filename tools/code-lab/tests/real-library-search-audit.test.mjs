@@ -72,7 +72,7 @@ async function main() {
     'список Python': ['list'],
     'словарь Python': ['dict'],
     'разбить строку по разделителю': ['split'],
-    'соединить элементы массива в строку': ['join', '"".join(it)'],
+    'соединить элементы массива в строку': ['join'],
     'округлить до двух знаков': ['tofixed', 'round(x, n)'],
     'асинхронно дождаться результата': ['await'],
     'разобрать JSON': ['parse', 'json.loads(s)'],
@@ -83,8 +83,7 @@ async function main() {
     'подменить функцию в тесте': ['monkeypatch.setattr(obj, "name", value)', 'mock.patch("module.name")'],
     'подготовка перед тестом': ['def setup(self)'],
     'очистка после теста': ['def teardown(self)'],
-    'дисперсия доходности': ['statistics.variance(data) statistics.pvariance(data)'],
-    'корреляция двух рядов': ['statistics.correlation(x, y)']
+    'корреляция двух рядов': ['np.corrcoef']
   };
   const results = [];
   for (const query of queries) {
