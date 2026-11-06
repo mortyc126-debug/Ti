@@ -125,7 +125,7 @@ function indexPiece(entry) {
     let a = pos.get(tk.t); if (!a) pos.set(tk.t, a = []);
     a.push(p++);
   }
-  return { id: entry.id, lang: String(entry.lang || '').toLowerCase(), title: entry.title || entry.id, group: entry.group || '', pos, size: p, text: tokens.clean.toLowerCase() };
+  return { id: entry.id, lang: String(entry.lang || '').toLowerCase(), title: entry.title || entry.id, group: entry.group || '', desc: entry.desc || '', tags: Array.isArray(entry.tags) ? entry.tags : [], aliases: Array.isArray(entry.aliases) ? entry.aliases : [], pos, size: p, text: tokens.clean.toLowerCase() };
 }
 
 // ── разбор ключа словаря ──
@@ -334,7 +334,7 @@ export function buildUsage(dict, entries) {
   const usage = {
     builtAt: Date.now(), ms: Date.now() - t0, pieceCount: pieces.length, sections, terms,
     piecesOf(sid, term) { return hits.get(sid + '\u0000' + term) || []; },
-    pieceInfo(id) { const p = byId.get(id); return p ? { id: p.id, title: p.title, lang: p.lang, group: p.group } : null; },
+    pieceInfo(id) { const p = byId.get(id); return p ? { id: p.id, title: p.title, lang: p.lang, group: p.group, desc: p.desc, tags: p.tags, aliases: p.aliases } : null; },
     pieceText(id) { const p = byId.get(id); return p ? p.text : ''; },
     termsOfPiece(id) {
       const arr = byPiece.get(id) || [];
