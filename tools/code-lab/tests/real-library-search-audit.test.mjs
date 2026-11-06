@@ -80,7 +80,7 @@ async function main() {
     'подписаться на клик': ['addeventlistener'],
     'запросить данные по HTTP': ['fetch'],
     'записать файл': ['f.write(s)'],
-    'подменить функцию в тесте': ['monkeypatch.setattr("module.name", value)', 'mock.patch("module.name")'],
+    'подменить функцию в тесте': ['monkeypatch.setattr(obj, "name", value)', 'mock.patch("module.name")'],
     'подготовка перед тестом': ['def setup(self)'],
     'очистка после теста': ['def teardown(self)'],
     'дисперсия доходности': ['statistics.variance(data) statistics.pvariance(data)'],
