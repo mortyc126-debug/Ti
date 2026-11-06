@@ -378,9 +378,9 @@ body:has(.drag) .app{transition:none}
 .concept-chip,.concept-relation{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border:1px solid var(--border);background:var(--bg2)}
 .concept-chip-text,.concept-relation-text{font-size:12px;color:var(--text2);min-width:0;overflow-wrap:anywhere}
 .concept-chip-remove{flex:0 0 auto;border:0;background:transparent;color:var(--text3);font-size:18px;line-height:1;cursor:pointer}
-.concept-chip-remove:hover{color:var(--danger)}
+.concept-chip-remove:hover{color:var(--acc)}
 .concept-empty{padding:12px;color:var(--text3);font-size:12px}
-.concept-status{white-space:pre-wrap;margin-top:18px;min-height:18px;color:var(--ok);font-size:12px}
-.concept-status.error{color:var(--danger)}
+.concept-status{white-space:pre-wrap;margin-top:18px;min-height:18px;color:var(--str);font-size:12px}
+.concept-status.error{color:var(--acc)}
 @media(max-width:900px){.concept-layout{grid-template-columns:240px minmax(0,1fr)}.concept-work{padding:20px}.concept-inline-form,.concept-relation-form{grid-template-columns:1fr 1fr}.concept-inline-form .btn{grid-column:1/-1}}
 @media(max-width:650px){.concept-top{align-items:flex-start;flex-direction:column;padding:20px}.concept-layout{display:flex;flex-direction:column}.concept-side{border-right:0;border-bottom:1px solid var(--border)}.concept-work{padding:18px}.concept-two-col{grid-template-columns:1fr}.concept-form-head{align-items:flex-start;flex-direction:column}.concept-inline-form,.concept-relation-form{grid-template-columns:1fr}}
