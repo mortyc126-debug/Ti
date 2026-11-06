@@ -1,0 +1,61 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { promises as fs } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { migrateTemplates } from '../lib/migrate.mjs';
+
+async function fixture({ withSections = true, group = 'Браузер / DOM' } = {}){
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'codelab-migrate-'));
+  const src = path.join(root, 'templates');
+  const out = path.join(root, 'library');
+  await fs.mkdir(src, { recursive: true });
+  await fs.mkdir(out, { recursive: true });
+  if(withSections){
+    await fs.writeFile(path.join(out, '_sections.json'), JSON.stringify({
+      tree: [{ name: 'Страница и браузер', subs: ['Работа с DOM'] }],
+      rules: ['Браузер / DOM => Страница и браузер / Работа с DOM']
+    }, null, 2));
+  }
+  await fs.writeFile(path.join(src, 'dom-example.json'), JSON.stringify({
+    id: 'dom-example',
+    title: 'Изменить элемент на странице',
+    lang: 'js',
+    group,
+    desc: 'Проверочный пример миграции.',
+    lines: [[
+      { k: 'kw', v: 'const' }, { k: 'sp' }, { k: 'name', v: 'value' },
+      { k: 'op', v: '=' }, { k: 'num', v: '1' }, { k: 'op', v: ';' }
+    ]]
+  }, null, 2));
+  return { root, src, out };
+}
+
+test('migrateTemplates applies current section rules to newly imported templates', async () => {
+  const f = await fixture();
+  try {
+    const report = await migrateTemplates({ src: f.src, out: f.out, dictPath: null });
+    const meta = JSON.parse(await fs.readFile(path.join(f.out, 'js', 'dom-example.js.meta.json'), 'utf8'));
+    assert.equal(report.created, 1);
+    assert.equal(report.groupsRemapped, 1);
+    assert.deepEqual(report.groupMoves, {
+      'Браузер / DOM => Страница и браузер / Работа с DOM': 1
+    });
+    assert.equal(meta.group, 'Страница и браузер / Работа с DOM');
+  } finally {
+    await fs.rm(f.root, { recursive: true, force: true });
+  }
+});
+
+test('migrateTemplates preserves the original group when no section rules exist', async () => {
+  const f = await fixture({ withSections: false });
+  try {
+    const report = await migrateTemplates({ src: f.src, out: f.out, dictPath: null });
+    const meta = JSON.parse(await fs.readFile(path.join(f.out, 'js', 'dom-example.js.meta.json'), 'utf8'));
+    assert.equal(report.created, 1);
+    assert.equal(report.groupsRemapped, 0);
+    assert.equal(meta.group, 'Браузер / DOM');
+  } finally {
+    await fs.rm(f.root, { recursive: true, force: true });
+  }
+});
