@@ -90,6 +90,36 @@ test('хранилище: ссылки на куски и задачи прив�
   await fs.rm(root, { recursive: true, force: true });
 });
 
+test('неоднозначные названия кусков и задач не привязываются к первому совпадению', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'tasks-'));
+  const rows = [
+    { id: 'piece-js-1', title: 'Одинаковый компонент', lang: 'js' },
+    { id: 'piece-js-2', title: 'Одинаковый компонент', lang: 'js' },
+    { id: 'piece-py-1', title: 'Одинаковый компонент', lang: 'python' }
+  ];
+  const store = createTaskStore({ root, rows: async () => rows, slug: s => 'new-' + s.length });
+  const pieceDry = await store.importText('=== Тест куска | js |\n? Q\n  - a -> кусок: Одинаковый компонент', { dry: true });
+  const pieceUnresolved = pieceDry.tasks[0].report.unresolved[0];
+  assert.equal(pieceUnresolved.ambiguous, true);
+  assert.deepEqual(pieceUnresolved.candidates.map(x => x.id), ['piece-js-1', 'piece-js-2']);
+
+  const pythonDry = await store.importText('=== Тест Python | python |\n? Q\n  - a -> кусок: Одинаковый компонент', { dry: true });
+  assert.equal(pythonDry.tasks[0].report.linked, 1);
+  assert.equal(pythonDry.tasks[0].task.steps[0].options[0].id, 'piece-py-1');
+
+  await fs.writeFile(path.join(root, 'task-a.json'), JSON.stringify({ id: 'task-a', title: 'Одинаковая задача', lang: 'js', steps: [{ q: 'Q', options: [] }] }));
+  await fs.writeFile(path.join(root, 'task-b.json'), JSON.stringify({ id: 'task-b', title: 'Одинаковая задача', lang: 'js', steps: [{ q: 'Q', options: [] }] }));
+  const taskDry = await store.importText('=== Тест задачи | js |\n? Q\n  - a -> задача: Одинаковая задача', { dry: true });
+  const taskUnresolved = taskDry.tasks[0].report.unresolved[0];
+  assert.equal(taskUnresolved.ambiguous, true);
+  assert.deepEqual(taskUnresolved.candidates.map(x => x.id).sort(), ['task-a', 'task-b']);
+
+  const explicit = await store.importText('=== Явный ID | js |\n? Q\n  - a -> задача: id:task-b', { dry: true });
+  assert.equal(explicit.tasks[0].report.linked, 1);
+  assert.equal(explicit.tasks[0].task.steps[0].options[0].id, 'task-b');
+  await fs.rm(root, { recursive: true, force: true });
+});
+
 test('что дальше: имя без источника → куски и задачи, которые его дают; HTML закрывает #id', () => {
   const contract = (code, lang) => lang === 'html' ? { provides: ['#box'], requires: [] } : { provides: ['run'], requires: ['btn', '#box', 'i'] };
   const rows = [{ id: 'p1', title: 'Кнопка', lang: 'js', nlines: 2, comp: { provides: ['btn'], requires: [] } }];
