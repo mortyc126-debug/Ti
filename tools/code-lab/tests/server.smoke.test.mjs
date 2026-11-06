@@ -18,7 +18,7 @@ await fs.writeFile(path.join(L, 'public', 'index.html'), '<!doctype html><title>
 await fs.copyFile(path.join(TOOLS, 'code-lab', 'public', 'tasks-format.js'), path.join(L, 'public', 'tasks-format.js'));   // общий формат задач (сервер и браузер)
 for(const f of ['code-links.js', 'structure-rules.js']) await fs.copyFile(path.join(TOOLS, 'code-lab', 'public', f), path.join(L, 'public', f));   // связи и правила структуры — общие для сервера и страницы
 for(const f of ['concepts.html', 'concepts.js', 'style.css', 'shell.js']) await fs.copyFile(path.join(TOOLS, 'code-lab', 'public', f), path.join(L, 'public', f));   // страница пользовательских конструкций и её оболочка
-await fs.writeFile(path.join(L, 'public', 'keyword-dict.json'), JSON.stringify({ words: { print: 'print — вывод' }, cssProps: { 'font-weight': 'font-weight — жирность шрифта' } }));
+await fs.writeFile(path.join(L, 'public', 'keyword-dict.json'), JSON.stringify({ words: { print: 'print — вывод' }, cssProps: { 'font-weight': 'font-weight — жирность шрифта', 'font-size': 'font-size — размер шрифта' } }));
 await fs.mkdir(path.join(L, 'public', 'dict'), { recursive: true });
 await fs.writeFile(path.join(L, 'public', 'dict', 'synonyms.json'), JSON.stringify({
   'font-weight': ['толщина шрифта'],
@@ -100,6 +100,13 @@ try {
   });
 
   await test('теневой поиск сохраняет targetKey и не меняет действующую выдачу', async () => {
+    // Вторая цель неоднозначной фразы должна иметь реальный фрагмент в библиотеке.
+    await fs.writeFile(path.join(L, 'library', 'css', 'css-size.css'), 'p { font-size: 16px; }\\n');
+    await fs.writeFile(path.join(L, 'library', 'css', 'css-size.css.meta.json'), JSON.stringify({
+      id: 'css-size', lang: 'css', title: 'Размер шрифта', group: 'CSS: шрифты',
+      desc: 'Задаёт размер шрифта', tags: [], aliases: []
+    }));
+    await get('/api/list'); // обновить индекс после добавления карточки
     const query = 'толщина шрифта';
     const legacy = await get('/api/search?q=' + encodeURIComponent(query));
     const comparison = await get('/api/search/shadow?q=' + encodeURIComponent(query));
