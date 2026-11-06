@@ -486,7 +486,7 @@
     {
       "id": "curated-query-033",
       "phrase": "соединить элементы массива в строку",
-      "targetKey": "\"\" .join(it)",
+      "targetKey": "\"\".join(it)",
       "language": "python",
       "scope": "",
       "origin": "manual",
