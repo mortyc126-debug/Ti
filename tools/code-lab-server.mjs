@@ -918,31 +918,50 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ...saved, deleted: id, removedRelations: relationsBefore - next.relations.length });
     }
     if(u.pathname === '/api/concepts/search' && req.method === 'GET'){
-      const query = String(u.searchParams.get('q') || '').trim().toLocaleLowerCase('ru').replace(/ё/g, 'е').replace(/\s+/g, ' ');
+      const normalize = value => String(value || '').trim().toLocaleLowerCase('ru').replace(/ё/g, 'е').replace(/\s+/g, ' ');
+      const query = normalize(u.searchParams.get('q'));
+      const language = normalize(u.searchParams.get('lang'));
+      const scope = normalize(u.searchParams.get('scope'));
       const data = await concepts.get();
       const pieceMap = new Map((await store.entries()).map(piece => [piece.id, piece]));
       const hits = [];
       for(const concept of data.concepts){
         const candidates = [
           { kind: 'name', label: 'название', value: concept.name, score: 100 },
-          ...(concept.aliases || []).map(alias => ({ kind: 'alias', label: 'вариант названия', value: typeof alias === 'string' ? alias : alias.value, score: 90 })),
-          ...(concept.forms || []).map(form => ({ kind: 'form', label: 'вариант записи', value: form.value, score: 80 })),
+          ...(concept.aliases || []).map(alias => ({ kind: 'alias', label: 'равнозначное название', value: typeof alias === 'string' ? alias : alias.value, score: 90 })),
+          ...(concept.forms || []).map(form => ({ kind: 'form', label: 'вариант записи', value: form.value, language: form.language || '', score: 80 })),
           { kind: 'definition', label: 'значение', value: concept.definition, score: 50 },
           ...(concept.tags || []).map(tag => ({ kind: 'tag', label: 'тег', value: tag, score: 30 })),
           ...(concept.examples || []).map(example => {
             const piece = pieceMap.get(example.pieceId);
+            return { kind: 'example', label: 'пример', value: [example.note, piece?.title].filter(Boolean).join(' '), score: 40, pieceId: example.pieceId };
+          }),
+          ...(data.queryPhrases || []).filter(item => item.targetConceptId === concept.id).map(item => {
+            const langMatch = !item.language || !language || normalize(item.language) === language;
+            const scopeMatch = !item.scope || !scope || normalize(item.scope) === scope;
+            if((language && item.language && !langMatch) || (scope && item.scope && !scopeMatch)) return null;
+            const hasContext = Boolean(item.language || item.scope);
+            const contextKnown = (!item.language || language === normalize(item.language)) && (!item.scope || scope === normalize(item.scope));
             return {
-              kind: 'example', label: 'пример', value: [example.note, piece?.title].filter(Boolean).join(' '),
-              score: 40, pieceId: example.pieceId
+              kind: 'queryPhrase',
+              label: 'поисковая формулировка' + (hasContext && !contextKnown ? ' · контекст не указан' : ''),
+              value: item.phrase,
+              score: hasContext && !contextKnown ? 58 : 72,
+              language: item.language || '',
+              scope: item.scope || '',
+              source: item.source || null,
+              note: item.note || '',
+              confidence: item.confidence,
+              contextual: hasContext && !contextKnown
             };
-          })
+          }).filter(Boolean)
         ];
         const matches = candidates.filter(item => {
-          const value = String(item.value || '').toLocaleLowerCase('ru').replace(/ё/g, 'е').replace(/\s+/g, ' ');
-          return query ? value.includes(query) : true;
+          const value = normalize(item.value);
+          return query ? value.includes(query) : item.kind !== 'queryPhrase';
         }).sort((a, b) => {
-          const aExact = String(a.value || '').toLocaleLowerCase('ru').replace(/ё/g, 'е').trim() === query;
-          const bExact = String(b.value || '').toLocaleLowerCase('ru').replace(/ё/g, 'е').trim() === query;
+          const aExact = normalize(a.value) === query;
+          const bExact = normalize(b.value) === query;
           return Number(bExact) - Number(aExact) || b.score - a.score;
         });
         if(matches.length) hits.push({ id: concept.id, name: concept.name, definition: concept.definition, match: matches[0] });
@@ -966,7 +985,7 @@ const server = http.createServer(async (req, res) => {
       }
       const results = [...hitMap.values()];
       results.sort((a, b) => b.match.score - a.match.score || a.name.localeCompare(b.name, 'ru'));
-      return json(res, 200, { hits: results.slice(0, 100), total: results.length, query });
+      return json(res, 200, { hits: results.slice(0, 100), total: results.length, query, language, scope });
     }
 
     // поиск по всей библиотеке: ?q=слова&limit=60 → { hits:[{id, score, why:[…]}], total, terms }
