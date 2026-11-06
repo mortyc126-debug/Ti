@@ -920,6 +920,7 @@ const server = http.createServer(async (req, res) => {
     if(u.pathname === '/api/concepts/search' && req.method === 'GET'){
       const query = String(u.searchParams.get('q') || '').trim().toLocaleLowerCase('ru').replace(/ё/g, 'е').replace(/\s+/g, ' ');
       const data = await concepts.get();
+      const pieceMap = new Map((await store.entries()).map(piece => [piece.id, piece]));
       const hits = [];
       for(const concept of data.concepts){
         const candidates = [
@@ -927,7 +928,14 @@ const server = http.createServer(async (req, res) => {
           ...(concept.aliases || []).map(alias => ({ kind: 'alias', label: 'вариант названия', value: typeof alias === 'string' ? alias : alias.value, score: 90 })),
           ...(concept.forms || []).map(form => ({ kind: 'form', label: 'вариант записи', value: form.value, score: 80 })),
           { kind: 'definition', label: 'значение', value: concept.definition, score: 50 },
-          ...(concept.tags || []).map(tag => ({ kind: 'tag', label: 'тег', value: tag, score: 30 }))
+          ...(concept.tags || []).map(tag => ({ kind: 'tag', label: 'тег', value: tag, score: 30 })),
+          ...(concept.examples || []).map(example => {
+            const piece = pieceMap.get(example.pieceId);
+            return {
+              kind: 'example', label: 'пример', value: [example.note, piece?.title].filter(Boolean).join(' '),
+              score: 40, pieceId: example.pieceId
+            };
+          })
         ];
         const matches = candidates.filter(item => {
           const value = String(item.value || '').toLocaleLowerCase('ru').replace(/ё/g, 'е').replace(/\s+/g, ' ');
