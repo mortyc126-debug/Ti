@@ -605,7 +605,7 @@ async function pieceReferenceIndex(){
   for(const t of await tasks.list()){
     const full = await tasks.get(t.id); if(!full) continue;
     tasks.eachOption(full.steps, o => {
-      if(o && o.id) add(o.id, { type: 'task', id: t.id, title: t.title || t.id });
+      if(o && o.kind === 'piece' && o.id) add(o.id, { type: 'task', id: t.id, title: t.title || t.id });
     });
   }
 
