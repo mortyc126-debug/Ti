@@ -693,6 +693,9 @@ async function runCode(lang, code){
   }
 }
 
+let restoreInProgress = false;
+let restoreRecoveryRequired = false;
+
 const server = http.createServer(async (req, res) => {
   try {
     const u = new URL(req.url, 'http://localhost');
@@ -700,6 +703,10 @@ const server = http.createServer(async (req, res) => {
     if(u.pathname.startsWith('/api/') || u.pathname.startsWith('/vendor/')){
       if(!isLocalHost(req.headers.host)) return json(res, 403, { error: 'запрещено: открывайте сервер по адресу http://localhost:' + PORT });
       if(req.headers.origin && !isLocalOrigin(req.headers.origin)) return json(res, 403, { error: 'запрещено: запрос с чужой страницы' });
+    }
+    if(restoreRecoveryRequired && u.pathname.startsWith('/api/')) return json(res, 503, { error: 'После ошибки отката требуется перезапуск сервера для восстановления данных.' });
+    if(restoreInProgress && u.pathname.startsWith('/api/') && !['/api/library/restore', '/api/backup/restore'].includes(u.pathname)) {
+      return json(res, 409, { error: 'Выполняется восстановление данных. Повторите запрос после его завершения.' });
     }
 
     // ── ИИ-сервисы: выбранный провайдер и проверка ключа (ключи в файлы не пишутся) ──
@@ -1032,6 +1039,9 @@ const server = http.createServer(async (req, res) => {
     // Восстановление архива: пути сохраняются, пары кода и паспорта связываются по полному пути.
     // Перед перезаписью существующих файлов создаётся локальная резервная копия в data/restore-backups/.
     if(u.pathname === '/api/library/restore' && req.method === 'POST'){
+      if(restoreInProgress) return json(res, 409, { ok: false, error: 'Другое восстановление уже выполняется.' });
+      restoreInProgress = true;
+      try {
       const b = await readBody(req);
       const files = Array.isArray(b.files) ? b.files : [];
       const mode = b.mode === 'replace' ? 'replace' : 'merge';
@@ -1196,6 +1206,7 @@ const server = http.createServer(async (req, res) => {
       } catch(e){
         const rollbackErrors = await rollbackRestore({ fs, written, deleted, backups });
         if(!rollbackErrors.length) await markRestoreTransaction({ fs, backupRoot, state: 'ROLLED_BACK' }).catch(markError => rollbackErrors.push(String(markError?.message || markError)));
+        if(rollbackErrors.length) restoreRecoveryRequired = true;
         return json(res, 500, { ok: false, error: String(e?.message || e), backupId: backups.size ? backupId : null, rollbackErrors });
       }
 
@@ -1205,6 +1216,9 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, mode, pairs, metaOnly: metaOnlyList.length, codeOnly: codeOnlyList.length, wroteCode, wroteMeta, wroteRoot, deleted: deleted.length,
         overwritten: writes.filter(op => backups.has(op.abs)).length, backedUp: backups.size, backupId: backups.size ? backupId : null,
         metaOnlyList: metaOnlyList.slice(0, 60), codeOnlyList: codeOnlyList.slice(0, 60), badMeta: badMeta.slice(0, 20) });
+      } finally {
+        restoreInProgress = false;
+      }
     }
 
     // правка шаблона целиком: новый код → заново токенизируем, перезаписываем файл
@@ -1303,6 +1317,9 @@ const server = http.createServer(async (req, res) => {
     // Восстановление остальных пользовательских хранилищ из полного архива.
     // Библиотека восстанавливается отдельным маршрутом /api/library/restore.
     if(u.pathname === '/api/backup/restore' && req.method === 'POST'){
+      if(restoreInProgress) return json(res, 409, { ok: false, error: 'Другое восстановление уже выполняется.' });
+      restoreInProgress = true;
+      try {
       const b = await readBody(req), files = Array.isArray(b.files) ? b.files : [];
       const mode = b.mode === 'replace' ? 'replace' : 'merge';
       const archiveSeen = new Set(), targets = new Set(), writes = [], invalid = [];
@@ -1415,10 +1432,14 @@ const server = http.createServer(async (req, res) => {
       } catch(e){
         const rollbackErrors = await rollbackRestore({ fs, written, deleted, backups });
         if(!rollbackErrors.length) await markRestoreTransaction({ fs, backupRoot, state: 'ROLLED_BACK' }).catch(markError => rollbackErrors.push(String(markError?.message || markError)));
+        if(rollbackErrors.length) restoreRecoveryRequired = true;
         return json(res, 500, { ok: false, error: String(e?.message || e), backupId: backups.size ? backupId : null, rollbackErrors });
       }
       try { await store.refresh(); } catch(_){}
       return json(res, 200, { ok: true, mode, written: writes.length, overwritten: writes.filter(op => backups.has(op.abs)).length, deleted: deleted.length, backedUp: backups.size, backupId: backups.size ? backupId : null });
+      } finally {
+        restoreInProgress = false;
+      }
     }
 
     // ── сохранённые данные (JSON из архивов) ──────────────────────────────
