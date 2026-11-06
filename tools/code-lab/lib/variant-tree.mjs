@@ -202,7 +202,7 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
     }
     // конструкции словаря, где термин стоит как отдельное слово («margin: 0 auto», «.queryselector(»)
     const re = new RegExp('(^|[^\\w-])' + r.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\w-])');
-    const idiomCandidates = /\s/.test(r.term) ? ((indexes[r.lang] && indexes[r.lang].idioms) || []) : ((indexes[r.lang] && indexes[r.lang].idiomsByToken.get(r.term)) || []);
+    const idiomCandidates = /[\s.@#]/.test(r.term) ? ((indexes[r.lang] && indexes[r.lang].idioms) || []) : ((indexes[r.lang] && indexes[r.lang].idiomsByToken.get(r.term)) || []);
     const idioms = idiomCandidates.filter(k => k !== r.term && re.test(k)).sort((a, b) => a.length - b.length).slice(0, 6);
     idioms.forEach(k => root.children.push({ term: k, lang: r.lang, code: r.lang === 'css' ? k : recase(k, caseMap), note: splitNote(D[k]).note, label: '', children: [] }));
     // в коде (не CSS) верхняя строка вставляет готовый вызов «document.querySelector(selector)», а не голое имя
