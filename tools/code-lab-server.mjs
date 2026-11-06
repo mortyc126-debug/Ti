@@ -1374,7 +1374,7 @@ const server = http.createServer(async (req, res) => {
             if(rootStat.isSymbolicLink() || !rootStat.isDirectory()) throw new Error('Небезопасная папка при полной замене: ' + path.relative(ROOT, dir));
             for(const entry of await fs.readdir(dir, { withFileTypes: true })){
               const rel = relative ? path.posix.join(relative, entry.name) : entry.name;
-              if(rootName === 'data' && (rel === 'description-jobs.json' || rel.startsWith('restore-backups/') || rel.endsWith('.tmp'))) continue;
+              if(rootName === 'data' && (rel === 'description-jobs.json' || rel === 'restore-backups' || rel.startsWith('restore-backups/') || rel.endsWith('.tmp'))) continue;
               if(['.git','node_modules','vendor'].includes(entry.name)) continue;
               const abs = path.join(dir, entry.name);
               if(entry.isSymbolicLink()) throw new Error('Символическая ссылка в хранилище: ' + path.relative(ROOT, abs));
