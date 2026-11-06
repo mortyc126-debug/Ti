@@ -24,6 +24,7 @@ test('библиотека: пары кода и паспортов, JSON и ID 
   const langs=(await fs.readdir(LIBRARY,{withFileTypes:true})).filter(x=>x.isDirectory()).map(x=>x.name);
   const ids=new Map(), problems=[], duplicateCodes=new Map(), missingIds=[], languageMismatches=[], rows=[];
   const emptyDescriptions=[], shortDescriptions=[], missingTitles=[], missingGroups=[], missingLangs=[], fileFieldMismatches=[];
+  const missingSchema=[], legacyMetadataFiles=[], legacyWordMaps=[], embeddedCodeMismatches=[];
   const statusCounts={}, descriptionLengthBuckets={empty:0,short:0,medium:0,long:0};
   let codeCount=0, metaCount=0;
   for(const langDir of langs){
@@ -53,7 +54,15 @@ test('библиотека: пары кода и паспортов, JSON и ID 
         if(!title) missingTitles.push(relativeFile);
         if(!group) missingGroups.push(relativeFile);
         if(!meta.lang) missingLangs.push(relativeFile);
+        if(meta.schema!==1) missingSchema.push(relativeFile);
         if(meta.file && meta.file!==path.basename(code)) fileFieldMismatches.push({file:relativeFile,declared:meta.file,actual:path.basename(code)});
+        if(typeof meta.code==='string'){
+          legacyMetadataFiles.push(relativeFile);
+          const embedded=meta.code.replace(/\r\n/g,'\n').trim();
+          const actual=(await fs.readFile(code,'utf8')).replace(/\r\n/g,'\n').trim();
+          if(embedded!==actual) embeddedCodeMismatches.push(relativeFile);
+        }
+        if(meta.words && typeof meta.words==='object' && !Array.isArray(meta.words) && !Array.isArray(meta.wordNotes)) legacyWordMaps.push(relativeFile);
         rows.push({ id:effectiveId, lang:canon(meta.lang || langDir), file:relativeCode });
         if(meta.lang && canon(meta.lang)!==canon(langDir)) languageMismatches.push(relativeFile+' ('+meta.lang+')');
       } else if(CODE_EXT.has(path.extname(file).toLowerCase())){
@@ -79,7 +88,7 @@ test('библиотека: пары кода и паспортов, JSON и ID 
     folderLanguageMismatches:languageMismatches.length,duplicateCodeGroups:dupGroups.length,
     duplicateCodeSamples:dupGroups,duplicateIdGroups,missingIdFiles:missingIds,
     emptyDescriptions,shortDescriptionSamples:shortDescriptions.slice(0,60),descriptionLengthBuckets,statusCounts,
-    missingTitles,missingGroups,missingLangs,fileFieldMismatches,
+    missingTitles,missingGroups,missingLangs,fileFieldMismatches,missingSchema,legacyMetadataFiles,legacyWordMaps,embeddedCodeMismatches,
     problems:problems.length,languageMismatchSamples:languageMismatches.slice(0,8)
   }));
   assert.deepEqual(problems,[]);
