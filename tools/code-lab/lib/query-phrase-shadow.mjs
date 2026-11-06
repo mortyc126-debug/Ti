@@ -39,6 +39,16 @@ function pieceMatchesTarget(targetKey, phrase, piece, usage) {
   if (target === 'str.join(it)' && q.startsWith('join')) {
     return normalize(piece.lang) === 'python' && /\.\s*join\s*\(\s*[^)\s]/i.test(code);
   }
+  if (target === 'float' && q === 'число с плавающей точкой') {
+    return normalize(piece.lang) === 'python';
+  }
+  if (target.startsWith('copy.copy(') && q.startsWith('поверхностная копия')) {
+    return normalize(piece.lang) === 'python' && /\bcopy\.copy\s*\(/i.test(code);
+  }
+  if (target === 'dict.copy()' && q.startsWith('поверхностная копия словаря')) {
+    return normalize(piece.lang) === 'python' && !/\bimport\s+pandas\b|\bpd\.dataframe\b/i.test(code) &&
+      (/\bdict\b/.test(code) || /\{\s*[^}]+:\s*[^}]+\}\s*\.\s*copy\s*\(/i.test(code));
+  }
   return true;
 }
 
