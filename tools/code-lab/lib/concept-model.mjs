@@ -109,12 +109,14 @@ export function validateConceptStore(input, { pieceIds } = {}){
   queryPhrases.forEach((q, i) => {
     const p = 'queryPhrases[' + i + ']';
     if(!q || typeof q !== 'object' || Array.isArray(q)){ fail(p, 'Поисковая фраза должна быть объектом'); return; }
-    const id = text(q.id), phrase = text(q.phrase), target = text(q.targetConceptId);
+    const id = text(q.id), phrase = text(q.phrase), target = text(q.targetConceptId), targetKey = text(q.targetKey);
     if(!id) fail(p + '.id', 'Нужен постоянный ID поисковой фразы');
     else if(phraseIds.has(id)) fail(p + '.id', 'ID поисковой фразы уже используется');
     else phraseIds.add(id);
     if(!phrase) fail(p + '.phrase', 'Поисковая фраза не может быть пустой');
-    if(!byId.has(target)) fail(p + '.targetConceptId', 'Целевое понятие не найдено');
+    if(Boolean(target) === Boolean(targetKey)) fail(p, 'Нужно указать ровно одну цель: targetConceptId или targetKey');
+    if(target && !byId.has(target)) fail(p + '.targetConceptId', 'Целевое понятие не найдено');
+    if(targetKey && targetKey.length > 240) fail(p + '.targetKey', 'Ключ цели слишком длинный');
     for(const field of ['language','scope','note']) if(q[field] != null && typeof q[field] !== 'string') fail(p + '.' + field, 'Поле должно быть строкой');
     if(text(q.language).length > 80) fail(p + '.language', 'Язык слишком длинный');
     if(text(q.scope).length > 120) fail(p + '.scope', 'Контекст слишком длинный');
@@ -122,10 +124,10 @@ export function validateConceptStore(input, { pieceIds } = {}){
     if(q.confidence != null && (!Number.isFinite(q.confidence) || q.confidence < 0 || q.confidence > 1)) fail(p + '.confidence', 'Уверенность должна быть числом от 0 до 1');
     if(q.source != null && (!q.source || typeof q.source !== 'object' || Array.isArray(q.source))) fail(p + '.source', 'Источник должен быть объектом');
     if(q.source && Object.entries(q.source).some(([k,v]) => !['file','key','group','index'].includes(k) || typeof v !== 'string' && typeof v !== 'number')) fail(p + '.source', 'Источник содержит неизвестные или некорректные поля');
-    const key = [norm(phrase), target, norm(q.language), norm(q.scope)].join('|');
+    const key = [norm(phrase), target || 'key:' + targetKey, norm(q.language), norm(q.scope)].join('|');
     if(phrase && target && phraseKeys.has(key)) fail(p, 'Такая поисковая фраза уже связана с понятием в этом контексте');
     phraseKeys.add(key);
-    if(phrase){ if(!phraseOwners.has(norm(phrase))) phraseOwners.set(norm(phrase), new Set()); phraseOwners.get(norm(phrase)).add(target); }
+    if(phrase){ if(!phraseOwners.has(norm(phrase))) phraseOwners.set(norm(phrase), new Set()); phraseOwners.get(norm(phrase)).add(target || 'key:' + targetKey); }
   });
   for(const [phrase, owners] of phraseOwners) if(owners.size > 1) warnings.push({ path: 'queryPhrases', message: 'Фраза «' + phrase + '» ведёт к нескольким понятиям; неоднозначность сохранена' });
   return { valid: errors.length === 0, errors, warnings };
