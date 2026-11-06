@@ -231,6 +231,19 @@ try {
     const zip = Buffer.from(await response.arrayBuffer());
     assert.equal(zip.readUInt32LE(0), 0x04034b50, 'должен скачиваться ZIP-архив');
     assert.ok(zip.includes(Buffer.from('backup-manifest.json')));
+    const zipEntries = new Map();
+    let zipOffset = 0;
+    while(zipOffset + 30 < zip.length && zip.readUInt32LE(zipOffset) === 0x04034b50){
+      const size = zip.readUInt32LE(zipOffset + 18), nameLen = zip.readUInt16LE(zipOffset + 26), extraLen = zip.readUInt16LE(zipOffset + 28);
+      const name = zip.subarray(zipOffset + 30, zipOffset + 30 + nameLen).toString('utf8');
+      const dataStart = zipOffset + 30 + nameLen + extraLen;
+      zipEntries.set(name, zip.subarray(dataStart, dataStart + size));
+      zipOffset = dataStart + size;
+    }
+    assert.equal(zip.readUInt32LE(zipOffset), 0x02014b50, 'после локальных записей должен идти центральный каталог');
+    const manifest = JSON.parse(zipEntries.get('backup-manifest.json').toString('utf8'));
+    assert.equal(manifest.format, 'code-lab-full-backup');
+    assert.ok(manifest.fileCount > 0);
     assert.ok(zip.includes(Buffer.from('library/js/shared.js')));
     assert.ok(zip.includes(Buffer.from('workspace/backup-sample.js')));
     assert.ok(zip.includes(Buffer.from('recipes/')));
