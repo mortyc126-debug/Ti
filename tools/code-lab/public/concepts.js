@@ -179,7 +179,8 @@ async function deleteConcept() {
   try {
     await api('/api/concepts/delete', { method: 'POST', body: JSON.stringify({ id: selectedId }) });
     data.concepts = data.concepts.filter(x => x.id !== selectedId);
-    data.relations = data.relations.filter(x => x.from !== selectedId && x.to !== selectedId);\n    data.queryPhrases = data.queryPhrases.filter(x => x.targetConceptId !== selectedId);
+    data.relations = data.relations.filter(x => x.from !== selectedId && x.to !== selectedId);
+    data.queryPhrases = data.queryPhrases.filter(x => x.targetConceptId !== selectedId);
     newConcept(); await searchList(); message('Понятие удалено.');
   } catch (error) { message(error.message, true); }
 }
