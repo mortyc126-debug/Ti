@@ -88,3 +88,29 @@ test('migrateTemplates skips duplicate code and reports the existing library fil
     await fs.rm(f.root, { recursive: true, force: true });
   }
 });
+
+test('migrateTemplates reports a same-ID code conflict without overwriting the library file', async () => {
+  const f = await fixture();
+  try {
+    await fs.mkdir(path.join(f.out, 'js'), { recursive: true });
+    const target = path.join(f.out, 'js', 'dom-example.js');
+    await fs.writeFile(target, 'const value=2;', 'utf8');
+    await fs.writeFile(target + '.meta.json', JSON.stringify({ id: 'dom-example', title: 'Существующая запись' }), 'utf8');
+    const report = await migrateTemplates({ src: f.src, out: f.out, dictPath: null });
+    assert.equal(report.created, 0);
+    assert.equal(report.skippedExisting, 1);
+    assert.equal(report.codeConflicts.length, 1);
+    assert.deepEqual(report.codeConflicts[0], {
+      file: 'dom-example.json',
+      id: 'dom-example',
+      codeFile: 'js/dom-example.js',
+      templateLength: 'const value=1;'.length,
+      existingLength: 'const value=2;'.length
+    });
+    assert.equal(await fs.readFile(target, 'utf8'), 'const value=2;');
+    const savedReport = JSON.parse(await fs.readFile(path.join(f.out, '_migration-report.json'), 'utf8'));
+    assert.equal(savedReport.codeConflicts.length, 1);
+  } finally {
+    await fs.rm(f.root, { recursive: true, force: true });
+  }
+});
