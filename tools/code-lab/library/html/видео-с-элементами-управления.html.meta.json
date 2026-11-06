@@ -9,5 +9,38 @@
     "video": "Встраивает видеоплеер.",
     "poster": "Задаёт изображение, которое показывается до запуска видео.",
     "video/mp4": "MIME-тип видеофайла MP4."
-  }
+  },
+  "schema": 1,
+  "id": "видео-с-элементами-управления",
+  "file": "видео-с-элементами-управления.html",
+  "status": "active",
+  "tags": [],
+  "aliases": [],
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "video",
+      "kind": "name",
+      "note": "Встраивает видеоплеер.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 28,
+      "text": "poster",
+      "kind": "name",
+      "note": "Задаёт изображение, которое показывается до запуска видео.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "video",
+      "kind": "name",
+      "note": "Встраивает видеоплеер.",
+      "source": "custom"
+    }
+  ],
+  "legacyFormat": "html-words-map"
 }

@@ -9,5 +9,46 @@
     "iframe": "Встраивает другой документ в текущую страницу.",
     "title": "Задаёт текстовое название встроенной области.",
     "height": "Задаёт высоту области."
-  }
+  },
+  "schema": 1,
+  "id": "встраивание-внешней-страницы",
+  "file": "встраивание-внешней-страницы.html",
+  "status": "active",
+  "tags": [],
+  "aliases": [],
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "iframe",
+      "kind": "name",
+      "note": "Встраивает другой документ в текущую страницу.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "title",
+      "kind": "name",
+      "note": "Задаёт текстовое название встроенной области.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "height",
+      "kind": "name",
+      "note": "Задаёт высоту области.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "iframe",
+      "kind": "name",
+      "note": "Встраивает другой документ в текущую страницу.",
+      "source": "custom"
+    }
+  ],
+  "legacyFormat": "html-words-map"
 }

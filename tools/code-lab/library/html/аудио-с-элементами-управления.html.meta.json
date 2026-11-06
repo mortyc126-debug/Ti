@@ -11,5 +11,54 @@
     "source": "Указывает альтернативный источник медиафайла.",
     "type": "Объявляет MIME-тип ресурса.",
     "audio/mpeg": "MIME-тип аудиофайла MP3."
-  }
+  },
+  "schema": 1,
+  "id": "аудио-с-элементами-управления",
+  "file": "аудио-с-элементами-управления.html",
+  "status": "active",
+  "tags": [],
+  "aliases": [],
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "audio",
+      "kind": "name",
+      "note": "Встраивает аудиоплеер.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 7,
+      "text": "controls",
+      "kind": "name",
+      "note": "Показывает встроенные элементы управления воспроизведением.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 3,
+      "text": "source",
+      "kind": "name",
+      "note": "Указывает альтернативный источник медиафайла.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 33,
+      "text": "type",
+      "kind": "name",
+      "note": "Объявляет MIME-тип ресурса.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "audio",
+      "kind": "name",
+      "note": "Встраивает аудиоплеер.",
+      "source": "custom"
+    }
+  ],
+  "legacyFormat": "html-words-map"
 }

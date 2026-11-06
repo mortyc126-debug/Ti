@@ -8,5 +8,78 @@
   "words": {
     "select": "Создаёт раскрывающийся список вариантов.",
     "option": "Задаёт отдельный вариант выбора."
-  }
+  },
+  "schema": 1,
+  "id": "выпадающий-список",
+  "file": "выпадающий-список.html",
+  "status": "active",
+  "tags": [],
+  "aliases": [],
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 1,
+      "text": "select",
+      "kind": "name",
+      "note": "Создаёт раскрывающийся список вариантов.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 3,
+      "text": "option",
+      "kind": "name",
+      "note": "Задаёт отдельный вариант выбора.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 31,
+      "text": "option",
+      "kind": "name",
+      "note": "Задаёт отдельный вариант выбора.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 3,
+      "text": "option",
+      "kind": "name",
+      "note": "Задаёт отдельный вариант выбора.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 34,
+      "text": "option",
+      "kind": "name",
+      "note": "Задаёт отдельный вариант выбора.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 3,
+      "text": "option",
+      "kind": "name",
+      "note": "Задаёт отдельный вариант выбора.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 34,
+      "text": "option",
+      "kind": "name",
+      "note": "Задаёт отдельный вариант выбора.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "select",
+      "kind": "name",
+      "note": "Создаёт раскрывающийся список вариантов.",
+      "source": "custom"
+    }
+  ],
+  "legacyFormat": "html-words-map"
 }

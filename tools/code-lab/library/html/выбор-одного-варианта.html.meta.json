@@ -10,5 +10,62 @@
     "legend": "Задаёт заголовок группы fieldset.",
     "radio": "Создаёт переключатель для выбора одного варианта в группе.",
     "value": "Задаёт значение, отправляемое для выбранного поля."
-  }
+  },
+  "schema": 1,
+  "id": "выбор-одного-варианта",
+  "file": "выбор-одного-варианта.html",
+  "status": "active",
+  "tags": [],
+  "aliases": [],
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "fieldset",
+      "kind": "name",
+      "note": "Группирует связанные элементы формы.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 3,
+      "text": "legend",
+      "kind": "name",
+      "note": "Задаёт заголовок группы fieldset.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 25,
+      "text": "legend",
+      "kind": "name",
+      "note": "Задаёт заголовок группы fieldset.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 43,
+      "text": "value",
+      "kind": "name",
+      "note": "Задаёт значение, отправляемое для выбранного поля.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 43,
+      "text": "value",
+      "kind": "name",
+      "note": "Задаёт значение, отправляемое для выбранного поля.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "fieldset",
+      "kind": "name",
+      "note": "Группирует связанные элементы формы.",
+      "source": "custom"
+    }
+  ],
+  "legacyFormat": "html-words-map"
 }

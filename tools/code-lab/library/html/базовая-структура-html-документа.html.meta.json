@@ -13,5 +13,102 @@
     "meta charset": "Задаёт кодировку символов.",
     "title": "Задаёт название страницы во вкладке браузера.",
     "body": "Содержит видимое содержимое страницы."
-  }
+  },
+  "schema": 1,
+  "id": "базовая-структура-html-документа",
+  "file": "базовая-структура-html-документа.html",
+  "status": "active",
+  "tags": [],
+  "aliases": [],
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 2,
+      "text": "doctype",
+      "kind": "name",
+      "note": "Объявляет тип документа и включает стандартный режим отображения.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 10,
+      "text": "html",
+      "kind": "name",
+      "note": "Корневой элемент HTML-документа.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 1,
+      "text": "html",
+      "kind": "name",
+      "note": "Корневой элемент HTML-документа.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 6,
+      "text": "lang",
+      "kind": "name",
+      "note": "Указывает язык содержимого документа.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 1,
+      "text": "head",
+      "kind": "name",
+      "note": "Содержит служебные сведения о странице.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 3,
+      "text": "title",
+      "kind": "name",
+      "note": "Задаёт название страницы во вкладке браузера.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 23,
+      "text": "title",
+      "kind": "name",
+      "note": "Задаёт название страницы во вкладке браузера.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "head",
+      "kind": "name",
+      "note": "Содержит служебные сведения о странице.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 1,
+      "text": "body",
+      "kind": "name",
+      "note": "Содержит видимое содержимое страницы.",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "body",
+      "kind": "name",
+      "note": "Содержит видимое содержимое страницы.",
+      "source": "custom"
+    },
+    {
+      "line": 9,
+      "col": 2,
+      "text": "html",
+      "kind": "name",
+      "note": "Корневой элемент HTML-документа.",
+      "source": "custom"
+    }
+  ],
+  "legacyFormat": "html-words-map"
 }

@@ -8,5 +8,62 @@
   "words": {
     "time": "Обозначает дату, время или длительность.",
     "datetime": "Задаёт машинно-читаемое значение даты или времени."
-  }
+  },
+  "schema": 1,
+  "id": "дата-и-время",
+  "file": "дата-и-время.html",
+  "status": "active",
+  "tags": [],
+  "aliases": [],
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 22,
+      "text": "time",
+      "kind": "name",
+      "note": "Обозначает дату, время или длительность.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 27,
+      "text": "datetime",
+      "kind": "name",
+      "note": "Задаёт машинно-читаемое значение даты или времени.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 69,
+      "text": "time",
+      "kind": "name",
+      "note": "Обозначает дату, время или длительность.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 20,
+      "text": "time",
+      "kind": "name",
+      "note": "Обозначает дату, время или длительность.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 25,
+      "text": "datetime",
+      "kind": "name",
+      "note": "Задаёт машинно-читаемое значение даты или времени.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 49,
+      "text": "time",
+      "kind": "name",
+      "note": "Обозначает дату, время или длительность.",
+      "source": "custom"
+    }
+  ],
+  "legacyFormat": "html-words-map"
 }
