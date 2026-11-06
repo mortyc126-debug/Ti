@@ -66,12 +66,22 @@ export function createTaskStore({ root, rows, slug, createPiece, similarPieces }
     const byTitle = new Map(), byNorm = new Map();
     const put = (m, k, r) => { if(!k) return; const a = m.get(k) || []; a.push(r); m.set(k, a); };
     for(const r of all){ put(byTitle, String(r.title || '').trim().toLowerCase(), r); put(byNorm, norm(r.title), r); }
-    const pick = arr => !arr || !arr.length ? null : (arr.find(r => r.lang === lang) || arr[0]);
+    const pick = arr => {
+      if(!arr || !arr.length) return { hit: null, ambiguous: false, candidates: [] };
+      const same = arr.filter(r => canonLang(r.lang) === canonLang(lang));
+      const pool = same.length ? same : arr;
+      return pool.length === 1
+        ? { hit: pool[0], ambiguous: false, candidates: pool }
+        : { hit: null, ambiguous: true, candidates: pool };
+    };
     return ref => {
-      let s = String(ref || '').trim(); if(!s) return null;
-      const mid = s.match(/^id\s*:\s*(.+)$/i); if(mid) s = mid[1].trim();
-      if(byId.has(s)) return byId.get(s);
-      return pick(byTitle.get(s.toLowerCase())) || pick(byNorm.get(norm(s)));
+      const raw = String(ref || '').trim(); if(!raw) return { hit: null, ambiguous: false, candidates: [] };
+      const mid = raw.match(/^id\s*:\s*(.+)$/i);
+      if(mid){ const id = mid[1].trim(); return { hit: byId.get(id) || null, ambiguous: false, candidates: [] }; }
+      if(byId.has(raw)) return { hit: byId.get(raw), ambiguous: false, candidates: [] };
+      const exact = pick(byTitle.get(raw.toLowerCase()));
+      if(exact.hit || exact.ambiguous) return exact;
+      return pick(byNorm.get(norm(raw)));
     };
   }
 
@@ -97,26 +107,54 @@ export function createTaskStore({ root, rows, slug, createPiece, similarPieces }
     const all = await rows();
     const findPiece = pieceResolver(all, task.lang);
     const tIndex = tasksIndex || await list();
-    const tById = new Map(tIndex.map(t => [t.id, t])), tByNorm = new Map(tIndex.map(t => [norm(t.title), t]));
+    const tById = new Map(tIndex.map(t => [t.id, t])), tByNorm = new Map();
+    for(const t of tIndex){ const key = norm(t.title); if(!tByNorm.has(key)) tByNorm.set(key, []); tByNorm.get(key).push(t); }
+    const pickTask = ref => {
+      const raw = String(ref || '').replace(/^id\s*:\s*/i, '').trim();
+      const arr = tByNorm.get(norm(raw)) || [];
+      const same = arr.filter(t => canonLang(t.lang) === canonLang(task.lang));
+      const pool = same.length ? same : arr;
+      return pool.length === 1 ? { hit: pool[0], ambiguous: false, candidates: pool } : { hit: null, ambiguous: pool.length > 1, candidates: pool };
+    };
     const report = { linked: 0, created: 0, unresolved: [] };
     const jobs = [];
     TaskFormat.eachOption(task.steps, o => jobs.push(o));
     for(const o of jobs){
       if(o.kind === 'piece'){
-        const hit = (o.id && all.find(r => r.id === o.id)) || findPiece(o.ref);
-        // ИИ часто пишет «кусок:» с названием ЗАДАЧИ — точное совпадение с задачей превращаем в ссылку на неё
-        const asTask = !hit && tByNorm.get(norm(String(o.ref || '').replace(/^id\s*:\s*/i, '')));
+        const explicit = o.id && all.find(r => r.id === o.id);
+        const pieceMatch = explicit ? { hit: explicit, ambiguous: false, candidates: [] } : findPiece(o.ref);
+        const hit = pieceMatch.hit;
+        const taskMatch = !hit && !pieceMatch.ambiguous ? pickTask(o.ref) : { hit: null, ambiguous: false, candidates: [] };
         if(hit){ o.id = hit.id; o.ref = hit.title || hit.id; report.linked++; }
-        else if(asTask && asTask.id !== task.id){ o.kind = 'task'; o.id = asTask.id; o.ref = asTask.title; report.linked++; report.converted = (report.converted || 0) + 1; }
-        else { o.id = ''; report.unresolved.push({ kind: 'piece', ref: o.ref, label: o.label,
-          candidates: taskCandidates(o.ref, tIndex.filter(t => t.id !== task.id)).map(c => ({ ...c, kind: 'task' })).slice(0, 2).concat(await pieceCandidates(o.ref, task.lang)).slice(0, 4) }); }
+        else if(taskMatch.hit && taskMatch.hit.id !== task.id){
+          o.kind = 'task'; o.id = taskMatch.hit.id; o.ref = taskMatch.hit.title;
+          report.linked++; report.converted = (report.converted || 0) + 1;
+        } else {
+          o.id = '';
+          const exactCandidates = [
+            ...pieceMatch.candidates.map(c => ({ id: c.id, title: c.title, lang: c.lang, kind: 'piece' })),
+            ...taskMatch.candidates.filter(c => c.id !== task.id).map(c => ({ id: c.id, title: c.title, lang: c.lang, kind: 'task' }))
+          ];
+          const fuzzy = exactCandidates.length ? [] : taskCandidates(o.ref, tIndex.filter(t => t.id !== task.id)).map(c => ({ ...c, kind: 'task' })).slice(0, 2).concat(await pieceCandidates(o.ref, task.lang));
+          report.unresolved.push({ kind: 'piece', ref: o.ref, label: o.label, ambiguous: !!(pieceMatch.ambiguous || taskMatch.ambiguous), candidates: exactCandidates.concat(fuzzy).slice(0, 4) });
+        }
       } else if(o.kind === 'task'){
-        const s = String(o.ref || '').replace(/^id\s*:\s*/i, '').trim();
-        const hit = tById.get(o.id) || tById.get(s) || tByNorm.get(norm(s));
-        if(hit && hit.id !== task.id){ o.id = hit.id; o.ref = hit.title; report.linked++; }
-        else { o.id = ''; report.unresolved.push({ kind: 'task', ref: o.ref, label: o.label, candidates: taskCandidates(s, tIndex.filter(t => t.id !== task.id)).map(c => ({ ...c, kind: 'task' })) }); }
+        const raw = String(o.ref || '').trim();
+        const idRef = raw.match(/^id\s*:\s*(.+)$/i);
+        const explicit = tById.get(o.id) || (idRef ? tById.get(idRef[1].trim()) : null);
+        let hit = explicit && explicit.id !== task.id ? explicit : null;
+        let match = { ambiguous: false, candidates: [] };
+        if(!hit && !idRef){
+          match = pickTask(raw);
+          if(match.hit && match.hit.id !== task.id) hit = match.hit;
+        }
+        if(hit){ o.id = hit.id; o.ref = hit.title; report.linked++; }
+        else {
+          o.id = '';
+          const candidates = match.candidates.filter(t => t.id !== task.id).map(t => ({ id: t.id, title: t.title, kind: 'task' }));
+          report.unresolved.push({ kind: 'task', ref: o.ref, label: o.label, ambiguous: !!match.ambiguous, candidates: candidates.length ? candidates : taskCandidates(raw, tIndex.filter(t => t.id !== task.id)).map(c => ({ ...c, kind: 'task' })) });
+        }
       }
-      // вариант «код» остаётся внутри задачи: раньше он становился куском «Задача: вариант» и засорял библиотеку
     }
     return report;
   }
