@@ -371,9 +371,20 @@ function codeContract(code, lang){
 }
 const _CONTRACT_LANGS = new Set(['js', 'ts', 'html', 'svg', 'css', 'python', 'sql']);
 
+let _slugCounter = 0;
 function slug(s){
   const base = String(s || 'tpl').toLowerCase().replace(/[^\wа-яё]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'tpl';
-  return base + '-' + Date.now().toString(36);
+  _slugCounter++;
+  return base + '-' + Date.now().toString(36) + '-' + _slugCounter.toString(36) + '-' + Math.random().toString(36).slice(2, 7);
+}
+async function uniqueFileId(dir, name){
+  await fs.mkdir(dir, { recursive: true });
+  for(let attempt = 0; attempt < 100; attempt++){
+    const id = slug(name);
+    try { await fs.access(path.join(dir, id + '.json')); }
+    catch(e){ if(e.code === 'ENOENT') return id; throw e; }
+  }
+  throw new Error('Не удалось подобрать свободный ID для: ' + String(name || 'запись'));
 }
 
 // что из 8 граней описано/видно у куска — для колонки «описано» в Описи
