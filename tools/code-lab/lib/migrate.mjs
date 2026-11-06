@@ -73,7 +73,7 @@ export async function migrateTemplates({ src, out, dictPath, dry = false, force 
   const dict = dictPath ? await fs.readFile(dictPath, 'utf8').then(JSON.parse).catch(() => null) : null;
   const inDict = buildDictLookup(dict);
 
-  const report = { src, out, dry, total: names.length, created: 0, skippedExisting: 0, skippedDuplicate: 0, duplicateContent: [], errors: [], byLang: {}, notes: { dict: 0, custom: 0 }, emptyDesc: [], withComponent: 0, groupsRemapped: 0, groupMoves: {} };
+  const report = { src, out, dry, total: names.length, created: 0, skippedExisting: 0, skippedDuplicate: 0, duplicateContent: [], codeConflicts: [], errors: [], byLang: {}, notes: { dict: 0, custom: 0 }, emptyDesc: [], withComponent: 0, groupsRemapped: 0, groupMoves: {} };
   let groupRules = [];
   try { const sections = JSON.parse(await fs.readFile(path.join(out, '_sections.json'), 'utf8')); groupRules = parseRules(sections.rules || []).rules; } catch(_) {}
   const usedPaths = new Map(); // нижний регистр пути → id (коллизии на Windows/macOS)
@@ -95,9 +95,22 @@ export async function migrateTemplates({ src, out, dictPath, dry = false, force 
 
     const codeFile = path.join(out, rel);
     const metaFile = codeFile + '.meta.json';
-    if(!force && (await exists(codeFile) || await exists(metaFile))){ report.skippedExisting++; continue; }
-
     const code = codeFromLines(j.lines);
+    if(!force){
+      const hasCode = await exists(codeFile), hasMeta = await exists(metaFile);
+      if(hasCode || hasMeta){
+        if(hasCode){
+          const existingCode = await fs.readFile(codeFile, 'utf8');
+          if(normalizeCode(existingCode)!==normalizeCode(code)){
+            report.codeConflicts.push({ file:name, id, codeFile:path.relative(out,codeFile).split(path.sep).join('/'), templateLength:normalizeCode(code).length, existingLength:normalizeCode(existingCode).length });
+          }
+        }else{
+          report.errors.push({ file:name, error:'есть паспорт без файла кода: '+path.relative(out,metaFile).split(path.sep).join('/') });
+        }
+        report.skippedExisting++;
+        continue;
+      }
+    }
     const codeKey = safeName(lang) + '\\u0000' + normalizeCode(code);
     const duplicateFiles = existingCodes.get(codeKey) || [];
     if(!force && duplicateFiles.length){
@@ -151,7 +164,7 @@ export async function migrateTemplates({ src, out, dictPath, dry = false, force 
     existingCodes.get(codeKey).push(rel.split(path.sep).join('/'));
   }
 
-  if(!dry && (report.created || report.skippedDuplicate)){
+  if(!dry && (report.created || report.skippedDuplicate || report.codeConflicts.length || report.errors.length)){
     await fs.mkdir(out, { recursive: true });
     await fs.writeFile(path.join(out, '_migration-report.json'), JSON.stringify(report, null, 2) + '\n', 'utf8');
   }
