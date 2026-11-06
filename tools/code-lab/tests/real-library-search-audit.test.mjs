@@ -67,7 +67,7 @@ async function main() {
     'объявить переменную': ['const', 'let', 'var'],
     'объявить константу': ['const'],
     'функция с именем': ['function', 'def'],
-    'пройти по массиву': ['for', 'for...of', 'foreach'],
+    'пройти по массиву': ['for', 'foreach'],
     'условие иначе': ['else'],
     'список Python': ['list'],
     'словарь Python': ['dict'],
