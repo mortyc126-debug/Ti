@@ -44,6 +44,14 @@ async function assertSafeTarget(fs, root, target){
   return targetStat;
 }
 
+async function hasSafeMarker(fs, dir, name){
+  const marker = path.join(dir, name);
+  const stat = await fs.lstat(marker).catch(error => isMissing(error) ? null : Promise.reject(error));
+  if(!stat) return false;
+  if(stat.isSymbolicLink() || !stat.isFile()) throw new Error('Небезопасный маркер транзакции: ' + marker);
+  return true;
+}
+
 async function writeAtomicNewFile(fs, target, content){
   const temp = path.join(path.dirname(target), '.restore-journal-' + randomUUID() + '.tmp');
   try {
@@ -142,9 +150,10 @@ export async function recoverRestoreTransactions({ fs = defaultFs, backupDir, ro
     if(!manifestStat) continue; // процесс мог упасть во время подготовки копий, до начала изменений
     if(manifestStat.isSymbolicLink() || !manifestStat.isFile()) throw new Error('Небезопасный манифест восстановления: ' + entry.name);
     const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
-    if(manifest?.format !== 'code-lab-restore-transaction' || manifest.version !== 2) continue; // старые пользовательские backup-манифесты
-    if(await fs.lstat(path.join(transactionDir, 'COMMITTED')).then(st => st.isFile() && !st.isSymbolicLink()).catch(error => isMissing(error) ? false : Promise.reject(error))) continue;
-    if(await fs.lstat(path.join(transactionDir, 'ROLLED_BACK')).then(st => st.isFile() && !st.isSymbolicLink()).catch(error => isMissing(error) ? false : Promise.reject(error))) continue;
+    if(manifest?.format == null && manifest?.version == null) continue; // старые пользовательские backup-манифесты
+    if(manifest?.format !== 'code-lab-restore-transaction' || manifest.version !== 2) throw new Error('Неподдерживаемый формат журнала восстановления: ' + entry.name);
+    if(await hasSafeMarker(fs, transactionDir, 'COMMITTED')) continue;
+    if(await hasSafeMarker(fs, transactionDir, 'ROLLED_BACK')) continue;
     const root = roots?.[manifest.root];
     if(!root || !Array.isArray(manifest.operations)) throw new Error('Журнал восстановления содержит неизвестный корень или список операций: ' + entry.name);
     const operations = manifest.operations;
