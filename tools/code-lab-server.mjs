@@ -900,6 +900,7 @@ const server = http.createServer(async (req, res) => {
       const metas = archiveFiles.filter(f => /\\.meta\\.json$/i.test(f.archivePath));
       const codes = archiveFiles.filter(f => !/\\.meta\\.json$/i.test(f.archivePath));
       const codeByPath = new Map(codes.map(c => [c.key, c]));
+      let pairs = 0;
       const consumed = new Set(), destinations = new Set(), writes = [];
       const metaOnlyList = [], codeOnlyList = [], badMeta = [];
       const addWrite = (archivePath, langValue, text, kind) => {
@@ -978,9 +979,8 @@ const server = http.createServer(async (req, res) => {
         return json(res, 500, { ok: false, error: String(e?.message || e), backupId: backups.size ? backupId : null, rollbackErrors });
       }
 
-      let pairs = 0, wroteCode = 0, wroteMeta = 0;
+      let wroteCode = 0, wroteMeta = 0;
       for(const op of writes){ if(op.kind === 'code') wroteCode++; else wroteMeta++; }
-      pairs = metas.length - metaOnlyList.length - badMeta.length;
       try { await store.refresh(); } catch(_){}
       return json(res, 200, { ok: true, pairs, metaOnly: metaOnlyList.length, codeOnly: codeOnlyList.length, wroteCode, wroteMeta,
         overwritten: backups.size, backupId: backups.size ? backupId : null,
