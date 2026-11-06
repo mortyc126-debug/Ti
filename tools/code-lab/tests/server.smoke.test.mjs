@@ -416,6 +416,46 @@ try {
     assert.equal((await fetch(base + '/')).status, 200);
     const g = await get('/api/git/info'); assert.ok('templates' in g && g.templates >= 3);
   });
+
+  await test('полная замена библиотеки удаляет лишнее только после резервирования', async () => {
+    const meta = JSON.stringify({ schema: 1, id: 'final-library-only', lang: 'js', title: 'Финальный кусок', group: 'Тест', desc: 'Проверка полной замены', tags: [], aliases: [] });
+    const result = await post('/api/library/restore', { mode: 'replace', files: [
+      { name: 'library/js/final-only.js', text: 'const finalOnly = true;' },
+      { name: 'library/js/final-only.js.meta.json', text: meta }
+    ] });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.mode, 'replace');
+    assert.ok(result.deleted > 0);
+    assert.equal(await fs.readFile(path.join(L, 'library', 'js', 'final-only.js'), 'utf8'), 'const finalOnly = true;');
+    await assert.rejects(fs.access(path.join(L, 'library', 'css', 'css-bold.css')));
+    assert.ok(result.backupId);
+    assert.equal(await fs.readFile(path.join(L, 'data', 'restore-backups', result.backupId, 'css', 'css-bold.css'), 'utf8').then(() => true), true);
+  });
+
+  await test('полная замена остальных хранилищ сохраняет служебные данные и резервирует удалённое', async () => {
+    const workspace = path.join(L, 'workspace');
+    await fs.mkdir(workspace, { recursive: true });
+    await fs.writeFile(path.join(workspace, 'stale.txt'), 'old workspace');
+    await fs.mkdir(path.join(L, 'data', 'restore-backups', 'manual'), { recursive: true });
+    await fs.writeFile(path.join(L, 'data', 'restore-backups', 'manual', 'keep.txt'), 'keep backup');
+    await fs.writeFile(path.join(L, 'data', 'description-jobs.json'), JSON.stringify({ keep: true }));
+    await fs.writeFile(path.join(L, 'data', 'stale.json'), JSON.stringify({ old: true }));
+    const result = await post('/api/backup/restore', { mode: 'replace', files: [
+      { name: 'workspace/current.txt', text: 'new workspace' },
+      { name: 'tasks/final.json', text: JSON.stringify({ id: 'final', title: 'Финальная задача' }) }
+    ] });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.mode, 'replace');
+    assert.equal(await fs.readFile(path.join(workspace, 'current.txt'), 'utf8'), 'new workspace');
+    await assert.rejects(fs.access(path.join(workspace, 'stale.txt')));
+    await assert.rejects(fs.access(path.join(L, 'data', 'stale.json')));
+    assert.equal(await fs.readFile(path.join(L, 'data', 'restore-backups', 'manual', 'keep.txt'), 'utf8'), 'keep backup');
+    assert.deepEqual(JSON.parse(await fs.readFile(path.join(L, 'data', 'description-jobs.json'), 'utf8')), { keep: true });
+    assert.ok(result.backupId);
+    assert.equal(await fs.readFile(path.join(L, 'data', 'restore-backups', result.backupId, 'workspace', 'stale.txt'), 'utf8'), 'old workspace');
+    assert.equal(await fs.readFile(path.join(L, 'data', 'restore-backups', result.backupId, 'data', 'stale.json'), 'utf8'), JSON.stringify({ old: true }));
+  });
+
 } finally {
   srv.kill();
   await fs.rm(tmp, { recursive: true, force: true });
