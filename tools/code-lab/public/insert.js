@@ -210,6 +210,7 @@
   }
 
   async function show(ed, force){
+    clearTimeout(timer); cancelVariantRequest();
     const c = wordCtx(ed, force);
     // внутри HTML-тега — его атрибуты и их значения (правила структуры), даже без набранных букв
     const tc = /^(html|htm|svg|xml)$/i.test((ed && ed.__f && ed.__f.lang) || '') && tagCtx(ed);   // при выделенном «…» wordCtx пуст — тег смотрим сами
