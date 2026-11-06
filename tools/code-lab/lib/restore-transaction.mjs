@@ -10,7 +10,7 @@ async function removeIfPresent(fs, target){
 }
 
 function safeRelative(value){
-  if(typeof value !== 'string' || !value || value.includes('\\0') || value.includes('\\\\')) return false;
+  if(typeof value !== 'string' || !value || value.includes('\0') || value.includes('\\')) return false;
   if(path.posix.isAbsolute(value) || /^[a-z]:/i.test(value)) return false;
   const parts = value.split('/');
   return parts.every(part => part && part !== '.' && part !== '..');
