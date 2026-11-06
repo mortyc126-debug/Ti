@@ -61,6 +61,16 @@ try {
     assert.equal(nw.obj.created, true); assert.equal(await fs.readFile(path.join(proj, 'глубоко', 'в', 'папке', 'new.py'), 'utf8'), 'print(1)\n');
   });
 
+  await test('параллельные сохранения не делят один временный файл', async () => {
+    const results = await Promise.all(Array.from({ length: 12 }, (_, i) =>
+      call('POST', '/api/ws/save', { path: 'parallel.txt', text: 'версия-' + i })
+    ));
+    assert.equal(results.filter(r => r.code === 200).length, 12);
+    assert.match(await fs.readFile(path.join(proj, 'parallel.txt'), 'utf8'), /^версия-\d+$/);
+    const leftovers = (await fs.readdir(proj)).filter(n => n.startsWith('parallel.txt.') && n.endsWith('.tmp'));
+    assert.deepEqual(leftovers, []);
+  });
+
   await test('конфликт: файл изменён снаружи → 409, без force не пишем, с force пишем', async () => {
     const a = (await call('GET', '/api/ws/file?path=a.css')).obj;
     const later = new Date(Date.now() + 10000); await fs.writeFile(path.join(proj, 'a.css'), 'внешняя правка\n'); await fs.utimes(path.join(proj, 'a.css'), later, later);
