@@ -31,7 +31,7 @@ assert.equal(outside.hits.some(x => x.targetKey === 'padding'), false);
 
 const ambiguous = index.search('отступ');
 assert.deepEqual(new Set(ambiguous.hits.map(x => x.targetKey)), new Set(['padding', 'margin']));
-assert.equal(ambiguous.ambiguous, 1);
+assert.equal(ambiguous.ambiguous, true);
 
 assert.equal(index.search('   ').total, 0);
 console.log('query-phrase-shadow: isolated index tests passed');
