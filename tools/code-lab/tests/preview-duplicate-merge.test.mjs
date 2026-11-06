@@ -13,7 +13,7 @@ try {
   const code = 'const value = 1;\n';
   const hash = crypto.createHash('sha256').update(code.trim()).digest('hex');
   const first = { id: 'legacy-piece-mvr123abc', title: 'Коротко', desc: 'Коротко.', tags: ['старый-тег'], aliases: ['старый-вариант'], component: { provides: ['a'] }, source: { desc: 'imported' }, wordNotes: [{ line: 0, col: 6, text: 'value', kind: 'name', note: 'Значение.', source: 'custom' }, { line: 0, col: 0, text: 'const', kind: 'concept', note: 'Понятие.', source: '' }] };
-  const second = { id: 'canonical-piece', title: 'Пример', desc: 'Подробное описание конструкции.', tags: ['канонический-тег'], aliases: ['пример'], component: { requires: ['b'] }, source: { desc: 'manual' }, wordNotes: [{ line: 0, col: 6, text: 'value', kind: 'name', note: 'Значение.', source: 'dict' }], extraField: { keep: true } };
+  const second = { id: 'canonical-piece', title: 'Пример', desc: 'Подробное описание конструкции.', tags: ['канонический-тег'], aliases: ['пример'], component: null, source: { desc: 'manual' }, wordNotes: [{ line: 0, col: 6, text: 'value', kind: 'name', note: 'Значение.', source: 'dict' }], extraField: { keep: true } };
   await fs.writeFile(path.join(library, 'js', 'legacy-piece-mvr123abc.js'), code);
   await fs.writeFile(path.join(library, 'js', 'legacy-piece-mvr123abc.js.meta.json'), JSON.stringify(first));
   await fs.writeFile(path.join(library, 'js', 'canonical-piece.js'), code);
@@ -31,6 +31,7 @@ try {
   assert.equal(preview.summary.verifiedCodePairs, 1);
   assert.equal(pair.candidatePassport.id, 'canonical-piece');
   assert.equal(pair.candidatePassport.desc, 'Подробное описание конструкции.');
+  assert.deepEqual(pair.candidatePassport.component, { provides: ['a'] });
   assert.deepEqual(pair.candidatePassport.tags, ['канонический-тег', 'старый-тег']);
   assert.deepEqual(pair.candidatePassport.aliases, ['пример', 'старый-вариант']);
   assert.equal(pair.review.conceptNotes.length, 1);
@@ -44,7 +45,7 @@ try {
   const changedRun = spawnSync(process.execPath, [scriptPath, library, manifestPath, outputPath], { encoding: 'utf8' });
   assert.notEqual(changedRun.status, 0);
   assert.match(changedRun.stderr + changedRun.stdout, /Код изменился после аудита/);
-  console.log('preview-duplicate-merge: 14 checks passed');
+  console.log('preview-duplicate-merge: 15 checks passed');
 } finally {
   await fs.rm(tmp, { recursive: true, force: true });
 }
