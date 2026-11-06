@@ -27,8 +27,13 @@ function pieceMatchesTarget(targetKey, phrase, piece, usage) {
 
   // Ключи вроде display/open/join встречаются в посторонних конструкциях.
   // Здесь оставляем только тот синтаксический смысл, который описывает фраза.
-  if (target === 'display' && q === 'скрыть элемент') return /\bdisplay\s*:\s*none\b/i.test(code);
-  if (target === 'visibility' && q === 'скрыть но оставить место') return /\bvisibility\s*:\s*hidden\b/i.test(code);
+  if (target === 'display' && (q === 'скрыть элемент' || q === 'скрыть элемент из потока')) return /\bdisplay\s*:\s*none\b/i.test(code);
+  if (target === 'visibility' && (q === 'скрыть но оставить место' || q === 'спрятать элемент, сохранив место')) return /\bvisibility\s*:\s*hidden\b/i.test(code);
+  if (target === 'float' && q === 'обтекание изображения текстом') return normalize(piece.lang) === 'css' && /\bfloat\s*:/i.test(code);
+  if (target === '@media' && q === 'медиазапрос для телефона') return /@media\s*\([^)]*(?:max-width|width\s*[<>=])/i.test(code);
+  if (target === 'parse' && q === 'разобрать json') return /\bJSON\s*\.\s*parse\s*\(/i.test(code);
+  if (target === 'stringify' && q === 'сериализовать в json') return /\bJSON\s*\.\s*stringify\s*\(/i.test(code);
+  if (target === 'addeventlistener' && q === 'подписаться на клик') return /\baddEventListener\s*\(\s*['"]click['"]/i.test(code);
   if (target === 'max-width' && q === 'ограничить ширину') return /(?<!\()\bmax-width\s*:/i.test(code);
   if (target === 'open' && q.startsWith('открыть файл')) {
     return normalize(piece.lang) === 'python' && /\bopen\s*\(/i.test(code);
