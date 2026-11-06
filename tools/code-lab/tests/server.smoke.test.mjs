@@ -132,6 +132,34 @@ try {
     assert.equal((await get('/api/template?id=' + encodeURIComponent(py.id))).lang, 'python');
   });
 
+  await test('восстановление архива сохраняет пути и резервирует перезаписи', async () => {
+    const oldMeta = { schema: 1, id: 'restore-js-shared', lang: 'js', title: 'Старый JS', group: 'Тест', desc: 'старый файл', tags: [], aliases: [] };
+    await fs.mkdir(path.join(L, 'library', 'js'), { recursive: true });
+    await fs.writeFile(path.join(L, 'library', 'js', 'shared.js'), 'const oldJs = true;');
+    await fs.writeFile(path.join(L, 'library', 'js', 'shared.js.meta.json'), JSON.stringify(oldMeta));
+    const meta = (id, lang, title) => JSON.stringify({ schema: 1, id, lang, title, group: 'Восстановление', desc: 'Тестовый файл', tags: [], aliases: [] });
+    const files = [
+      { name: 'library/js/shared.js.meta.json', text: meta('restore-js-shared', 'js', 'JS из архива') },
+      { name: 'library/js/shared.js', text: 'const restoredJs = true;' },
+      { name: 'library/ts/shared.js.meta.json', text: meta('restore-ts-shared', 'ts', 'TS из архива') },
+      { name: 'library/ts/shared.js', text: 'const restoredTs: number = 1;' }
+    ];
+    const restored = await post('/api/library/restore', { files });
+    assert.equal(restored.ok, true);
+    assert.equal(restored.pairs, 2);
+    assert.equal(restored.overwritten, 2);
+    assert.ok(restored.backupId);
+    assert.equal(await fs.readFile(path.join(L, 'library', 'js', 'shared.js'), 'utf8'), 'const restoredJs = true;');
+    assert.equal(await fs.readFile(path.join(L, 'library', 'ts', 'shared.js'), 'utf8'), 'const restoredTs: number = 1;');
+    assert.equal(JSON.parse(await fs.readFile(path.join(L, 'library', 'js', 'shared.js.meta.json'), 'utf8')).id, 'restore-js-shared');
+    assert.equal(JSON.parse(await fs.readFile(path.join(L, 'library', 'ts', 'shared.js.meta.json'), 'utf8')).id, 'restore-ts-shared');
+    assert.equal(await fs.readFile(path.join(L, 'data', 'restore-backups', restored.backupId, 'js', 'shared.js'), 'utf8'), 'const oldJs = true;');
+
+    const bad = await fetch(base + '/api/library/restore', { method: 'POST', body: JSON.stringify({ files: [{ name: '../../escape.js', text: 'bad' }] }) });
+    assert.equal(bad.status, 400, 'путь за пределами архива должен отклоняться');
+    await assert.rejects(fs.access(path.join(tmp, 'escape.js')));
+  });
+
   await test('удаление убирает файлы', async () => {
     assert.ok((await post('/api/delete', { id: newId })).ok);
     await assert.rejects(fs.access(path.join(L, 'library', 'python', newId + '.py')));
