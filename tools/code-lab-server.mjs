@@ -912,10 +912,15 @@ const server = http.createServer(async (req, res) => {
       const next = {
         ...current,
         concepts: current.concepts.filter(concept => concept.id !== id),
-        relations: current.relations.filter(relation => relation.from !== id && relation.to !== id)
+        relations: current.relations.filter(relation => relation.from !== id && relation.to !== id),
+        queryPhrases: (current.queryPhrases || []).filter(phrase => phrase.targetConceptId !== id)
       };
       const saved = await concepts.save(next);
-      return json(res, 200, { ...saved, deleted: id, removedRelations: relationsBefore - next.relations.length });
+      return json(res, 200, {
+        ...saved, deleted: id,
+        removedRelations: relationsBefore - next.relations.length,
+        removedQueryPhrases: (current.queryPhrases || []).length - next.queryPhrases.length
+      });
     }
     if(u.pathname === '/api/concepts/search' && req.method === 'GET'){
       const normalize = value => String(value || '').trim().toLocaleLowerCase('ru').replace(/ё/g, 'е').replace(/\s+/g, ' ');
