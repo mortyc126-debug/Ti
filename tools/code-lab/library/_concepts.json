@@ -636,7 +636,7 @@
     {
       "id": "curated-query-044",
       "phrase": "записать файл",
-      "targetKey": "f.write(s)",
+      "targetKey": "monkeypatch.setattr(obj, \"name\", value)",
       "language": "python",
       "scope": "",
       "origin": "manual",
