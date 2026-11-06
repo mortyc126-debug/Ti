@@ -84,7 +84,8 @@
     <div class="catline">а ниже — загрузка архивов данных (json/gz/zip) для инспектора</div>
     <div class="drop" id="drop">перетащи сюда бэкап библиотеки (код + .meta.json) или архивы — восстановятся как есть, без переработки<input type="file" id="file" multiple style="display:none"></div>
     <div style="margin:8px 0"><button class="btn" id="rescue">Перенести шаблоны кода из Данных в Библиотеку</button>
-      <button class="btn" id="cleanmeta" title="убрать паспорта библиотеки (.meta.json), случайно загруженные в Данные — им место рядом с кодом, а не здесь">убрать паспорта из Данных</button></div>
+      <button class="btn" id="cleanmeta" title="убрать паспорта библиотеки (.meta.json), случайно загруженные в Данные — им место рядом с кодом, а не здесь">убрать паспорта из Данных</button>
+      <button class="btn" id="exportBackup">Скачать полный бэкап</button></div>
     <div class="saved" id="saved"></div>
     <div class="err" id="err"></div>
 
@@ -127,12 +128,63 @@ fileInput.onchange = e => handle(e.target.files);
 ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
 drop.addEventListener('drop', e => handle(e.dataTransfer.files));
 
+$('#exportBackup').onclick = async () => {
+  const btn = $('#exportBackup'), label = btn.textContent;
+  btn.disabled = true; btn.textContent = 'собираю архив…';
+  try {
+    const response = await fetch('/api/backup/export');
+    if(!response.ok) throw new Error('сервер вернул ' + response.status);
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'code-lab-backup-' + new Date().toISOString().slice(0,10) + '.zip';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    btn.textContent = '✓ архив готов';
+  } catch(e) {
+    alert('Не удалось создать полный бэкап: ' + e.message);
+    btn.textContent = label;
+  } finally {
+    btn.disabled = false;
+    if(btn.textContent === '✓ архив готов') setTimeout(() => { btn.textContent = label; }, 2500);
+  }
+};
+
 async function handle(fileList){
   err.textContent = ''; files = [];
   const raw = [];
   for(const f of fileList){
     try { const got = await extract(f); for(const g of got) raw.push(g); }
     catch(e){ err.textContent += '«' + f.name + '»: ' + e.message + '\n'; }
+  }
+  const manifestFile = raw.find(g => g.name === 'backup-manifest.json');
+  if(manifestFile){
+    let manifest = null; try { manifest = JSON.parse(manifestFile.text); } catch(_){}
+    if(manifest && manifest.format === 'code-lab-full-backup' && manifest.version === 1){
+      const libraryFiles = raw.filter(g => g.name.startsWith('library/') && g.name.split('/').length >= 3);
+      const otherFiles = raw.filter(g => g.name !== 'backup-manifest.json' && !libraryFiles.includes(g));
+      let libraryResult = { ok: true, pairs: 0 }, dataResult = { ok: true, written: 0 };
+      if(libraryFiles.length){
+        libraryResult = await fetch('/api/library/restore', { method: 'POST', body: JSON.stringify({ files: libraryFiles }) }).then(x => x.json()).catch(() => null);
+        if(!libraryResult || !libraryResult.ok){
+          alert('Библиотеку восстановить не удалось: ' + ((libraryResult && libraryResult.error) || 'сервер не ответил') + '. Остальные данные не тронуты.');
+          err.textContent = 'восстановление полного бэкапа остановлено на библиотеке';
+          return;
+        }
+      }
+      if(otherFiles.length){
+        dataResult = await fetch('/api/backup/restore', { method: 'POST', body: JSON.stringify({ files: otherFiles }) }).then(x => x.json()).catch(() => null);
+        if(!dataResult || !dataResult.ok){
+          alert('Библиотека восстановлена (' + libraryResult.pairs + ' пар), но остальные данные не восстановлены: ' + ((dataResult && dataResult.error) || 'сервер не ответил') + '. Перед перезаписью библиотека и остальные файлы сохраняются отдельно.');
+          err.textContent = 'частичное восстановление: библиотека восстановлена, остальные данные требуют повторного запуска';
+          return;
+        }
+      }
+      const backups = [libraryResult.backupId, dataResult.backupId].filter(Boolean);
+      err.textContent = '✓ полный бэкап восстановлен · пар библиотеки: ' + (libraryResult.pairs || 0) + ' · остальных файлов: ' + (dataResult.written || 0) + (backups.length ? ' · резервные копии: ' + backups.join(', ') : '');
+      $('#comp').style.display = 'none';
+      return;
+    }
   }
   const isMeta = n => /\.meta\.json$/i.test(n);
   const metaFiles = raw.filter(g => isMeta(g.name));
