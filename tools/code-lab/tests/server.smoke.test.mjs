@@ -227,7 +227,7 @@ try {
 
     const response = await fetch(base + '/api/backup/export');
     assert.equal(response.status, 200);
-    assert.match(response.headers.get('content-type') || '', /application\\/zip/);
+    assert.match(response.headers.get('content-type') || '', /application\/zip/);
     const zip = Buffer.from(await response.arrayBuffer());
     assert.equal(zip.readUInt32LE(0), 0x04034b50, 'должен скачиваться ZIP-архив');
     assert.ok(zip.includes(Buffer.from('backup-manifest.json')));
