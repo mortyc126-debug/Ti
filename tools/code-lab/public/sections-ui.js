@@ -153,10 +153,10 @@
       if(del.length && !confirm('Удалить ' + del.length + ' дубл(ей)? Одноимённые куски с тем же кодом останутся. Вернуть можно через git.')) return;
       q('#suMsg').textContent = 'применяю…';
       const a = Object.keys(map).length ? await api('/api/sections/assign', { map }).catch(() => null) : { changed: 0 };
-      let removed = 0; for(const id of del){ const d = await api('/api/delete', { id }).catch(() => null); if(d && !d.error) removed++; }
+      let removed = 0, blocked = 0; const deletedIds = []; for(const id of del){ const d = await api('/api/delete', { id }).catch(() => null); if(d && d.ok){ removed++; deletedIds.push(id); } else blocked++; }
       q('#suMsg').className = 'sx-msg ok';
-      q('#suMsg').textContent = '✓ Перенесено: ' + ((a && a.changed) || 0) + ', удалено дублей: ' + removed + '.';
-      rows.forEach(el => { const x = items[+el.dataset.i]; if(map[x.id] || del.includes(x.id)) el.style.opacity = '.35'; });
+      q('#suMsg').textContent = '✓ Перенесено: ' + ((a && a.changed) || 0) + ', удалено дублей: ' + removed + (blocked ? ', защищено от удаления: ' + blocked + ' (есть ссылки).' : '.');
+      rows.forEach(el => { const x = items[+el.dataset.i]; if(map[x.id] || deletedIds.includes(x.id)) el.style.opacity = '.35'; });
     };
   }
 
