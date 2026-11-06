@@ -1,0 +1,757 @@
+{
+  "schemaVersion": 2,
+  "concepts": [],
+  "relations": [],
+  "queryPhrases": [
+    {
+      "id": "curated-query-001",
+      "phrase": "отступ внутри элемента",
+      "targetKey": "padding",
+      "language": "css",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "CSS и HTML",
+        "index": 1
+      },
+      "note": "Внутренний отступ элемента; не смешивать с внешним margin."
+    },
+    {
+      "id": "curated-query-002",
+      "phrase": "отступ снаружи элемента",
+      "targetKey": "margin",
+      "language": "css",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "CSS и HTML",
+        "index": 2
+      },
+      "note": "Внешний отступ элемента; не смешивать с внутренним padding."
+    },
+    {
+      "id": "curated-query-003",
+      "phrase": "обводка вокруг элемента",
+      "targetKey": "border",
+      "language": "css",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "CSS и HTML",
+        "index": 3
+      },
+      "note": "Граница элемента; отличается от outline расположением и влиянием на геометрию."
+    },
+    {
+      "id": "curated-query-004",
+      "phrase": "обводка вокруг элемента",
+      "targetKey": "outline",
+      "language": "css",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "CSS и HTML",
+        "index": 4
+      },
+      "note": "Внешняя обводка; не занимает место в блочной модели."
+    },
+    {
+      "id": "curated-query-005",
+      "phrase": "толщина шрифта",
+      "targetKey": "font-weight",
+      "language": "css",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "CSS и HTML",
+        "index": 5
+      },
+      "note": "Толщина начертания, а не размер шрифта."
+    },
+    {
+      "id": "curated-query-006",
+      "phrase": "межбуквенный интервал",
+      "targetKey": "letter-spacing",
+      "language": "css",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "CSS и HTML",
+        "index": 6
+      },
+      "note": "Расстояние между символами, не между словами."
+    },
+    {
+      "id": "curated-query-007",
+      "phrase": "выровнять текст по центру",
+      "targetKey": "text-align",
+      "language": "css",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "CSS и HTML",
+        "index": 7
+      },
+      "note": "Выравнивание текста внутри строки или блока."
+    },
+    {
+      "id": "curated-query-008",
+      "phrase": "выровнять элементы по центру",
+      "targetKey": "align-items",
+      "language": "css",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "CSS и HTML",
+        "index": 8
+      },
+      "note": "Выравнивание элементов по поперечной оси контейнера."
+    },
+    {
+      "id": "curated-query-009",
+      "phrase": "выровнять элементы по центру",
+      "targetKey": "justify-content",
+      "language": "css",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "CSS и HTML",
+        "index": 9
+      },
+      "note": "Распределение и выравнивание по главной оси контейнера."
+    },
+    {
+      "id": "curated-query-010",
+      "phrase": "расположить элемент поверх другого",
+      "targetKey": "z-index",
+      "language": "css",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "CSS и HTML",
+        "index": 10
+      },
+      "note": "Уровень наложения; сам по себе не создаёт контекст позиционирования."
+    },
+    {
+      "id": "curated-query-011",
+      "phrase": "обтекание изображения текстом",
+      "targetKey": "float",
+      "language": "css",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "CSS и HTML",
+        "index": 11
+      },
+      "note": "CSS-свойство обтекания; не тип числа float."
+    },
+    {
+      "id": "curated-query-012",
+      "phrase": "спрятать элемент, сохранив место",
+      "targetKey": "visibility",
+      "language": "css",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "CSS и HTML",
+        "index": 12
+      },
+      "note": "visibility:hidden скрывает содержимое, сохраняя место в раскладке."
+    },
+    {
+      "id": "curated-query-013",
+      "phrase": "скрыть элемент из потока",
+      "targetKey": "display",
+      "language": "css",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "CSS и HTML",
+        "index": 13
+      },
+      "note": "Для исключения элемента из раскладки нужен display:none."
+    },
+    {
+      "id": "curated-query-014",
+      "phrase": "плавно изменить свойство",
+      "targetKey": "transition",
+      "language": "css",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "CSS и HTML",
+        "index": 14
+      },
+      "note": "Переход между значениями свойства; не полный эквивалент keyframes."
+    },
+    {
+      "id": "curated-query-015",
+      "phrase": "медиазапрос для телефона",
+      "targetKey": "@media",
+      "language": "css",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "CSS и HTML",
+        "index": 15
+      },
+      "note": "Медиазапрос с условием ширины экрана; viewport сам по себе не медиазапрос."
+    },
+    {
+      "id": "curated-query-016",
+      "phrase": "объявить переменную",
+      "targetKey": "const",
+      "language": "js",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "JavaScript и Python",
+        "index": 16
+      },
+      "note": "Объявление переменной с неизменяемой привязкой; содержимое объекта при этом может меняться."
+    },
+    {
+      "id": "curated-query-017",
+      "phrase": "объявить переменную",
+      "targetKey": "let",
+      "language": "js",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "JavaScript и Python",
+        "index": 17
+      },
+      "note": "Объявление переменной с блочной областью видимости."
+    },
+    {
+      "id": "curated-query-018",
+      "phrase": "объявить переменную",
+      "targetKey": "var",
+      "language": "js",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "JavaScript и Python",
+        "index": 18
+      },
+      "note": "Объявление переменной с функциональной или глобальной областью видимости."
+    },
+    {
+      "id": "curated-query-019",
+      "phrase": "объявить константу",
+      "targetKey": "const",
+      "language": "js",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "JavaScript и Python",
+        "index": 19
+      },
+      "note": "Объявление const; повторное присваивание запрещено."
+    },
+    {
+      "id": "curated-query-020",
+      "phrase": "функция с именем",
+      "targetKey": "function",
+      "language": "js",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "JavaScript и Python",
+        "index": 20
+      },
+      "note": "Именованное объявление функции в JavaScript."
+    },
+    {
+      "id": "curated-query-021",
+      "phrase": "функция с именем",
+      "targetKey": "def",
+      "language": "python",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "JavaScript и Python",
+        "index": 21
+      },
+      "note": "Именованное объявление функции в Python."
+    },
+    {
+      "id": "curated-query-022",
+      "phrase": "пройти по массиву",
+      "targetKey": "for",
+      "language": "js",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "JavaScript и Python",
+        "index": 22
+      },
+      "note": "Цикл; точный вариант зависит от задачи и вида коллекции."
+    },
+    {
+      "id": "curated-query-023",
+      "phrase": "пройти по массиву",
+      "targetKey": "for...of",
+      "language": "js",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "JavaScript и Python",
+        "index": 23
+      },
+      "note": "Перебор значений итерируемой коллекции."
+    },
+    {
+      "id": "curated-query-024",
+      "phrase": "пройти по массиву",
+      "targetKey": "foreach",
+      "language": "js",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "JavaScript и Python",
+        "index": 24
+      },
+      "note": "Метод перебора; не тождественен синтаксису цикла."
+    },
+    {
+      "id": "curated-query-025",
+      "phrase": "пройти по массиву",
+      "targetKey": "for",
+      "language": "python",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "JavaScript и Python",
+        "index": 25
+      },
+      "note": "Перебор элементов итерируемого объекта в Python."
+    },
+    {
+      "id": "curated-query-026",
+      "phrase": "условие иначе",
+      "targetKey": "else",
+      "language": "js",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "JavaScript и Python",
+        "index": 26
+      },
+      "note": "Ветвь альтернативного условия JavaScript."
+    },
+    {
+      "id": "curated-query-027",
+      "phrase": "условие иначе",
+      "targetKey": "else",
+      "language": "python",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "JavaScript и Python",
+        "index": 27
+      },
+      "note": "Ветвь альтернативного условия Python."
+    },
+    {
+      "id": "curated-query-028",
+      "phrase": "список Python",
+      "targetKey": "list",
+      "language": "python",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "JavaScript и Python",
+        "index": 28
+      },
+      "note": "Встроенный изменяемый тип списка Python."
+    },
+    {
+      "id": "curated-query-029",
+      "phrase": "словарь Python",
+      "targetKey": "dict",
+      "language": "python",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "JavaScript и Python",
+        "index": 29
+      },
+      "note": "Встроенный тип отображения ключей на значения в Python."
+    },
+    {
+      "id": "curated-query-030",
+      "phrase": "разбить строку по разделителю",
+      "targetKey": "split",
+      "language": "js",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "JavaScript и Python",
+        "index": 30
+      },
+      "note": "Разделяет строку по разделителю и возвращает массив."
+    },
+    {
+      "id": "curated-query-031",
+      "phrase": "разбить строку по разделителю",
+      "targetKey": "s.split(\",\")",
+      "language": "python",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "JavaScript и Python",
+        "index": 31
+      },
+      "note": "Разделяет строку и возвращает список частей."
+    },
+    {
+      "id": "curated-query-032",
+      "phrase": "соединить элементы массива в строку",
+      "targetKey": "join",
+      "language": "js",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "JavaScript и Python",
+        "index": 32
+      },
+      "note": "Метод массива соединяет элементы в строку."
+    },
+    {
+      "id": "curated-query-033",
+      "phrase": "соединить элементы массива в строку",
+      "targetKey": "\"\" .join(it)",
+      "language": "python",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "JavaScript и Python",
+        "index": 33
+      },
+      "note": "Метод строки Python соединяет элементы итерируемого объекта."
+    },
+    {
+      "id": "curated-query-034",
+      "phrase": "округлить до двух знаков",
+      "targetKey": "tofixed",
+      "language": "js",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "JavaScript и Python",
+        "index": 34
+      },
+      "note": "toFixed возвращает строку с заданным числом знаков после точки."
+    },
+    {
+      "id": "curated-query-035",
+      "phrase": "округлить до двух знаков",
+      "targetKey": "round(x, n)",
+      "language": "python",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "JavaScript и Python",
+        "index": 35
+      },
+      "note": "round возвращает число; форматирование фиксированного числа знаков — отдельная задача."
+    },
+    {
+      "id": "curated-query-036",
+      "phrase": "асинхронно дождаться результата",
+      "targetKey": "await",
+      "language": "js",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "JavaScript и Python",
+        "index": 36
+      },
+      "note": "Ожидание результата Promise."
+    },
+    {
+      "id": "curated-query-037",
+      "phrase": "асинхронно дождаться результата",
+      "targetKey": "await",
+      "language": "python",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "JavaScript и Python",
+        "index": 37
+      },
+      "note": "Ожидание awaitable в асинхронной функции."
+    },
+    {
+      "id": "curated-query-038",
+      "phrase": "разобрать JSON",
+      "targetKey": "parse",
+      "language": "js",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "DOM, сеть, файлы и тесты",
+        "index": 38
+      },
+      "note": "В этом запросе учитывается только JSON.parse, не parseInt и другие разборщики."
+    },
+    {
+      "id": "curated-query-039",
+      "phrase": "разобрать JSON",
+      "targetKey": "json.loads(s)",
+      "language": "python",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "DOM, сеть, файлы и тесты",
+        "index": 39
+      },
+      "note": "Десериализация JSON-текста в объект Python."
+    },
+    {
+      "id": "curated-query-040",
+      "phrase": "сериализовать в JSON",
+      "targetKey": "stringify",
+      "language": "js",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "DOM, сеть, файлы и тесты",
+        "index": 40
+      },
+      "note": "В этом запросе учитывается только JSON.stringify."
+    },
+    {
+      "id": "curated-query-041",
+      "phrase": "сериализовать в JSON",
+      "targetKey": "json.dumps(obj)",
+      "language": "python",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "DOM, сеть, файлы и тесты",
+        "index": 41
+      },
+      "note": "Сериализация объекта Python в JSON-текст."
+    },
+    {
+      "id": "curated-query-042",
+      "phrase": "подписаться на клик",
+      "targetKey": "addeventlistener",
+      "language": "js",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "DOM, сеть, файлы и тесты",
+        "index": 42
+      },
+      "note": "Регистрация обработчика именно события click."
+    },
+    {
+      "id": "curated-query-043",
+      "phrase": "запросить данные по HTTP",
+      "targetKey": "fetch",
+      "language": "js",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "DOM, сеть, файлы и тесты",
+        "index": 43
+      },
+      "note": "Fetch API отправляет сетевой запрос и возвращает Promise с Response."
+    },
+    {
+      "id": "curated-query-044",
+      "phrase": "записать файл",
+      "targetKey": "f.write(s)",
+      "language": "python",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "DOM, сеть, файлы и тесты",
+        "index": 44
+      },
+      "note": "Запись данных в открытый файловый объект."
+    },
+    {
+      "id": "curated-query-045",
+      "phrase": "подменить функцию в тесте",
+      "targetKey": "monkeypatch.setattr(\"module.name\", value)",
+      "language": "python",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "DOM, сеть, файлы и тесты",
+        "index": 45
+      },
+      "note": "Подмена атрибута или функции через pytest monkeypatch."
+    },
+    {
+      "id": "curated-query-046",
+      "phrase": "подменить функцию в тесте",
+      "targetKey": "mock.patch(\"module.name\")",
+      "language": "python",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "DOM, сеть, файлы и тесты",
+        "index": 46
+      },
+      "note": "Подмена объекта по пути через unittest.mock.patch."
+    },
+    {
+      "id": "curated-query-047",
+      "phrase": "подготовка перед тестом",
+      "targetKey": "def setup(self)",
+      "language": "python",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "DOM, сеть, файлы и тесты",
+        "index": 47
+      },
+      "note": "Метод подготовки unittest; pytest fixtures — отдельный механизм."
+    },
+    {
+      "id": "curated-query-048",
+      "phrase": "очистка после теста",
+      "targetKey": "def teardown(self)",
+      "language": "python",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "DOM, сеть, файлы и тесты",
+        "index": 48
+      },
+      "note": "Метод очистки unittest после теста."
+    },
+    {
+      "id": "curated-query-049",
+      "phrase": "дисперсия доходности",
+      "targetKey": "statistics.variance(data) statistics.pvariance(data)",
+      "language": "python",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "Финансовые и статистические термины",
+        "index": 49
+      },
+      "note": "Дисперсия выборки и генеральной совокупности; не синоним волатильности."
+    },
+    {
+      "id": "curated-query-050",
+      "phrase": "корреляция двух рядов",
+      "targetKey": "statistics.correlation(x, y)",
+      "language": "python",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "Финансовые и статистические термины",
+        "index": 50
+      },
+      "note": "Корреляция измеряет стандартизованную связь; не ковариация."
+    }
+  ]
+}
