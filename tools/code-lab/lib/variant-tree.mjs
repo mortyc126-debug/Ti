@@ -45,7 +45,7 @@ function codeFor(term, lang, ex, cm){
   return recase(term, cm);
 }
 
-export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, caseMap = null }){
+export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, caseMap = null, concepts = [], queryPhrases = [] }){
   const qn = norm(q); if(!qn) return { q, lang, roots: [] };
   const qw = words(qn).map(stem);
   const langs = dict && dict.langs ? dict.langs : {};
@@ -186,5 +186,62 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
     if(pick.length) out.push({ term: '', lang: pick[0].lang, code: '', label: 'куски из библиотеки', note: hits.length + ' по названию', group: true,
       children: pick.map(x => ({ term: x.title, lang: x.lang, code: '', note: x.title + (near.length && x.lang !== near[0] ? ' · ' + x.lang.toUpperCase() : ''), label: '', children: [], piece: x.id })) });
   }
+  // Пользовательские конструкции — отдельный слой. Их названия, определения и формы
+  // не превращаются в синонимы языка и не смешиваются с legacy-группами.
+  const langKey = value => {
+    const v = norm(value);
+    return ({ javascript:'js', typescript:'ts', py:'python', htm:'html' })[v] || v;
+  };
+  const sameLang = (a, b) => !a || !b || langKey(a) === langKey(b);
+  const conceptHits = [];
+  for(const concept of Array.isArray(concepts) ? concepts : []){
+    if(!concept || !concept.id || !concept.name) continue;
+    const aliases = (Array.isArray(concept.aliases) ? concept.aliases : [])
+      .map(x => typeof x === 'string' ? x : x && x.value).filter(Boolean);
+    const forms = (Array.isArray(concept.forms) ? concept.forms : []).filter(f => f && f.value);
+    const phrases = (Array.isArray(queryPhrases) ? queryPhrases : [])
+      .filter(p => p && p.targetConceptId === concept.id && sameLang(p.language, lang));
+    const score = (value, weight) => {
+      const s = norm(value); if(!s || !hasQ(s)) return 0;
+      if(s === qn) return weight + 100;
+      if(s.startsWith(qn)) return weight + 60;
+      if(s.includes(qn)) return weight + 35;
+      return weight;
+    };
+    const scores = [
+      score(concept.name, 100),
+      ...aliases.map(x => score(x, 85)),
+      ...forms.filter(f => sameLang(f.language, lang)).map(f => score(f.value, 70)),
+      ...phrases.map(p => score(p.phrase, 75)),
+      score(concept.definition, 25),
+      ...(Array.isArray(concept.tags) ? concept.tags.map(x => score(x, 15)) : [])
+    ];
+    const best = Math.max(0, ...scores);
+    if(!best) continue;
+    const visibleForms = forms.filter(f => sameLang(f.language, lang));
+    const formNodes = visibleForms.map(f => ({
+      term:f.value, show:f.value, code:f.value, lang:f.language || lang,
+      label:[f.language, f.kind].filter(Boolean).join(' · '),
+      note:f.note || 'Вариант записи этой конструкции', children:[]
+    }));
+    const exampleNodes = (Array.isArray(concept.examples) ? concept.examples : [])
+      .filter(e => e && e.pieceId)
+      .map(e => {
+        const row = rows.find(x => x.id === e.pieceId);
+        return { term:row ? row.title : e.pieceId, lang:row ? row.lang : lang, code:'',
+          note:e.note || (row ? row.title : 'Пример из библиотеки'), label:'пример', children:[], piece:e.pieceId };
+      });
+    const children = formNodes.slice();
+    if(exampleNodes.length) children.push({ group:true, label:'Примеры', note:'Фрагменты из библиотеки', lang, children:exampleNodes });
+    if(!children.length) children.push({ show:concept.name, code:'', lang, label:'сохранённая конструкция',
+      note:concept.definition || 'Для этой конструкции пока не добавлены варианты записи', children:[] });
+    conceptHits.push({ score:best, node:{ group:true, label:concept.name,
+      note:concept.definition || 'Сохранённая пользовательская конструкция', lang, children } });
+  }
+  conceptHits.sort((a,b) => b.score-a.score || a.node.label.localeCompare(b.node.label, 'ru'));
+  if(conceptHits.length) out.unshift({ group:true, label:'Мои конструкции',
+    note:'Сохранённые понятия и их варианты записи', lang,
+    children:conceptHits.slice(0, 8).map(x => x.node) });
+
   return { q, lang, roots: out };
 }
