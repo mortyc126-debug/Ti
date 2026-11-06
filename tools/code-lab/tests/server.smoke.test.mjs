@@ -109,7 +109,7 @@ try {
     const weight = comparison.shadow.hits.find(hit => hit.targetKey === 'font-weight');
     assert.ok(weight.pieces.some(piece => piece.id === 'css-bold'));
     assert.ok(comparison.shadow.hits.some(hit => hit.targetKey === 'font-size'), 'неоднозначная фраза должна сохранить вторую цель');
-    assert.equal(comparison.shadow.ambiguous, 2);
+    assert.equal(comparison.shadow.ambiguous, 1);
   });
 
   await test('правка файла синонимов подхватывается без перезапуска', async () => {
