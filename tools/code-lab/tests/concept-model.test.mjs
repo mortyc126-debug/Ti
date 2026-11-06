@@ -39,4 +39,16 @@ assert.equal(validateConceptStore(relationExpansion).valid, true);
 relationExpansion.relations.push({ id: 'r2', from: 'debounce', to: 'timer', type: 'depends' });
 assert.ok(validateConceptStore(relationExpansion).errors.some(e => e.message.includes('Такая связь уже существует')));
 
-console.log('concept-model: 8 checks passed');
+
+const symmetricDuplicate = base();
+symmetricDuplicate.relations = [
+  { id: 'r1', from: 'debounce', to: 'timer', type: 'equivalent' },
+  { id: 'r2', from: 'timer', to: 'debounce', type: 'equivalent' }
+];
+assert.ok(validateConceptStore(symmetricDuplicate).errors.some(e => e.message.includes('Такая связь уже существует')));
+
+const duplicateRelationId = base();
+duplicateRelationId.relations.push({ id: 'r1', from: 'timer', to: 'debounce', type: 'calls' });
+assert.ok(validateConceptStore(duplicateRelationId).errors.some(e => e.path === 'relations[1].id'));
+
+console.log('concept-model: 10 checks passed');
