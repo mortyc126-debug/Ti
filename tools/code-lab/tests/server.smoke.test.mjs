@@ -462,8 +462,8 @@ try {
     assert.equal(scriptResponse.status, 200);
     const uiScript = await scriptResponse.text();
     assert.doesNotThrow(() => new Function(uiScript), 'скрипт редактора должен разбираться без синтаксических ошибок');
-    const htmlIds = new Set([...html.matchAll(/\\bid="([^"]+)"/g)].map(match => match[1]));
-    const usedIds = [...uiScript.matchAll(/\\$\\('([^']+)'\\)/g)].map(match => match[1]);
+    const htmlIds = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]));
+    const usedIds = [...uiScript.matchAll(/\$\('([^']+)'\)/g)].map(match => match[1]);
     assert.deepEqual([...new Set(usedIds.filter(id => !htmlIds.has(id)))], [], 'все статические обращения к полям должны иметь элементы в HTML');
     for(const asset of ['/style.css', '/shell.js']) assert.equal((await fetch(base + asset)).status, 200);
   });
