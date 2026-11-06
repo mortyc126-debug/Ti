@@ -50,11 +50,54 @@ async function main() {
     return templateCache.get(id);
   };
 
+  const expectedCuratedTargets = {
+    'отступ внутри элемента': ['padding'],
+    'отступ снаружи элемента': ['margin'],
+    'обводка вокруг элемента': ['border', 'outline'],
+    'толщина шрифта': ['font-weight'],
+    'межбуквенный интервал': ['letter-spacing'],
+    'выровнять текст по центру': ['text-align'],
+    'выровнять элементы по центру': ['align-items', 'justify-content'],
+    'расположить элемент поверх другого': ['z-index'],
+    'обтекание изображения текстом': ['float'],
+    'спрятать элемент, сохранив место': ['visibility'],
+    'скрыть элемент из потока': ['display'],
+    'плавно изменить свойство': ['transition'],
+    'медиазапрос для телефона': ['@media'],
+    'объявить переменную': ['const', 'let', 'var'],
+    'объявить константу': ['const'],
+    'функция с именем': ['function', 'def'],
+    'пройти по массиву': ['for', 'for...of', 'foreach'],
+    'условие иначе': ['else'],
+    'список Python': ['list'],
+    'словарь Python': ['dict'],
+    'разбить строку по разделителю': ['split', 's.split(",")'],
+    'соединить элементы массива в строку': ['join', '"".join(it)'],
+    'округлить до двух знаков': ['tofixed', 'round(x, n)'],
+    'асинхронно дождаться результата': ['await'],
+    'разобрать JSON': ['parse', 'json.loads(s)'],
+    'сериализовать в JSON': ['stringify', 'json.dumps(obj)'],
+    'подписаться на клик': ['addeventlistener'],
+    'запросить данные по HTTP': ['fetch'],
+    'записать файл': ['f.write(s)'],
+    'подменить функцию в тесте': ['monkeypatch.setattr("module.name", value)', 'mock.patch("module.name")'],
+    'подготовка перед тестом': ['def setup(self)'],
+    'очистка после теста': ['def teardown(self)'],
+    'дисперсия доходности': ['statistics.variance(data) statistics.pvariance(data)'],
+    'корреляция двух рядов': ['statistics.correlation(x, y)']
+  };
   const results = [];
   for (const query of queries) {
     const comparison = await get('/api/search/shadow?q=' + encodeURIComponent(query) + '&limit=100');
     const legacy = comparison.legacy || { hits: [] };
     const shadow = comparison.shadow || { hits: [] };
+    const expectedTargets = expectedCuratedTargets[query];
+    if (expectedTargets) {
+      const foundTargets = new Set((shadow.hits || []).map(hit => hit.targetKey));
+      for (const target of expectedTargets) {
+        assert.ok(foundTargets.has(target), `Курируемая фраза «${query}» не нашла цель «${target}» через HTTP`);
+      }
+    }
     const legacyHits = (legacy.hits || []).slice(0, 10).map((hit, index) => ({
       position: index + 1, id: hit.id, title: hit.title || hit.name || '',
       score: hit.score ?? hit.match?.score ?? null, why: hit.why || []
