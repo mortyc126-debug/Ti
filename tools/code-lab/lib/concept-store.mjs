@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { createEmptyConceptStore, validateConceptStore } from './concept-model.mjs';
+import { createEmptyConceptStore, migrateConceptStore, validateConceptStore } from './concept-model.mjs';
 
 export function createConceptStore({ filePath, getPieceIds = async () => new Set() }) {
   if (!filePath) throw new Error('Нужен путь к файлу хранилища понятий');
@@ -24,13 +24,14 @@ export function createConceptStore({ filePath, getPieceIds = async () => new Set
     if (currentStamp === null) cached = createEmptyConceptStore();
     else {
       const parsed = JSON.parse(await fs.readFile(target, 'utf8'));
-      const result = validateConceptStore(parsed);
+      const migrated = migrateConceptStore(parsed);
+      const result = validateConceptStore(migrated);
       if (!result.valid) {
         const error = new Error('Файл хранилища понятий не прошёл проверку');
         error.validation = result;
         throw error;
       }
-      cached = parsed;
+      cached = migrated;
     }
     cachedStamp = currentStamp;
     return cached;
@@ -48,17 +49,17 @@ export function createConceptStore({ filePath, getPieceIds = async () => new Set
       const value = await load();
       return JSON.parse(JSON.stringify(value));
     },
-    async validate(input) { return validate(input); },
+    async validate(input) { return validate(migrateConceptStore(input)); },
     save(input) {
       return withLock(async () => {
         await load();
-        const result = await validate(input);
+        const next = migrateConceptStore(JSON.parse(JSON.stringify(input)));
+        const result = await validate(next);
         if (!result.valid) {
           const error = new Error('Данные понятий не прошли проверку');
           error.validation = result;
           throw error;
         }
-        const next = JSON.parse(JSON.stringify(input));
         await fs.mkdir(path.dirname(target), { recursive: true });
         const temp = target + '.tmp-' + process.pid + '-' + randomUUID();
         try {
@@ -71,7 +72,13 @@ export function createConceptStore({ filePath, getPieceIds = async () => new Set
         }
         cached = next;
         cachedStamp = await stamp();
-        return { ok: true, count: next.concepts.length, relationCount: next.relations.length, warnings: result.warnings };
+        return {
+          ok: true,
+          count: next.concepts.length,
+          relationCount: next.relations.length,
+          queryPhraseCount: next.queryPhrases.length,
+          warnings: result.warnings
+        };
       });
     }
   };
