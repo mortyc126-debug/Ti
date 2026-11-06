@@ -491,7 +491,7 @@ async function pieceReferenceIndex(){
   for(const name of (await readNames(RECIPES)).filter(n => n.endsWith('.json'))){
     const recipe = JSON.parse(await fs.readFile(path.join(RECIPES, name), 'utf8'));
     for(const item of Array.isArray(recipe.items) ? recipe.items : []){
-      if(item && item.id) add(item.id, { type: 'recipe', id: recipe.id || name.replace(/\\.json$/i, ''), title: recipe.title || name });
+      if(item && item.id) add(item.id, { type: 'recipe', id: recipe.id || name.replace(/\.json$/i, ''), title: recipe.title || name });
     }
   }
 
@@ -506,7 +506,7 @@ async function pieceReferenceIndex(){
     const flow = JSON.parse(await fs.readFile(path.join(FLOWS, name), 'utf8'));
     const nodes = flow.graph && Array.isArray(flow.graph.nodes) ? flow.graph.nodes : [];
     for(const node of nodes){
-      if(node && node.src && node.src.id) add(node.src.id, { type: 'flow', id: flow.id || name.replace(/\\.json$/i, ''), title: flow.name || flow.title || name });
+      if(node && node.src && node.src.id) add(node.src.id, { type: 'flow', id: flow.id || name.replace(/\.json$/i, ''), title: flow.name || flow.title || name });
     }
   }
   return index;
@@ -858,14 +858,17 @@ const server = http.createServer(async (req, res) => {
       }
       // оценка «полноты»: есть раздел, описание, пояснения к словам — такой оставляем
       const score = e => { let n = 0; if(String(e.meta.group || '').trim()) n += 3; if(String(e.meta.desc || '').trim()) n += 2; return n + Math.min((e.meta.wordNotes || []).filter(w => w.source === 'custom').length, 20); };
-      let removed = 0, groups = 0;
+      const refIndex = await pieceReferenceIndex();
+      let removed = 0, groups = 0; const blockedGroups = [];
       for(const [, arr] of byCode){
         if(arr.length < 2) continue;
         groups++;
         arr.sort((a, b) => score(b) - score(a));   // лучший — первым, его оставляем
+        const references = arr.flatMap(e => (refIndex.get(e.id) || []).map(ref => ({ pieceId: e.id, ...ref })));
+        if(references.length){ blockedGroups.push({ ids: arr.map(e => e.id), references }); continue; }
         for(let i = 1; i < arr.length; i++){ if(await store.remove(arr[i].id)) removed++; }
       }
-      return json(res, 200, { ok: true, groups, removed, total: ents.length });
+      return json(res, 200, { ok: true, groups, removed, total: ents.length, blocked: blockedGroups.length, blockedGroups: blockedGroups.slice(0, 50) });
     }
 
     // объединённый импорт: один код-файл, полноценный кусок JSON, массив кусков или сборник {dict,pieces}
@@ -1198,7 +1201,9 @@ const server = http.createServer(async (req, res) => {
     // удалить шаблон
     if(u.pathname === '/api/delete' && req.method === 'POST'){
       const b = await readBody(req);
-      if(!(await store.has(b.id))) return json(res, 404, { error: 'нет такого шаблона' });
+      if(!(await store.has(b.id))) return json(res, 404, { ok: false, error: 'нет такого шаблона' });
+      const references = (await pieceReferenceIndex()).get(String(b.id)) || [];
+      if(references.length) return json(res, 409, { ok: false, error: 'Кусок используется в сохранённых данных. Сначала отвяжи его или выбери другой вариант.', references });
       await store.remove(b.id);
       return json(res, 200, { ok: true });
     }
@@ -1650,7 +1655,10 @@ const server = http.createServer(async (req, res) => {
     }
     if(u.pathname === '/api/tasks/delete' && req.method === 'POST'){
       const b = await readBody(req);
-      return json(res, 200, { ok: await tasks.remove(String(b.id || '')) });
+      const id = String(b.id || '');
+      const references = await tasks.usedBy(id);
+      if(references.length) return json(res, 409, { ok: false, error: 'На эту задачу ссылаются другие задачи. Сначала отвяжи их.', references });
+      return json(res, 200, { ok: await tasks.remove(id) });
     }
     if(u.pathname === '/api/tasks/used-by'){ return json(res, 200, await tasks.usedBy(String(u.searchParams.get('id') || ''))); }
     // «пригодится»: до 3 задач к открытому коду. files — все открытые, active — имя активного,
