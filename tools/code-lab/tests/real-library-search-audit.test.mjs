@@ -79,7 +79,7 @@ async function main() {
     'сериализовать в JSON': ['stringify', 'json.dumps(obj)'],
     'подписаться на клик': ['addeventlistener'],
     'записать файл': ['write'],
-    'подменить функцию в тесте': ['monkeypatch.setattr(obj, "name", value)', 'mock.patch("module.name")'],
+    'подменить функцию в тесте': ['patch'],
     'подготовка перед тестом': ['def setup(self)'],
     'очистка после теста': ['def teardown(self)'],
     'корреляция двух рядов': ['np.corrcoef']
