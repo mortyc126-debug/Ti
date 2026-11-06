@@ -113,4 +113,21 @@ const copyIndex = createLegacyQueryPhraseShadow({
 });
 assert.deepEqual(copyIndex.search('поверхностная копия').rankedPieces.map(piece => piece.id), ['real-copy']);
 
+// Два targetKey с разными именами аргумента одной функции не создают ложную неоднозначность.
+const deepCopyUsage = {
+  terms: { python: { 'copy.deepcopy(obj)': {}, 'copy.deepcopy(x)': {} } },
+  piecesOf() { return ['deep-copy']; },
+  pieceInfo() { return { id: 'deep-copy', title: 'Глубокая копия', lang: 'python' }; },
+  pieceText() { return 'copy.deepcopy(source)'; }
+};
+const deepCopyIndex = createLegacyQueryPhraseShadow({
+  queryPhrases: [
+    { id: 'deep-a', phrase: 'глубокая копия', targetKey: 'copy.deepcopy(obj)' },
+    { id: 'deep-b', phrase: 'глубокая копия', targetKey: 'copy.deepcopy(x)' }
+  ],
+  usage: deepCopyUsage
+});
+assert.equal(deepCopyIndex.search('глубокая копия').total, 2);
+assert.equal(deepCopyIndex.search('глубокая копия').ambiguous, false);
+
 console.log('query-phrase-shadow: isolated index and content-filter tests passed');
