@@ -161,27 +161,29 @@ async function handle(fileList){
   if(manifestFile){
     let manifest = null; try { manifest = JSON.parse(manifestFile.text); } catch(_){}
     if(manifest && manifest.format === 'code-lab-full-backup' && manifest.version === 1){
-      const libraryFiles = raw.filter(g => g.name.startsWith('library/') && g.name.split('/').length >= 3);
+      const mode = confirm('Как восстановить полный бэкап?\n\nОК — полностью заменить содержимое хранилищ. Лишние файлы будут удалены, но сначала сохранены в резервную копию.\n\nОтмена — объединить архив с текущими данными, ничего лишнего не удаляя.');
+      const restoreMode = mode ? 'replace' : 'merge';
+      const libraryFiles = raw.filter(g => g.name.startsWith('library/'));
       const otherFiles = raw.filter(g => g.name !== 'backup-manifest.json' && !libraryFiles.includes(g));
-      let libraryResult = { ok: true, pairs: 0 }, dataResult = { ok: true, written: 0 };
-      if(libraryFiles.length){
-        libraryResult = await fetch('/api/library/restore', { method: 'POST', body: JSON.stringify({ files: libraryFiles }) }).then(x => x.json()).catch(() => null);
+      let libraryResult = { ok: true, pairs: 0, deleted: 0 }, dataResult = { ok: true, written: 0, deleted: 0 };
+      if(libraryFiles.length || restoreMode === 'replace'){
+        libraryResult = await fetch('/api/library/restore', { method: 'POST', body: JSON.stringify({ files: libraryFiles, mode: restoreMode }) }).then(x => x.json()).catch(() => null);
         if(!libraryResult || !libraryResult.ok){
           alert('Библиотеку восстановить не удалось: ' + ((libraryResult && libraryResult.error) || 'сервер не ответил') + '. Остальные данные не тронуты.');
           err.textContent = 'восстановление полного бэкапа остановлено на библиотеке';
           return;
         }
       }
-      if(otherFiles.length){
-        dataResult = await fetch('/api/backup/restore', { method: 'POST', body: JSON.stringify({ files: otherFiles }) }).then(x => x.json()).catch(() => null);
+      if(otherFiles.length || restoreMode === 'replace'){
+        dataResult = await fetch('/api/backup/restore', { method: 'POST', body: JSON.stringify({ files: otherFiles, mode: restoreMode }) }).then(x => x.json()).catch(() => null);
         if(!dataResult || !dataResult.ok){
-          alert('Библиотека восстановлена (' + libraryResult.pairs + ' пар), но остальные данные не восстановлены: ' + ((dataResult && dataResult.error) || 'сервер не ответил') + '. Перед перезаписью библиотека и остальные файлы сохраняются отдельно.');
+          alert('Библиотека восстановлена (' + libraryResult.pairs + ' пар), но остальные данные не восстановлены: ' + ((dataResult && dataResult.error) || 'сервер не ответил') + '. Библиотека уже сохранена отдельно; повтори восстановление после устранения причины.');
           err.textContent = 'частичное восстановление: библиотека восстановлена, остальные данные требуют повторного запуска';
           return;
         }
       }
       const backups = [libraryResult.backupId, dataResult.backupId].filter(Boolean);
-      err.textContent = '✓ полный бэкап восстановлен · пар библиотеки: ' + (libraryResult.pairs || 0) + ' · остальных файлов: ' + (dataResult.written || 0) + (backups.length ? ' · резервные копии: ' + backups.join(', ') : '');
+      err.textContent = '✓ полный бэкап восстановлен · режим: ' + restoreMode + ' · пар библиотеки: ' + (libraryResult.pairs || 0) + ' · удалено из библиотеки: ' + (libraryResult.deleted || 0) + ' · остальных файлов: ' + (dataResult.written || 0) + ' · удалено остальных: ' + (dataResult.deleted || 0) + (backups.length ? ' · резервные копии: ' + backups.join(', ') : '');
       $('#comp').style.display = 'none';
       return;
     }
