@@ -204,8 +204,13 @@ export function createTaskStore({ root, rows, slug, createPiece, similarPieces }
     const all = await rows();
     const cnt = new Map(); for(const r of all){ const k = String(r.title || '').trim().toLowerCase(); cnt.set(k, (cnt.get(k) || 0) + 1); }
     const tl = await list(); const tTitle = new Map(tl.map(t => [t.id, t.title]));
+    const taskCounts = new Map(); for(const t of tl){ const k = norm(t.title); taskCounts.set(k, (taskCounts.get(k) || 0) + 1); }
     return TaskFormat.serialize(task, o => {
-      if(o.kind === 'task') return o.id ? (tTitle.get(o.id) || o.ref || o.id) : (o.ref || '');
+      if(o.kind === 'task'){
+        if(!o.id) return o.ref || '';
+        const title = tTitle.get(o.id);
+        return title && taskCounts.get(norm(title)) === 1 ? title : 'id:' + o.id;
+      }
       if(!o.id) return o.ref || '';
       const r = all.find(x => x.id === o.id); const title = r ? r.title : o.ref;
       return title && cnt.get(String(title).trim().toLowerCase()) === 1 ? title : 'id:' + o.id;
