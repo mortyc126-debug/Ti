@@ -66,7 +66,7 @@ function placeNotes(lines, notes, look, { onlyEmpty = true } = {}){
   return unplaced;
 }
 
-export function createLibraryStore({ root, legacyDir = null, dictPath = null, getDict, coverage = () => ({}), contract = null, writeAtomicFile = writeAtomic }){
+export function createLibraryStore({ root, legacyDir = null, dictPath = null, getDict, coverage = () => ({}), contract = null, writeAtomicFile = null }){
   const _CONTRACT_LANGS = new Set(['js', 'ts', 'html', 'svg', 'css', 'python', 'sql']);
   const byPath = new Map();   // путь кода → запись
   let byId = new Map();
@@ -188,6 +188,8 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
     }
   }
 
+  const atomicWrite = writeAtomicFile || writeAtomic;
+
   // Два файла образуют одну логическую запись. Если второй файл не записался,
   // возвращаем оба пути к прежнему состоянию (включая отсутствие новых файлов).
   async function writePairAtomic(codePath, code, metaPath, metaText){
@@ -197,13 +199,13 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
     };
     const [oldCode, oldMeta] = await Promise.all([snapshot(codePath), snapshot(metaPath)]);
     try {
-      await writeAtomicFile(codePath, code);
-      await writeAtomicFile(metaPath, metaText);
+      await atomicWrite(codePath, code);
+      await atomicWrite(metaPath, metaText);
     } catch(error) {
       const rollbackErrors = [];
       for(const [p, old] of [[codePath, oldCode], [metaPath, oldMeta]]){
         try {
-          if(old.exists) await writeAtomicFile(p, old.content);
+          if(old.exists) await atomicWrite(p, old.content);
           else await fs.unlink(p).catch(err => { if(err.code !== 'ENOENT') throw err; });
         } catch(rollbackError){ rollbackErrors.push(rollbackError); }
       }
