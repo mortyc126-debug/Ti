@@ -182,7 +182,7 @@
   }
   // список ненайденного; onPick(u, cand) — выбор кандидата
   function unresolvedHtml(list, tag){
-    return list.map((u, i) => '<div class="tk-un" data-k="' + tag + ':' + i + '">не найден' + (u.kind === 'task' ? 'а задача' : ' кусок') + ' «' + esc(u.ref) + '»'
+    return list.map((u, i) => '<div class="tk-un" data-k="' + tag + ':' + i + '">' + (u.ambiguous ? 'неоднозначная ссылка на ' : 'не найден' + (u.kind === 'task' ? 'а задача' : ' кусок')) + ' «' + esc(u.ref) + '»'
       + (u.label ? ' <span style="opacity:.7">(вариант «' + esc(u.label) + '»)</span>' : '')
       + ((u.candidates || []).length
         ? '<div class="tk-cands">похоже: ' + u.candidates.map((c, j) => '<button class="btn tk-cand" data-c="' + j + '" title="заменить ссылку; прежнее название останется заметкой «было»">' + (c.kind === 'task' ? 'задача: ' : '') + esc(c.title) + (c.lang ? ' <span style="opacity:.6">' + esc(c.lang) + '</span>' : '') + '</button>').join('')
