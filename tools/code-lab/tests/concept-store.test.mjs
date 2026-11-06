@@ -17,7 +17,9 @@ try {
   };
   const saved = await store.save(data);
   assert.equal(saved.ok, true);
-  assert.equal((await store.get()).concepts[0].id, 'debounce');\n  assert.equal((await store.get()).schemaVersion, 2, 'v1 должен мигрировать в v2 при чтении/сохранении');\n  assert.deepEqual((await store.get()).queryPhrases, []);
+  assert.equal((await store.get()).concepts[0].id, 'debounce');
+  assert.equal((await store.get()).schemaVersion, 2, 'v1 должен мигрировать в v2 при сохранении');
+  assert.deepEqual((await store.get()).queryPhrases, []);
   data.concepts[0].examples[0].pieceId = 'missing';
   await assert.rejects(store.save(data), error => error.validation.errors.some(item => item.path === 'concepts[0].examples[0].pieceId'));
   assert.equal((await store.get()).concepts[0].examples[0].pieceId, 'js-example');
