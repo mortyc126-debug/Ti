@@ -152,10 +152,11 @@ test('библиотека: пары кода и паспортов, JSON и ID 
   const idGroups = new Map();
   for(const row of rows){ if(!idGroups.has(row.id)) idGroups.set(row.id,[]); idGroups.get(row.id).push(row.file); }
   const duplicateIdGroups = [...idGroups.values()].filter(group => group.length > 1);
+  const rowsByFile=new Map(rows.map(row=>[row.file,row]));
   const sectionConfig=JSON.parse(await fs.readFile(path.join(LIBRARY,'_sections.json'),'utf8'));
   const parsedSectionRules=parseRules(sectionConfig.rules||[]);
   const templateFiles=await walk(path.join(CODELAB_ROOT,'templates'));
-  const templateGroupPlan={total:0,withLines:0,withoutLines:0,changed:0,outsideAfter:[],moves:{},missingFromLibrary:[],nonMigratable:[],duplicateIds:[],codeDuplicates:[]};
+  const templateGroupPlan={total:0,withLines:0,withoutLines:0,changed:0,outsideAfter:[],moves:{},missingFromLibrary:[],nonMigratable:[],duplicateIds:[],codeDuplicateCount:0,missingTemplateCodeDuplicates:[]};
   const libraryIdSet=new Set(rows.map(row=>row.id)), seenTemplateIds=new Set();
   for(const file of templateFiles.filter(file=>file.toLowerCase().endsWith('.json'))){
     try{
@@ -168,7 +169,19 @@ test('библиотека: пары кода и паспортов, JSON и ID 
         if(!libraryIdSet.has(templateId)) templateGroupPlan.missingFromLibrary.push({file:path.relative(CODELAB_ROOT,file).split(path.sep).join('/'),id:templateId});
         const lang=String(value.lang||'txt').toLowerCase(), code=codeFromLines(value.lines).replace(/\r\n/g,'\n').trim();
         const matches=duplicateCodes.get(lang+'\u0000'+code)||[];
-        if(matches.length) templateGroupPlan.codeDuplicates.push({file:path.relative(CODELAB_ROOT,file).split(path.sep).join('/'),id:templateId,libraryFiles:matches});
+        if(matches.length){
+          templateGroupPlan.codeDuplicateCount++;
+          if(!libraryIdSet.has(templateId)){
+            templateGroupPlan.missingTemplateCodeDuplicates.push({
+              file:path.relative(CODELAB_ROOT,file).split(path.sep).join('/'),id:templateId,
+              title:value.title||'',descLength:String(value.desc||'').trim().length,
+              tagsCount:Array.isArray(value.tags)?value.tags.length:0,
+              aliasesCount:Array.isArray(value.aliases)?value.aliases.length:0,
+              component:!!value.component,
+              libraryEntries:matches.map(file=>({file,...(rowsByFile.get(file)||{})}))
+            });
+          }
+        }
       }else{
         templateGroupPlan.withoutLines++;
         templateGroupPlan.nonMigratable.push({file:path.relative(CODELAB_ROOT,file).split(path.sep).join('/'),id:templateId});
@@ -196,7 +209,6 @@ test('библиотека: пары кода и паспортов, JSON и ID 
       }catch(_){}
     }
   }
-  const rowsByFile=new Map(rows.map(row=>[row.file,row]));
   const duplicatePairQuality={pairs:dupGroups.length,oneDescriptionEmpty:0,descriptionUnequal:0,tagsOnlyOneSide:0,aliasesOnlyOneSide:0,componentOnlyOneSide:0,wordNotesOnlyOneSide:0,orphanNotesOnlyOneSide:0,referencedPairs:[]};
   const duplicatePairSamples=[];
   for(const group of dupGroups){
@@ -217,10 +229,13 @@ test('библиотека: пары кода и паспортов, JSON и ID 
     const row=rows.find(item=>item.file===file);
     if(row) duplicateIds.set(row.id,file);
   }
-  const referenceFiles=await walkReferenceFiles(REPO_ROOT), duplicateReferenceHits=[];
+  const referenceFiles=await walkReferenceFiles(REPO_ROOT), duplicateReferenceHits=[], templateReferenceHits=[];
+  const missingTemplateIds=new Set(templateGroupPlan.missingFromLibrary.map(item=>item.id));
   for(const file of referenceFiles){
     const body=await fs.readFile(file,'utf8');
-    for(const id of duplicateIds.keys()) if(body.includes(id)) duplicateReferenceHits.push({id,file:path.relative(REPO_ROOT,file).split(path.sep).join('/')});
+    const relative=path.relative(REPO_ROOT,file).split(path.sep).join('/');
+    for(const id of duplicateIds.keys()) if(body.includes(id)) duplicateReferenceHits.push({id,file:relative});
+    if(!relative.startsWith('tools/code-lab/templates/')) for(const id of missingTemplateIds) if(body.includes(id)) templateReferenceHits.push({id,file:relative});
   }
   const wordNoteProblemByKind={}, wordNoteProblemByLang={};
   for(const problem of wordNoteProblems){
@@ -231,7 +246,7 @@ test('библиотека: пары кода и паспортов, JSON и ID 
   console.log('library-integrity:',JSON.stringify({
     languages:langs,codeCount,metaCount,effectiveIds:ids.size,missingIds:missingIds.length,
     folderLanguageMismatches:languageMismatches.length,duplicateCodeGroups:dupGroups.length,
-    duplicateCodeSamples:dupGroups,duplicateIdGroups,duplicatePairQuality,duplicatePairSamples,otherDataGroupIssues,templateGroupPlan,duplicateReferenceScan:{filesScanned:referenceFiles.length,idsScanned:duplicateIds.size,hitCount:duplicateReferenceHits.length,hits:duplicateReferenceHits},missingIdFiles:missingIds,
+    duplicateCodeSamples:dupGroups,duplicateIdGroups,duplicatePairQuality,duplicatePairSamples,otherDataGroupIssues,templateGroupPlan,duplicateReferenceScan:{filesScanned:referenceFiles.length,idsScanned:duplicateIds.size,hitCount:duplicateReferenceHits.length,hits:duplicateReferenceHits},templateReferenceScan:{idsScanned:missingTemplateIds.size,hitCount:templateReferenceHits.length,hits:templateReferenceHits},missingIdFiles:missingIds,
     emptyDescriptions,shortDescriptionSamples:shortDescriptions.slice(0,60),descriptionLengthBuckets,statusCounts,
     missingTitles,missingGroups,missingLangs,fileFieldMismatches,missingSchema,legacyMetadataFiles,legacyWordMaps,legacyWordMapStats,embeddedCodeMismatches,unknownGroups,wordNoteProblems:wordNoteProblems.slice(0,80),wordNoteProblemCount:wordNoteProblems.length,wordNoteProblemFiles:[...new Set(wordNoteProblems.map(x=>x.file))],wordNoteProblemByKind,wordNoteProblemByLang,wordNoteTotal,orphanNoteTotal,malformedTagFields,malformedComponents,replacementCharacterFields,codeReplacementFiles,
     problems:problems.length,languageMismatchSamples:languageMismatches.slice(0,8)
