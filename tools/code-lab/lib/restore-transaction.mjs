@@ -21,7 +21,7 @@ function allowedTarget(rootName, relative){
   if(rootName !== 'app') return false;
   const value = relative.toLowerCase();
   if(['tasks/', 'recipes/', 'flows/', 'data/', 'workspace/', 'templates/'].some(prefix => value.startsWith(prefix))) {
-    if(value.startsWith('data/restore-backups/') || value === 'data/description-jobs.json') return false;
+    if(value === 'data/restore-backups' || value.startsWith('data/restore-backups/') || value === 'data/description-jobs.json') return false;
     return true;
   }
   return value.startsWith('public/dict/') || value === 'public/keyword-dict.json';
