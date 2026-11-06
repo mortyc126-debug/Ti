@@ -476,42 +476,39 @@ async function pieceReferenceIndex(){
     const key = [ref.type, ref.id || '', ref.term || '', ref.file || ''].join(':');
     if(!list.some(x => [x.type, x.id || '', x.term || '', x.file || ''].join(':') === key)) list.push(ref);
   };
+  const readNames = async dir => {
+    try { return await fs.readdir(dir); }
+    catch(e){ if(e.code === 'ENOENT') return []; throw e; }
+  };
 
-  try {
-    for(const t of await tasks.list()){
-      const full = await tasks.get(t.id); if(!full) continue;
-      tasks.eachOption(full.steps, o => {
-        if(o && o.id) add(o.id, { type: 'task', id: t.id, title: t.title || t.id });
-      });
-    }
-  } catch(_){}
+  for(const t of await tasks.list()){
+    const full = await tasks.get(t.id); if(!full) continue;
+    tasks.eachOption(full.steps, o => {
+      if(o && o.id) add(o.id, { type: 'task', id: t.id, title: t.title || t.id });
+    });
+  }
 
-  try {
-    const names = (await fs.readdir(RECIPES)).filter(n => n.endsWith('.json'));
-    for(const name of names){
-      let recipe; try { recipe = JSON.parse(await fs.readFile(path.join(RECIPES, name), 'utf8')); } catch(_){ continue; }
-      for(const item of Array.isArray(recipe.items) ? recipe.items : []){
-        if(item && item.id) add(item.id, { type: 'recipe', id: recipe.id || name.replace(/\\.json$/i, ''), title: recipe.title || name });
-      }
+  for(const name of (await readNames(RECIPES)).filter(n => n.endsWith('.json'))){
+    const recipe = JSON.parse(await fs.readFile(path.join(RECIPES, name), 'utf8'));
+    for(const item of Array.isArray(recipe.items) ? recipe.items : []){
+      if(item && item.id) add(item.id, { type: 'recipe', id: recipe.id || name.replace(/\\.json$/i, ''), title: recipe.title || name });
     }
-  } catch(_){}
+  }
 
-  try {
-    for(const [term, example] of Object.entries(await loadExamples())){
-      if(example && example.id) add(example.id, { type: 'dictionary-example', term });
-    }
-  } catch(_){}
+  let examples = {};
+  try { examples = JSON.parse(await fs.readFile(EXAMPLES_FILE, 'utf8')); }
+  catch(e){ if(e.code !== 'ENOENT') throw e; }
+  for(const [term, example] of Object.entries(examples || {})){
+    if(example && example.id) add(example.id, { type: 'dictionary-example', term });
+  }
 
-  try {
-    const names = (await fs.readdir(FLOWS)).filter(n => n.endsWith('.json'));
-    for(const name of names){
-      let flow; try { flow = JSON.parse(await fs.readFile(path.join(FLOWS, name), 'utf8')); } catch(_){ continue; }
-      const nodes = flow.graph && Array.isArray(flow.graph.nodes) ? flow.graph.nodes : [];
-      for(const node of nodes){
-        if(node && node.src && node.src.id) add(node.src.id, { type: 'flow', id: flow.id || name.replace(/\\.json$/i, ''), title: flow.name || flow.title || name });
-      }
+  for(const name of (await readNames(FLOWS)).filter(n => n.endsWith('.json'))){
+    const flow = JSON.parse(await fs.readFile(path.join(FLOWS, name), 'utf8'));
+    const nodes = flow.graph && Array.isArray(flow.graph.nodes) ? flow.graph.nodes : [];
+    for(const node of nodes){
+      if(node && node.src && node.src.id) add(node.src.id, { type: 'flow', id: flow.id || name.replace(/\\.json$/i, ''), title: flow.name || flow.title || name });
     }
-  } catch(_){}
+  }
   return index;
 }
 
