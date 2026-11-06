@@ -133,6 +133,53 @@ try {
     assert.equal((await get('/api/template?id=' + encodeURIComponent(py.id))).lang, 'python');
   });
 
+  await test('импорт сохраняет полный паспорт и не затирает ручные поля', async () => {
+    const imported = await post('/api/import', { pieces: [{
+      lang: 'js', title: 'Полный паспорт', group: 'Проверка импорта', desc: 'Ручное описание',
+      code: 'const passportValue = 7;', output: 'готово', tags: ['важный'], aliases: ['псевдоним'],
+      source: { title: 'manual', desc: 'manual', tags: 'manual' },
+      wordNotes: [{ line: 0, col: 6, text: 'passportValue', note: 'Пояснение к токену', source: 'custom' }],
+      orphanNotes: [{ line: 20, col: 0, text: 'missingToken', note: 'Осиротевшее пояснение', source: 'custom' }],
+      labels: { passportValue: 'Значение паспорта' },
+      component: { summary: 'Контракт компонента', provides: ['passportValue'], requires: [] },
+      status: 'described', descAt: 12345,
+      meta: { legacyField: { keep: true } }, passport: { passportField: 'сохранить' },
+      customField: { version: 7 }
+    }] });
+    assert.equal(imported.created, 1);
+    const list = await get('/api/list?labels=1');
+    const item = list.find(x => x.title === 'Полный паспорт');
+    assert.ok(item);
+    const file = item.file || (item.id + '.js');
+    const metaPath = path.join(L, 'library', 'js', file + '.meta.json');
+    const meta = JSON.parse(await fs.readFile(metaPath, 'utf8'));
+    assert.deepEqual(meta.tags, ['важный']);
+    assert.deepEqual(meta.aliases, ['псевдоним']);
+    assert.equal(meta.source.title, 'manual');
+    assert.equal(meta.source.desc, 'manual');
+    assert.equal(meta.wordNotes.some(x => x.text === 'passportValue' && x.note === 'Пояснение к токену'), true);
+    assert.equal(meta.orphanNotes.some(x => x.text === 'missingToken'), true);
+    assert.equal(meta.labels.passportValue, 'Значение паспорта');
+    assert.equal(meta.component.summary, 'Контракт компонента');
+    assert.equal(meta.status, 'described');
+    assert.equal(meta.descAt, 12345);
+    assert.equal(meta.legacyField.keep, true);
+    assert.equal(meta.passportField, 'сохранить');
+    assert.equal(meta.customField.version, 7);
+
+    const update = await post('/api/import', { pieces: [{
+      lang: 'js', title: 'Импортированное новое название', desc: 'Импортированное описание',
+      code: 'const passportValue = 7;', tags: ['чужой тег'], source: { title: 'imported', desc: 'imported', tags: 'imported' }
+    }] });
+    assert.equal(update.updated, 1);
+    const after = JSON.parse(await fs.readFile(metaPath, 'utf8'));
+    assert.equal(after.title, 'Полный паспорт', 'импорт не должен затирать ручное название');
+    assert.equal(after.desc, 'Ручное описание', 'импорт не должен затирать ручное описание');
+    assert.deepEqual(after.tags, ['важный'], 'импорт не должен затирать ручные теги');
+    assert.equal(after.source.title, 'manual');
+    assert.equal(after.source.desc, 'manual');
+  });
+
   await test('одноимённые наборы, рецепты и схемы получают разные ID', async () => {
     const d1 = await post('/api/data/save', { name: 'Повторяющийся набор', data: { version: 1 } });
     const d2 = await post('/api/data/save', { name: 'Повторяющийся набор', data: { version: 2 } });
