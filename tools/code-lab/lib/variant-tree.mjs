@@ -115,19 +115,24 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
       if(norm(r.term) === key && ['можно','содержит'].includes(r.verb)) inside.push(r);
       if(norm(r.term) === key && ['внутри','не внутри','требует','обязательно','заметка'].includes(r.verb)) context.push(r);
     }
-    const make = (r, relation) => {
-      const child = node(r.term, L, relation);
-      const extra = r.note || (relation === 'после' ? 'Можно использовать после: ' + r.args.join(', ') : 'Можно разместить внутри конструкции «' + term + '»');
-      child.note = [child.note, extra].filter(Boolean).join(' — ');
-      return child;
+    const continuations = new Map();
+    const addContinuation = (target, relation, rule) => {
+      if(!exists(target)) return;
+      const key = norm(target);
+      if(!continuations.has(key)) continuations.set(key, { term:target, relations:new Set(), notes:[] });
+      const item = continuations.get(key); item.relations.add(relation); if(rule.note) item.notes.push(rule.note);
     };
-    const validAfter = after.filter(r => exists(r.term));
-    const validInside = inside.flatMap(r => r.args.filter(exists).map(t => ({ term:t, args:[t], note:r.note })));
+    after.forEach(r => addContinuation(r.term, 'после', r));
+    inside.forEach(r => r.args.forEach(t => addContinuation(t, 'внутри', r)));
     const groups = [];
-    if(validAfter.length) groups.push({ group:true, label:'Что может идти дальше', note:'Следующие конструкции по правилам языка', lang:L,
-      children:[...new Map(validAfter.map(r => [norm(r.term), make(r, 'после')])).values()] });
-    if(validInside.length) groups.push({ group:true, label:'Что можно разместить внутри', note:'Допустимые части этой конструкции', lang:L,
-      children:[...new Map(validInside.map(r => [norm(r.term), make(r, 'внутри')])).values()] });
+    if(continuations.size) groups.push({ group:true, label:'Варианты продолжения', note:'Что может следовать за конструкцией или входить в неё', lang:L,
+      children:[...continuations.values()].map(item => {
+        const child = node(item.term, L, [...item.relations].join(' · '));
+        const extra = item.notes.length ? [...new Set(item.notes)].join(' — ')
+          : [...item.relations].includes('после') ? 'Допустимо после: ' + term : 'Допустимая часть конструкции «' + term + '»';
+        child.note = [child.note, extra].filter(Boolean).join(' — ');
+        return child;
+      }) });
     if(context.length) groups.push({ group:true, label:'Условия применения', note:'Ограничения и контекст конструкции', lang:L,
       children:context.map(r => ({ show:r.verb + ': ' + r.args.join(', '), code:'', lang:L, label:'', note:r.note || '', children:[] })) });
     return groups;
