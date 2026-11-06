@@ -102,8 +102,8 @@ for(const file of files){
       source:meta.source||null,externalLinks:meta.externalLinks||meta.links||meta.references||meta.reference||null,
       wordNotes:notes,orphanNotes:orphans
     },
-    codeUrls:[...new Set(code.match(/https?:\\/\\/[^\\s"'<>)}\\]]+/g)||[])],
-    metaUrls:[...new Set(JSON.stringify(meta).match(/https?:\\/\\/[^\\s"'<>)}\\]]+/g)||[])]
+    codeUrls:[...new Set(code.match(/https?:\/\/[^\s"'<>)}\]]+/g)||[])],
+    metaUrls:[...new Set(JSON.stringify(meta).match(/https?:\/\/[^\s"'<>)}\]]+/g)||[])]
   });
 }
 const groups=map=>[...map.values()].filter(v=>v.length>1).map(files=>({count:files.length,files}));
