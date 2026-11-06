@@ -98,7 +98,9 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
     if(D[t]) return { key: t, rank: 1 };
     if((L === 'js' || L === 'ts') && W[t]) return { key: t, rank: 1.5 };   // for, while — базовые слова языка
     if(t.length < 2 || /\s/.test(t)) return null;
-    const re = tokRe(t); for(const k of (indexes[L] && indexes[L].idiomsByToken.get(t)) || []) if(re.test(k)) return { key: t, rank: 0.5 };
+    const re = tokRe(t), ix = indexes[L];
+    const candidates = ix ? (ix.idiomsByToken.get(t) || (/[.@#]/.test(t) ? ix.idioms : [])) : [];
+    for(const k of candidates) if(re.test(k)) return { key: t, rank: 0.5 };
     return null;
   };
   for(const L of want){
