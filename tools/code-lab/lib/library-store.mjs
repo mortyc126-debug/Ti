@@ -136,14 +136,19 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
       const old = byPath.get(f);
       if(old && old.codeMtime === cm && old.metaMtime === mm) continue;
       let code; try { code = await fs.readFile(f, 'utf8'); } catch(_){ continue; }
-      let meta = null;
-      if(hasMeta){ try { meta = JSON.parse(await fs.readFile(metaPath, 'utf8')); } catch(_){ meta = null; } }
+      let meta = null, metaError = null;
+      if(hasMeta){
+        try {
+          meta = JSON.parse(await fs.readFile(metaPath, 'utf8'));
+          if(!meta || typeof meta !== 'object' || Array.isArray(meta)) throw new Error('паспорт должен быть JSON-объектом');
+        } catch(error){ metaError = error; meta = null; }
+      }
       const base = path.basename(f).replace(/\.[^.]+$/, '');
       const id = String((meta && meta.id) || base);
-      const virtual = !meta;
+      const virtual = !meta && !hasMeta;
       if(!meta) meta = defaultMeta(f, id);
       const lang = String(meta.lang || langForExt(extOf(f)) || 'txt').toLowerCase();
-      const e = { id, codePath: f, metaPath, hasMeta, codeMtime: cm, metaMtime: mm, code, meta, lang, virtual };
+      const e = { id, codePath: f, metaPath, hasMeta, codeMtime: cm, metaMtime: mm, code, meta, lang, virtual, metaError };
       e.row = buildRow(e);
       byPath.set(f, e); changed = true;
     }
@@ -271,6 +276,7 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
         await scan();
         const id = String(obj.id);
         const e = byId.get(id) || null;
+        if(e && e.metaError) throw new Error('Паспорт повреждён и не будет перезаписан автоматически: ' + e.metaPath);
         const dict = await dictOf();
         const lang = String(obj.lang || (e && e.lang) || 'js').toLowerCase();
         const ext = extFor(lang);
