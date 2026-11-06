@@ -439,6 +439,8 @@ try {
     assert.ok(hits.hits.some(hit => hit.id === 'delay-call' && hit.match.kind === 'alias'));
     assert.ok(hits.hits.some(hit => hit.id === 'deferred-call' && hit.match.kind === 'equivalent'));
     assert.ok(!hits.hits.some(hit => hit.id === 'timer-concept'), 'связанные, но не эквивалентные понятия не должны подмешиваться в поиск');
+    const exampleHits = await get('/api/concepts/search?q=цикл');
+    assert.ok(exampleHits.hits.some(hit => hit.id === 'delay-call' && hit.match.kind === 'example'));
     const invalid = await fetch(base + '/api/concepts/save', { method: 'POST', body: JSON.stringify({
       schemaVersion: 1, concepts: [{ id: 'bad', name: 'Плохой пример', definition: '', aliases: [], forms: [], tags: [], examples: [{ pieceId: 'missing-piece' }] }], relations: []
     }) });
