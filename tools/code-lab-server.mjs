@@ -1171,6 +1171,157 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, id: j.id });
     }
 
+    // Полный архив пользовательских данных. Секреты провайдеров и временная очередь ИИ не экспортируются.
+    if(u.pathname === '/api/backup/export' && req.method === 'GET'){
+      const files = [], skipped = [];
+      const collect = async (dir, prefix, skip = () => false) => {
+        const walk = async (current, relative = '') => {
+          let entries;
+          try { entries = await fs.readdir(current, { withFileTypes: true }); }
+          catch(e){ if(e.code === 'ENOENT') return; throw e; }
+          for(const entry of entries){
+            const rel = relative ? path.posix.join(relative, entry.name) : entry.name;
+            if(entry.isDirectory()){
+              if(['.git','node_modules','vendor'].includes(entry.name)) continue;
+              await walk(path.join(current, entry.name), rel);
+            } else if(entry.isFile()){
+              const archiveName = path.posix.join(prefix, rel);
+              if(skip(rel) || skip(archiveName)) continue;
+              const bytes = await fs.readFile(path.join(current, entry.name));
+              try {
+                const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+                if(text.includes('\0')){ skipped.push(archiveName); continue; }
+                files.push({ name: archiveName, text });
+              } catch(_){ skipped.push(archiveName); }
+            }
+          }
+        };
+        await walk(dir);
+      };
+      await collect(LIBRARY, 'library');
+      await collect(TASKS, 'tasks');
+      await collect(RECIPES, 'recipes');
+      await collect(FLOWS, 'flows');
+      await collect(DATA, 'data', rel => rel === 'description-jobs.json' || rel.startsWith('restore-backups/') || rel.endsWith('.tmp'));
+      await collect(path.join(PUBLIC, 'dict'), 'public/dict');
+      await collect(path.join(ROOT, 'workspace'), 'workspace');
+      await collect(TEMPLATES, 'templates');
+      const keywordPath = path.join(PUBLIC, 'keyword-dict.json');
+      try {
+        const bytes = await fs.readFile(keywordPath);
+        files.push({ name: 'public/keyword-dict.json', text: new TextDecoder('utf-8', { fatal: true }).decode(bytes) });
+      } catch(e){ if(e.code !== 'ENOENT') throw e; }
+      files.sort((a,b) => a.name.localeCompare(b.name));
+      const manifest = {
+        format: 'code-lab-full-backup', version: 1, createdAt: new Date().toISOString(),
+        fileCount: files.length, totalBytes: files.reduce((n,x) => n + Buffer.byteLength(x.text, 'utf8'), 0),
+        skippedBinaryFiles: skipped
+      };
+      const zip = makeZipStore([...files, { name: 'backup-manifest.json', text: JSON.stringify(manifest, null, 2) + '\n' }]);
+      const stamp = new Date().toISOString().slice(0,10);
+      res.writeHead(200, {
+        'Content-Type': 'application/zip',
+        'Content-Disposition': 'attachment; filename="code-lab-backup-' + stamp + '.zip"',
+        'Content-Length': zip.length,
+        'Cache-Control': 'no-store'
+      });
+      res.end(zip);
+      return;
+    }
+
+    // Восстановление остальных пользовательских хранилищ из полного архива.
+    // Библиотека восстанавливается отдельным маршрутом /api/library/restore.
+    if(u.pathname === '/api/backup/restore' && req.method === 'POST'){
+      const b = await readBody(req), files = Array.isArray(b.files) ? b.files : [];
+      const archiveSeen = new Set(), targets = new Set(), writes = [], invalid = [];
+      const normalize = value => {
+        const raw = String(value || '').replace(/\\/g, '/');
+        if(!raw || raw.startsWith('/') || /^[a-z]:/i.test(raw) || raw.includes('\0')) return null;
+        const parts = raw.split('/');
+        if(parts.some(x => x === '..')) return null;
+        const clean = parts.filter(x => x && x !== '.');
+        return clean.length ? clean.join('/') : null;
+      };
+      for(const file of files){
+        const name = normalize(file && file.name);
+        if(!name){ invalid.push(String(file && file.name || '(пустое имя)')); continue; }
+        const key = name.toLowerCase();
+        if(archiveSeen.has(key)){ invalid.push(name + ' (повтор пути)'); continue; }
+        archiveSeen.add(key);
+        const parts = name.split('/');
+        const allowed = ['tasks','recipes','flows','data','workspace','templates'].includes(parts[0])
+          || (parts[0] === 'public' && (parts[1] === 'dict' || name === 'public/keyword-dict.json'));
+        if(!allowed || parts.length < 2 || (parts[0] === 'data' && (parts[1] === 'restore-backups' || name === 'data/description-jobs.json'))){
+          invalid.push(name + ' (путь не входит в полный бэкап)'); continue;
+        }
+        const abs = within(ROOT, path.join(...parts));
+        if(!abs){ invalid.push(name + ' (недопустимый путь)'); continue; }
+        if(/\.json$/i.test(name)){
+          try { JSON.parse(String(file.text ?? '')); }
+          catch(_){ invalid.push(name + ' (битый JSON)'); continue; }
+        }
+        const rel = path.relative(ROOT, abs), destKey = rel.toLowerCase();
+        if(targets.has(destKey)){ invalid.push(name + ' (совпадает место назначения)'); continue; }
+        targets.add(destKey);
+        writes.push({ abs, rel, text: String(file.text ?? '') });
+      }
+      if(invalid.length) return json(res, 400, { ok: false, error: 'Архив содержит недопустимые файлы. Ничего не записано.', invalid: invalid.slice(0, 60) });
+
+      const backupId = 'full-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+      const backupRoot = path.join(DATA, 'restore-backups', backupId);
+      const backups = new Map(), written = [];
+      const lstatOrNull = async target => { try { return await fs.lstat(target); } catch(e){ if(e.code === 'ENOENT') return null; throw e; } };
+      const safeStat = async target => {
+        const rootStat = await lstatOrNull(ROOT);
+        if(rootStat?.isSymbolicLink()) throw new Error('Корень приложения не должен быть символической ссылкой');
+        let cur = ROOT;
+        const parts = path.relative(ROOT, target).split(path.sep).filter(Boolean);
+        for(const part of parts.slice(0, -1)){
+          cur = path.join(cur, part);
+          const st = await lstatOrNull(cur);
+          if(st && (st.isSymbolicLink() || !st.isDirectory())) throw new Error('Небезопасная папка назначения: ' + path.relative(ROOT, cur));
+        }
+        const st = await lstatOrNull(target);
+        if(st?.isSymbolicLink()) throw new Error('Файл назначения не должен быть символической ссылкой: ' + path.relative(ROOT, target));
+        return st;
+      };
+      try {
+        for(const op of writes){
+          const st = await safeStat(op.abs);
+          if(!st) continue;
+          if(!st.isFile()) throw new Error('На месте файла архива уже существует папка: ' + op.rel);
+          const backupPath = path.join(backupRoot, op.rel);
+          await fs.mkdir(path.dirname(backupPath), { recursive: true });
+          await fs.copyFile(op.abs, backupPath);
+          backups.set(op.abs, backupPath);
+        }
+        if(backups.size){
+          await fs.mkdir(backupRoot, { recursive: true });
+          await fs.writeFile(path.join(backupRoot, 'manifest.json'), JSON.stringify({
+            createdAt: new Date().toISOString(),
+            files: [...backups.entries()].map(([target, backup]) => ({ target: path.relative(ROOT, target), backup: path.relative(backupRoot, backup) }))
+          }, null, 2) + '\n', 'utf8');
+        }
+        for(const op of writes){
+          await fs.mkdir(path.dirname(op.abs), { recursive: true });
+          await fs.writeFile(op.abs, op.text, 'utf8');
+          written.push(op);
+        }
+      } catch(e){
+        const rollbackErrors = [];
+        for(const op of written.reverse()){
+          try {
+            const backupPath = backups.get(op.abs);
+            if(backupPath){ await fs.mkdir(path.dirname(op.abs), { recursive: true }); await fs.copyFile(backupPath, op.abs); }
+            else await fs.unlink(op.abs).catch(() => {});
+          } catch(err){ rollbackErrors.push(String(err?.message || err)); }
+        }
+        return json(res, 500, { ok: false, error: String(e?.message || e), backupId: backups.size ? backupId : null, rollbackErrors });
+      }
+      try { await store.refresh(); } catch(_){}
+      return json(res, 200, { ok: true, written: writes.length, overwritten: backups.size, backupId: backups.size ? backupId : null });
+    }
+
     // ── сохранённые данные (JSON из архивов) ──────────────────────────────
     if(u.pathname === '/api/data/save' && req.method === 'POST'){
       const b = await readBody(req);
