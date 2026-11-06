@@ -1306,6 +1306,7 @@ const server = http.createServer(async (req, res) => {
     // Библиотека восстанавливается отдельным маршрутом /api/library/restore.
     if(u.pathname === '/api/backup/restore' && req.method === 'POST'){
       const b = await readBody(req), files = Array.isArray(b.files) ? b.files : [];
+      const mode = b.mode === 'replace' ? 'replace' : 'merge';
       const archiveSeen = new Set(), targets = new Set(), writes = [], invalid = [];
       const normalize = value => {
         const raw = String(value || '').replace(/\\/g, '/');
@@ -1323,7 +1324,6 @@ const server = http.createServer(async (req, res) => {
         archiveSeen.add(key);
         const parts = name.split('/');
         const allowed = ['tasks','recipes','flows','data','workspace','templates'].includes(parts[0])
-          || (parts[0] === 'library' && parts.length === 2 && parts[1].startsWith('_'))
           || (parts[0] === 'public' && (parts[1] === 'dict' || name === 'public/keyword-dict.json'));
         if(!allowed || parts.length < 2 || (parts[0] === 'data' && (parts[1] === 'restore-backups' || name === 'data/description-jobs.json'))){
           invalid.push(name + ' (путь не входит в полный бэкап)'); continue;
@@ -1343,7 +1343,7 @@ const server = http.createServer(async (req, res) => {
 
       const backupId = 'full-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
       const backupRoot = path.join(DATA, 'restore-backups', backupId);
-      const backups = new Map(), written = [];
+      const backups = new Map(), written = [], deleted = [];
       const lstatOrNull = async target => { try { return await fs.lstat(target); } catch(e){ if(e.code === 'ENOENT') return null; throw e; } };
       const safeStat = async target => {
         const rootStat = await lstatOrNull(ROOT);
@@ -1365,7 +1365,38 @@ const server = http.createServer(async (req, res) => {
         const backupDir = path.join(DATA, 'restore-backups');
         const backupDirStat = await lstatOrNull(backupDir);
         if(backupDirStat && (backupDirStat.isSymbolicLink() || !backupDirStat.isDirectory())) throw new Error('Папка резервных копий не должна быть ссылкой или обычным файлом');
-        for(const op of writes){
+        const deletions = [];
+        if(mode === 'replace'){
+          const incoming = new Set(writes.map(op => op.rel.split(path.sep).join('/').toLowerCase()));
+          const walk = async (dir, rootName, relative = '') => {
+            const rootStat = await lstatOrNull(dir);
+            if(!rootStat) return;
+            if(rootStat.isSymbolicLink() || !rootStat.isDirectory()) throw new Error('Небезопасная папка при полной замене: ' + path.relative(ROOT, dir));
+            for(const entry of await fs.readdir(dir, { withFileTypes: true })){
+              const rel = relative ? path.posix.join(relative, entry.name) : entry.name;
+              if(rootName === 'data' && (rel === 'description-jobs.json' || rel.startsWith('restore-backups/') || rel.endsWith('.tmp'))) continue;
+              if(['.git','node_modules','vendor'].includes(entry.name)) continue;
+              const abs = path.join(dir, entry.name);
+              if(entry.isSymbolicLink()) throw new Error('Символическая ссылка в хранилище: ' + path.relative(ROOT, abs));
+              if(entry.isDirectory()) await walk(abs, rootName, rel);
+              else if(entry.isFile()){
+                const archivePath = path.relative(ROOT, abs).split(path.sep).join('/');
+                if(!incoming.has(archivePath.toLowerCase())) deletions.push({ abs, rel: path.relative(ROOT, abs) });
+              }
+            }
+          };
+          for(const [name, dir] of [
+            ['tasks', path.join(ROOT, 'tasks')], ['recipes', RECIPES], ['flows', FLOWS],
+            ['data', DATA], ['workspace', path.join(ROOT, 'workspace')], ['templates', TEMPLATES],
+            ['public/dict', path.join(PUBLIC, 'dict')]
+          ]) await walk(dir, name);
+          const keywordPath = path.join(PUBLIC, 'keyword-dict.json');
+          const keywordStat = await lstatOrNull(keywordPath);
+          if(keywordStat?.isSymbolicLink()) throw new Error('Файл словаря не должен быть символической ссылкой');
+          if(keywordStat?.isFile() && !incoming.has('public/keyword-dict.json')) deletions.push({ abs: keywordPath, rel: path.relative(ROOT, keywordPath) });
+          else if(keywordStat && !keywordStat.isFile()) throw new Error('На месте файла словаря находится папка');
+        }
+        for(const op of [...writes, ...deletions]){
           const st = await safeStat(op.abs);
           if(!st) continue;
           if(!st.isFile()) throw new Error('На месте файла архива уже существует папка: ' + op.rel);
@@ -1386,19 +1417,20 @@ const server = http.createServer(async (req, res) => {
           await fs.writeFile(op.abs, op.text, 'utf8');
           written.push(op);
         }
+        for(const op of deletions){ await fs.unlink(op.abs); deleted.push(op); }
       } catch(e){
         const rollbackErrors = [];
-        for(const op of written.reverse()){
+        for(const op of [...written, ...deleted].reverse()){
           try {
             const backupPath = backups.get(op.abs);
             if(backupPath){ await fs.mkdir(path.dirname(op.abs), { recursive: true }); await fs.copyFile(backupPath, op.abs); }
-            else await fs.unlink(op.abs).catch(() => {});
+            else if(written.includes(op)) await fs.unlink(op.abs).catch(() => {});
           } catch(err){ rollbackErrors.push(String(err?.message || err)); }
         }
         return json(res, 500, { ok: false, error: String(e?.message || e), backupId: backups.size ? backupId : null, rollbackErrors });
       }
       try { await store.refresh(); } catch(_){}
-      return json(res, 200, { ok: true, written: writes.length, overwritten: backups.size, backupId: backups.size ? backupId : null });
+      return json(res, 200, { ok: true, mode, written: writes.length, overwritten: writes.filter(op => backups.has(op.abs)).length, deleted: deleted.length, backedUp: backups.size, backupId: backups.size ? backupId : null });
     }
 
     // ── сохранённые данные (JSON из архивов) ──────────────────────────────
