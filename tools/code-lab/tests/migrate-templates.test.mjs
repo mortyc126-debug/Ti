@@ -23,6 +23,8 @@ async function fixture({ withSections = true, group = 'Браузер / DOM' } =
     lang: 'js',
     group,
     desc: 'Проверочный пример миграции.',
+    tags: ['dom', 'пример'],
+    aliases: ['изменить DOM'],
     lines: [[
       { k: 'kw', v: 'const' }, { k: 'sp' }, { k: 'name', v: 'value' },
       { k: 'op', v: '=' }, { k: 'num', v: '1' }, { k: 'op', v: ';' }
@@ -42,6 +44,10 @@ test('migrateTemplates applies current section rules to newly imported templates
       'Браузер / DOM => Страница и браузер / Работа с DOM': 1
     });
     assert.equal(meta.group, 'Страница и браузер / Работа с DOM');
+    assert.deepEqual(meta.tags, ['dom', 'пример']);
+    assert.deepEqual(meta.aliases, ['изменить DOM']);
+    assert.equal(meta.source.tags, 'imported');
+    assert.equal(meta.source.aliases, 'imported');
   } finally {
     await fs.rm(f.root, { recursive: true, force: true });
   }
@@ -55,6 +61,29 @@ test('migrateTemplates preserves the original group when no section rules exist'
     assert.equal(report.created, 1);
     assert.equal(report.groupsRemapped, 0);
     assert.equal(meta.group, 'Браузер / DOM');
+  } finally {
+    await fs.rm(f.root, { recursive: true, force: true });
+  }
+});
+
+test('migrateTemplates skips duplicate code and reports the existing library file', async () => {
+  const f = await fixture();
+  try {
+    await fs.mkdir(path.join(f.out, 'js'), { recursive: true });
+    await fs.writeFile(path.join(f.out, 'js', 'existing.js'), 'const value=1;', 'utf8');
+    const report = await migrateTemplates({ src: f.src, out: f.out, dictPath: null });
+    assert.equal(report.created, 0);
+    assert.equal(report.skippedDuplicate, 1);
+    assert.deepEqual(report.duplicateContent, [{
+      file: 'dom-example.json',
+      id: 'dom-example',
+      lang: 'js',
+      existingFiles: ['js/existing.js']
+    }]);
+    assert.equal(report.groupsRemapped, 0);
+    await assert.rejects(fs.access(path.join(f.out, 'js', 'dom-example.js')));
+    const savedReport = JSON.parse(await fs.readFile(path.join(f.out, '_migration-report.json'), 'utf8'));
+    assert.equal(savedReport.skippedDuplicate, 1);
   } finally {
     await fs.rm(f.root, { recursive: true, force: true });
   }
