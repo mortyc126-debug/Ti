@@ -97,12 +97,12 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
   const rulesFor = L => {
     if(rulesCache.has(L)) return rulesCache.get(L);
     const rules = ((dict && dict.structure && dict.structure[L]) || []).map(raw => {
-      const m = String(raw).match(/^(.+):\\s*(после|можно|содержит|внутри|не внутри|требует|обязательно|заметка)\\s+(.+)$/i);
+      const m = String(raw).match(/^(.+):\s*(после|можно|содержит|внутри|не внутри|требует|обязательно|заметка)\s+(.+)$/i);
       if(!m) return null;
       const term = m[1].trim(), verb = m[2].toLowerCase();
-      const cut = m[3].split(/\\s+[—–]\\s+/);
+      const cut = m[3].split(/\s+[—–]\s+/);
       const body = cut.shift().trim(), note = cut.join(' — ').trim();
-      const args = ['требует','заметка'].includes(verb) ? [body] : body.split(/\\s*[,|;]\\s*|\\s+или\\s+/).map(x => x.trim()).filter(Boolean);
+      const args = ['требует','заметка'].includes(verb) ? [body] : body.split(/\s*[,|;]\s*|\s+или\s+/).map(x => x.trim()).filter(Boolean);
       return { term, verb, args, note };
     }).filter(Boolean);
     rulesCache.set(L, rules); return rules;
