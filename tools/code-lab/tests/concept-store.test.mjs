@@ -9,7 +9,7 @@ try {
   const filePath = path.join(tmp, 'library', '_concepts.json');
   const store = createConceptStore({ filePath, getPieceIds: async () => new Set(['js-example']) });
   const empty = await store.get();
-  assert.deepEqual(empty, { schemaVersion: 1, concepts: [], relations: [] });
+  assert.deepEqual(empty, { schemaVersion: 2, concepts: [], relations: [], queryPhrases: [] });
   const data = {
     schemaVersion: 1,
     concepts: [{ id: 'debounce', name: 'Задержка частых вызовов', definition: 'Откладывает вызов до паузы.', aliases: ['debounce', 'отложенный вызов'], forms: [{ value: 'debounce(fn, delay)', language: 'js', kind: 'syntax', note: 'Вызов' }], tags: ['таймеры'], examples: [{ pieceId: 'js-example' }], origin: 'manual' }],
@@ -17,7 +17,7 @@ try {
   };
   const saved = await store.save(data);
   assert.equal(saved.ok, true);
-  assert.equal((await store.get()).concepts[0].id, 'debounce');
+  assert.equal((await store.get()).concepts[0].id, 'debounce');\n  assert.equal((await store.get()).schemaVersion, 2, 'v1 должен мигрировать в v2 при чтении/сохранении');\n  assert.deepEqual((await store.get()).queryPhrases, []);
   data.concepts[0].examples[0].pieceId = 'missing';
   await assert.rejects(store.save(data), error => error.validation.errors.some(item => item.path === 'concepts[0].examples[0].pieceId'));
   assert.equal((await store.get()).concepts[0].examples[0].pieceId, 'js-example');
@@ -28,7 +28,7 @@ try {
   assert.ok(ambiguous.warnings.some(item => item.message.includes('несколькими понятиями')));
   await fs.writeFile(filePath, '{ invalid', 'utf8');
   await assert.rejects(store.get(), SyntaxError);
-  console.log('concept-store: 7 checks passed');
+  console.log('concept-store: v1 compatibility and v2 checks passed');
 } finally {
   await fs.rm(tmp, { recursive: true, force: true });
 }
