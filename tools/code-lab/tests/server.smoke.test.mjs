@@ -133,6 +133,26 @@ try {
     assert.equal((await get('/api/template?id=' + encodeURIComponent(py.id))).lang, 'python');
   });
 
+  await test('одноимённые наборы, рецепты и схемы получают разные ID', async () => {
+    const d1 = await post('/api/data/save', { name: 'Повторяющийся набор', data: { version: 1 } });
+    const d2 = await post('/api/data/save', { name: 'Повторяющийся набор', data: { version: 2 } });
+    assert.ok(d1.id && d2.id && d1.id !== d2.id);
+    assert.equal(JSON.parse(await fs.readFile(path.join(L, 'data', d1.id + '.json'), 'utf8')).data.version, 1);
+    assert.equal(JSON.parse(await fs.readFile(path.join(L, 'data', d2.id + '.json'), 'utf8')).data.version, 2);
+
+    const r1 = await post('/api/recipes/save', { title: 'Повторяющийся рецепт', items: [] });
+    const r2 = await post('/api/recipes/save', { title: 'Повторяющийся рецепт', items: [] });
+    assert.ok(r1.ok && r2.ok && r1.id !== r2.id);
+    await fs.access(path.join(L, 'recipes', r1.id + '.json'));
+    await fs.access(path.join(L, 'recipes', r2.id + '.json'));
+
+    const f1 = await post('/api/flows/save', { name: 'Повторяющаяся схема', graph: { nodes: [], edges: [] } });
+    const f2 = await post('/api/flows/save', { name: 'Повторяющаяся схема', graph: { nodes: [], edges: [] } });
+    assert.ok(f1.ok && f2.ok && f1.id !== f2.id);
+    await fs.access(path.join(L, 'flows', f1.id + '.json'));
+    await fs.access(path.join(L, 'flows', f2.id + '.json'));
+  });
+
   await test('удаление и дедупликация защищают куски со ссылками', async () => {
     await fs.mkdir(path.join(L, 'recipes'), { recursive: true });
     await fs.writeFile(path.join(L, 'recipes', 'uses-piece.json'), JSON.stringify({ id: 'uses-piece', title: 'Рецепт со ссылкой', items: [{ id: protectedId, title: 'Кусок' }] }));
