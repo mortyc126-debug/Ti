@@ -552,6 +552,7 @@ function coverage(j){
 let _lblCache = { v: -1, dict: null, map: new Map() };
 let _caseMap = { v: -1, map: null };   // регистр имён из библиотеки (queryselector → querySelector) для дерева вариантов
 let _variantSnapshot = { v: -1, dict: null, rows: [], codes: [] }; // неизменяемый снимок для быстрых повторных подсказок
+let _variantConceptSnapshot = { stamp: null, concepts: [], queryPhrases: [] }; // пользовательские конструкции для дерева подсказок
 async function labelsFor(entry, names){
   const dict = await kwDict();
   if(_lblCache.v !== store.version || _lblCache.dict !== dict) _lblCache = { v: store.version, dict, map: new Map() };
@@ -2096,7 +2097,17 @@ const server = http.createServer(async (req, res) => {
       }
       if(_caseMap.v !== store.version || _caseMap.dict !== dict)
         _caseMap = { v:store.version, dict, map:caseMapFrom(_variantSnapshot.codes.concat(_dictRawKeys)) };
-      return json(res, 200, buildVariants({ q, lang, dict, rows:_variantSnapshot.rows, synonyms:dict.synonyms || {}, caseMap:_caseMap.map }));
+      // Читаем пользовательские конструкции только при изменении файла; обычные подсказки
+      // не должны каждый раз клонировать всё хранилище понятий.
+      const conceptStamp = await fs.stat(concepts.filePath).then(s => s.mtimeMs + ':' + s.size, () => 'missing');
+      if(_variantConceptSnapshot.stamp !== conceptStamp){
+        const data = await concepts.get();
+        _variantConceptSnapshot = { stamp:conceptStamp, concepts:data.concepts || [], queryPhrases:data.queryPhrases || [] };
+      }
+      return json(res, 200, buildVariants({
+        q, lang, dict, rows:_variantSnapshot.rows, synonyms:dict.synonyms || {}, caseMap:_caseMap.map,
+        concepts:_variantConceptSnapshot.concepts, queryPhrases:_variantConceptSnapshot.queryPhrases
+      }));
     }
 
     // ── свои имена в коде песочницы: что внутри, где объявлено, похожие на опечатку ──
