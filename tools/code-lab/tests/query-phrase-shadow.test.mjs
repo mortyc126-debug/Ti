@@ -77,4 +77,40 @@ const excludedIndex = createLegacyQueryPhraseShadow({
 assert.equal(excludedIndex.search('стрелочная функция').total, 0);
 assert.equal(excludedIndex.search('найти элемент по id').total, 0);
 
+// CSS float не является числом с плавающей точкой.
+const floatPieces = [
+  { id: 'css-float', title: 'Обтекание', lang: 'css' },
+  { id: 'py-float', title: 'Число float', lang: 'python' }
+];
+const floatUsage = {
+  terms: { css: { float: {} }, python: { float: {} } },
+  piecesOf(section) { return section === 'css' ? ['css-float'] : ['py-float']; },
+  pieceInfo(id) { return floatPieces.find(piece => piece.id === id) || null; },
+  pieceText(id) { return id === 'css-float' ? 'img { float: left; }' : 'value = float(text)'; }
+};
+const floatIndex = createLegacyQueryPhraseShadow({
+  queryPhrases: [{ id: 'float-type', phrase: 'число с плавающей точкой', targetKey: 'float' }],
+  usage: floatUsage
+});
+assert.deepEqual(floatIndex.search('число с плавающей точкой').rankedPieces.map(piece => piece.id), ['py-float']);
+
+// pandas.DataFrame.copy() не является copy.copy() и не должно попадать в поверхностную копию Python-объекта.
+const copyPieces = [
+  { id: 'real-copy', title: 'Поверхностная копия', lang: 'python' },
+  { id: 'pandas-copy', title: 'Очистка данных pandas', lang: 'python' }
+];
+const copyUsage = {
+  terms: { python: { 'copy.copy(obj)': {} } },
+  piecesOf() { return ['real-copy', 'pandas-copy']; },
+  pieceInfo(id) { return copyPieces.find(piece => piece.id === id) || null; },
+  pieceText(id) { return id === 'real-copy'
+    ? 'import copy\nresult = copy.copy(source)'
+    : 'import pandas as pd\nclean = raw.copy()'; }
+};
+const copyIndex = createLegacyQueryPhraseShadow({
+  queryPhrases: [{ id: 'shallow-copy', phrase: 'поверхностная копия', targetKey: 'copy.copy(obj)' }],
+  usage: copyUsage
+});
+assert.deepEqual(copyIndex.search('поверхностная копия').rankedPieces.map(piece => piece.id), ['real-copy']);
+
 console.log('query-phrase-shadow: isolated index and content-filter tests passed');
