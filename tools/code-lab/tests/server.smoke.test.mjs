@@ -133,6 +133,35 @@ try {
     assert.equal((await get('/api/template?id=' + encodeURIComponent(py.id))).lang, 'python');
   });
 
+  await test('импорт рецепта останавливается на неоднозначных названиях до подтверждения', async () => {
+    await fs.mkdir(path.join(L, 'library', 'js'), { recursive: true });
+    for(const [id, code] of [['recipe-title-a', 'const recipeA = 1;'], ['recipe-title-b', 'const recipeB = 2;']]){
+      await fs.writeFile(path.join(L, 'library', 'js', id + '.js'), code);
+      await fs.writeFile(path.join(L, 'library', 'js', id + '.js.meta.json'), JSON.stringify({
+        id, lang: 'js', title: 'Одинаковый компонент', group: 'Тест', desc: 'Для неоднозначного импорта', tags: [], aliases: []
+      }));
+    }
+    await new Promise(r => setTimeout(r, 1100));
+    await get('/api/list');
+    const before = (await fs.readdir(path.join(L, 'recipes')).catch(() => [])).filter(x => x.endsWith('.json')).length;
+    const preview = await post('/api/recipes/import', { title: 'Неполный рецепт', items: [{ title: 'Одинаковый компонент' }] });
+    assert.equal(preview.ok, false);
+    assert.equal(preview.needsConfirmation, true);
+    assert.equal(preview.itemsUnresolved, 1);
+    assert.equal(preview.unresolved[0].reason, 'неоднозначное название');
+    const afterPreview = (await fs.readdir(path.join(L, 'recipes')).catch(() => [])).filter(x => x.endsWith('.json')).length;
+    assert.equal(afterPreview, before, 'без подтверждения рецепт не должен сохраняться');
+
+    const confirmed = await post('/api/recipes/import', { title: 'Неполный рецепт', items: [{ title: 'Одинаковый компонент' }], allowUnresolved: true });
+    assert.equal(confirmed.ok, true);
+    assert.equal(confirmed.itemsUnresolved, 1);
+    const names = (await fs.readdir(path.join(L, 'recipes'))).filter(x => x.endsWith('.json'));
+    let saved = null;
+    for(const name of names){ const value = JSON.parse(await fs.readFile(path.join(L, 'recipes', name), 'utf8')); if(value.title === 'Неполный рецепт') saved = value; }
+    assert.ok(saved);
+    assert.equal(saved.items[0].id, '');
+  });
+
   await test('импорт сохраняет полный паспорт и не затирает ручные поля', async () => {
     const imported = await post('/api/import', { pieces: [{
       lang: 'js', title: 'Полный паспорт', group: 'Проверка импорта', desc: 'Ручное описание',
