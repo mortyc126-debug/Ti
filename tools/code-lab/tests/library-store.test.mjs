@@ -200,6 +200,20 @@ await test('автомиграция: пустая library + templates/ → ку
 });
 
 
+await test('старые паспорта с переставленными kind и note восстанавливают пояснение', async () => {
+  await store.save({
+    id: 'переставленные-поля', lang: 'js', title: 'Старые поля',
+    lines: tokenize('const present = 1;', 'js'),
+    wordNotes: [{ line: 0, col: 6, text: 'present', kind: 'пользовательское пояснение', note: 'name', source: 'custom' }]
+  });
+  const t = await store.get('переставленные-поля');
+  assert.equal(tokenAt(t.lines, 'present').e, 'пользовательское пояснение');
+  const file = path.join(tmp, 'lib', 'js', 'переставленные-поля.js.meta.json');
+  const meta = JSON.parse(await fs.readFile(file, 'utf8'));
+  assert.equal(meta.wordNotes[0].kind, 'name');
+  assert.equal(meta.wordNotes[0].note, 'пользовательское пояснение');
+});
+
 await test('больше пятидесяти непривязанных пояснений не теряются при сохранении', async () => {
   const notes = Array.from({ length: 60 }, (_, i) => ({
     line: 0, col: i, text: 'missingToken' + i, note: 'пояснение ' + i, source: 'custom'
