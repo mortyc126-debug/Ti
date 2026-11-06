@@ -207,7 +207,7 @@
         if(t && t.toLowerCase().startsWith(w)){
           const after = t.slice(w.length);
           const from = pos + m[1].length, to = from + m[2].length;
-          if(!py && /^\s*\(/.test(after) && rest.trim() && !/^\s*\(/.test(rest) && !/^\s*[.=:,;)]/.test(rest) && !/^\s*await\b/.test(rest)) out.push({ from, to, msg: 'после ' + m[2] + ' нужны круглые скобки: ' + t.replace(/\s*\{.*$/, '').replace(/\bусловие\b/g, '…'), level: 'bad' });
+          if(!py && /^\s*\(/.test(after) && rest.trim() && !/^\s*\(/.test(rest) && !/^\s*[.=:,;)]/.test(rest) && !/^\s*await\b/.test(rest)) out.push({ from, to, msg: 'после ' + m[2] + ' нужны круглые скобки: ' + t.replace(/\s*\{.*$/, '').replace(/условие/g, '…'), level: 'bad' });
           if(py && /:\s*$/.test(t) && !rest.includes(':') && !/[\\(\[{,]\s*$/.test(line.trimEnd()) && !/^\s*[.=(\[]/.test(rest)) out.push({ from, to, msg: 'в конце строки с ' + m[2] + ' нужно «:» — ' + t, level: 'bad' });
         }
       }
