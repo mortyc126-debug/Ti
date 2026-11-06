@@ -248,5 +248,47 @@ await test('больше пятидесяти непривязанных поя�
   assert.equal(meta.orphanNotes[59].note, 'пояснение 59');
 });
 
+await test('старый ID разрешается в канонический без появления второй записи', async () => {
+  const root = path.join(tmp, 'id-aliases');
+  const aliases = mk(root); await aliases.init();
+  await aliases.save({ id: 'canonical-piece', lang: 'js', title: 'Канонический фрагмент', lines: tokenize('const value = 1;', 'js') });
+  await fs.writeFile(path.join(root, '_id-aliases.json'), JSON.stringify({
+    version: 1, aliases: { 'legacy-piece': 'canonical-piece' }
+  }), 'utf8');
+  await aliases.refresh();
+  assert.equal(await aliases.has('legacy-piece'), true);
+  const resolved = await aliases.get('legacy-piece');
+  assert.equal(resolved.id, 'canonical-piece');
+  assert.equal((await aliases.rows()).filter(row => row.id === 'legacy-piece').length, 0);
+  assert.equal((await aliases.rows()).filter(row => row.id === 'canonical-piece').length, 1);
+  await assert.rejects(
+    aliases.save({ id: 'legacy-piece', lang: 'js', lines: tokenize('const duplicate = 2;', 'js') }),
+    /является алиасом/
+  );
+  assert.equal(await aliases.remove('legacy-piece'), false);
+  assert.equal(await aliases.has('canonical-piece'), true);
+});
+
+await test('циклические алиасы ID блокируют загрузку', async () => {
+  const root = path.join(tmp, 'id-alias-cycle');
+  await fs.mkdir(root, { recursive: true });
+  await fs.writeFile(path.join(root, '_id-aliases.json'), JSON.stringify({
+    version: 1, aliases: { 'old-a': 'old-b', 'old-b': 'old-a' }
+  }), 'utf8');
+  const aliases = mk(root);
+  await assert.rejects(aliases.init(), /Циклическая ссылка в алиасах ID/);
+});
+
+await test('алиас на отсутствующий канонический ID не создаёт фиктивную запись', async () => {
+  const root = path.join(tmp, 'id-alias-missing-target');
+  await fs.mkdir(root, { recursive: true });
+  await fs.writeFile(path.join(root, '_id-aliases.json'), JSON.stringify({
+    version: 1, aliases: { 'legacy-missing': 'canonical-missing' }
+  }), 'utf8');
+  const aliases = mk(root); await aliases.init();
+  assert.equal(await aliases.has('legacy-missing'), false);
+  assert.equal(await aliases.get('legacy-missing'), null);
+});
+
 await fs.rm(tmp, { recursive: true, force: true });
 console.log(`library-store: ${n} проверок пройдено`);
