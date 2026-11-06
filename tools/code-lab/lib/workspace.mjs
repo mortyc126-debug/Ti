@@ -92,17 +92,27 @@ const encode = (text, eol, bom) => {
   return (bom ? '\uFEFF' : '') + t;
 };
 
+const writeQueues = new Map(); // сериализуем замены одного пути: Windows не всегда допускает конкурирующий rename в один target
 async function writeAtomic(abs, data){
-  await fs.mkdir(path.dirname(abs), { recursive: true });
-  // У каждого параллельного сохранения свой временный файл: общий *.pid.tmp
-  // приводил к гонке двух writeFile/rename для одного пути.
-  const tmp = abs + '.' + process.pid + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10) + '.tmp';
+  const previous = writeQueues.get(abs) || Promise.resolve();
+  let release;
+  const current = new Promise(resolve => { release = resolve; });
+  writeQueues.set(abs, current);
+  await previous;
   try {
-    await fs.writeFile(tmp, data, 'utf8');
-    await fs.rename(tmp, abs);
-  } catch(e){
-    await fs.unlink(tmp).catch(() => {});
-    throw e;
+    await fs.mkdir(path.dirname(abs), { recursive: true });
+    // У каждой записи свой временный файл; разные пути по-прежнему пишутся параллельно.
+    const tmp = abs + '.' + process.pid + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10) + '.tmp';
+    try {
+      await fs.writeFile(tmp, data, 'utf8');
+      await fs.rename(tmp, abs);
+    } catch(e){
+      await fs.unlink(tmp).catch(() => {});
+      throw e;
+    }
+  } finally {
+    release();
+    if(writeQueues.get(abs) === current) writeQueues.delete(abs);
   }
 }
 
