@@ -58,6 +58,9 @@ jobs:
       - name: Build duplicate merge manifest
         if: always() && hashFiles('audit-library-report.json') != ''
         run: node tools/code-lab/scripts/build-duplicate-merge-manifest.mjs audit-library-report.json duplicate-merge-manifest.json
+      - name: Audit references to legacy fragment IDs
+        if: always() && hashFiles('duplicate-merge-manifest.json') != ''
+        run: node tools/code-lab/scripts/audit-duplicate-id-references.mjs tools/code-lab duplicate-merge-manifest.json duplicate-id-reference-report.json
       - name: Upload library audit report
         if: always()
         uses: actions/upload-artifact@v4
@@ -66,5 +69,6 @@ jobs:
           path: |
             audit-library-report.json
             duplicate-merge-manifest.json
+            duplicate-id-reference-report.json
           if-no-files-found: warn
           retention-days: 7
