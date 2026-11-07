@@ -272,7 +272,13 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     phraseRank: item._phraseRank, lexicalRank: item._lexicalRank, why: item.why
   }));
 
-  const roots = (variants?.roots || []).filter(root => inScope(root) && targetCompatible(root.term));
+  const roots = (variants?.roots || []).filter(root => {
+    if (!inScope(root) || !targetCompatible(root.term)) return false;
+    // href — HTML-атрибут ссылки, а не CSS-конструкция. Общий синоним
+    // не должен создавать второй CSS-корень для обычной навигационной ссылки.
+    if (linkTask && canonicalTerm(root.term) === 'href' && canonicalLanguage(root.lang || '') === 'css') return false;
+    return true;
+  });
   const rootByKey = new Map();
   const rootByLanguage = new Map();
   // Корни уже отсортированы по релевантности; для одноимённых конструкций
