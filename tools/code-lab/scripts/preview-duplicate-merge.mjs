@@ -109,18 +109,20 @@ for (const pair of manifest.pairs) {
     group: canonical.passport.group || secondary.passport.group || '',
     desc: descSource.passport.desc || '',
     descAt: descSource.passport.descAt ?? canonical.passport.descAt ?? secondary.passport.descAt,
-    component: canonical.passport.component ?? secondary.passport.component ?? null,
     output: canonical.passport.output || secondary.passport.output || '',
     labels: { ...(secondary.passport.labels || {}), ...(canonical.passport.labels || {}) },
     externalLinks: canonical.passport.externalLinks ?? secondary.passport.externalLinks ?? null,
     tags: uniqueList(orderedSources.map(source => source.passport.tags || [])),
     aliases: uniqueList(orderedSources.map(source => source.passport.aliases || [])),
     status: orderedSources.some(source => source.passport.status === 'described') ? 'described' : (canonical.passport.status || secondary.passport.status || 'needs_description'),
-    wordNotes: [...uniqueNotes(allWordNotes).map(({ _sourceFile, ...note }) => note), ...candidateConceptNotes],
+    // Concepts and component/provenance data stay out of the provisional passport:
+    // their original collection/schema must be reviewed before any import.
+    wordNotes: uniqueNotes(allWordNotes).map(({ _sourceFile, ...note }) => note),
     orphanNotes: uniqueNotes(allOrphanNotes).map(({ _sourceFile, ...note }) => note),
     _mergePreviewOnly: true
   };
-  if (!candidatePassport.component) delete candidatePassport.component;
+  delete candidatePassport.component;
+  delete candidatePassport.source;
   if (!Object.keys(candidatePassport.labels || {}).length) delete candidatePassport.labels;
   if (candidatePassport.externalLinks == null) delete candidatePassport.externalLinks;
   previews.push({
@@ -137,9 +139,15 @@ for (const pair of manifest.pairs) {
       componentSources: orderedSources.map(source => ({ file: source.file, component: source.passport.component ?? null })),
       provenanceSources: orderedSources.map(source => ({ file: source.file, source: source.passport.source ?? null })),
       provenanceMergeProposal,
+      componentMergeProposal: {
+        mode: 'preserve-original-objects; schema review required',
+        values: orderedSources.map(source => ({ file: source.file, value: source.passport.component ?? null }))
+      },
       sourcePassports: orderedSources.map(source => ({ file: source.file, id: source.id, passport: source.passport })),
       conceptNotes,
+      conceptNoteHandling: 'not moved into candidate wordNotes; original collection and record retained in sourcePassports',
       noteAnchorConflicts: pair.notes.anchorConflicts,
+      noteConflictHandling: 'all distinct note records retained; identical explanation with differing kind/source is metadata-only and no winner is selected',
       urls: pair.urls
     }
   });
@@ -151,7 +159,12 @@ const summary = {
   pairsWithFieldConflicts: previews.filter(item => item.review.fieldConflicts.length).length,
   pairsWithComponentDataOnBothSides: previews.filter(item => item.review.componentSources.every(x => x.component != null)).length,
   conceptNotesPreservedSeparately: previews.reduce((n, item) => n + item.review.conceptNotes.length, 0),
+  conceptNotesMovedIntoCandidatePassport: 0,
   noteAnchorConflicts: previews.reduce((n, item) => n + item.review.noteAnchorConflicts.length, 0),
+  differentExplanationConflicts: previews.reduce((n, item) => n + item.review.noteAnchorConflicts.filter(note => (note.explanations || []).length > 1).length, 0),
+  metadataOnlyNoteConflicts: previews.reduce((n, item) => n + item.review.noteAnchorConflicts.filter(note => (note.explanations || []).length === 1 && ((note.kinds || []).length > 1 || (note.sources || []).length > 1)).length, 0),
+  componentDataPreservedInSourcePassports: previews.reduce((n, item) => n + item.review.componentSources.filter(x => x.component != null).length, 0),
+  provenanceSourcePassportsPreserved: previews.reduce((n, item) => n + item.review.provenanceSources.filter(x => x.source != null).length, 0),
   importablePairs: 0
 };
 const result = {
