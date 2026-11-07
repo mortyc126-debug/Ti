@@ -168,9 +168,15 @@ async function main() {
     taskResultMap.set(query, result);
     taskResults.push({
       query,
-      targets: result.targets.slice(0, 12).map(x => x.targetKey),
-      roots: result.roots.slice(0, 12).map(x => x.term || x.label),
-      pieces: result.pieces.slice(0, 8).map(x => ({ title: x.title, lang: x.lang, sources: x.sources })),
+      targets: result.targets.slice(0, 12).map(x => ({
+        key: x.targetKey, score: x.score,
+        phrases: (x.phrases || []).slice(0, 2).map(p => ({ phrase: p.phrase, match: p.match?.kind, score: p.match?.score }))
+      })),
+      roots: result.roots.slice(0, 12).map(x => ({ term: x.term || x.label, score: x.score, label: x.label })),
+      pieces: result.pieces.slice(0, 8).map(x => ({
+        title: x.title, lang: x.lang, score: x.score, sources: x.sources,
+        matchedTargets: x.matchedTargets, contextBoost: x.contextBoost
+      })),
       counts: result.counts
     });
   }
