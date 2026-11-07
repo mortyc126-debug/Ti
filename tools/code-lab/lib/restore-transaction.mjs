@@ -55,7 +55,7 @@ async function hasSafeMarker(fs, dir, name){
 // fsync файла обязателен перед публикацией rename: после сбоя содержимое
 // временного файла должно пережить перезапуск, а не только попасть в page cache.
 export async function syncRestoreFile(fs = defaultFs, target){
-  const handle = await fs.open(target, 'r');
+  const handle = await fs.open(target, 'r+');
   try { await handle.sync(); }
   finally { await handle.close(); }
 }
