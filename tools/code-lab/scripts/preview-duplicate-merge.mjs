@@ -85,6 +85,22 @@ for (const pair of manifest.pairs) {
     field,
     values: orderedSources.map(source => ({ file: source.file, value: source.passport[field] ?? null }))
   }));
+  // Keep provenance out of the candidate passport until the real source schema is
+  // explicitly reconciled. This proposal is lossless and review-only: every
+  // original key/value remains paired with the passport it came from.
+  const provenanceKeys = [...new Set(orderedSources.flatMap(source =>
+    Object.keys(source.passport.source && typeof source.passport.source === 'object' ? source.passport.source : {})
+  ))].sort();
+  const provenanceMergeProposal = {
+    mode: 'preserve-all-values; manual schema reconciliation required',
+    fields: provenanceKeys.map(key => ({
+      key,
+      values: orderedSources
+        .filter(source => source.passport.source && typeof source.passport.source === 'object' &&
+          Object.prototype.hasOwnProperty.call(source.passport.source, key))
+        .map(source => ({ file: source.file, value: source.passport.source[key] }))
+    }))
+  };
   const candidatePassport = {
     ...canonical.passport,
     id: canonical.id,
@@ -120,6 +136,7 @@ for (const pair of manifest.pairs) {
       descSourceFile: descSource.file,
       componentSources: orderedSources.map(source => ({ file: source.file, component: source.passport.component ?? null })),
       provenanceSources: orderedSources.map(source => ({ file: source.file, source: source.passport.source ?? null })),
+      provenanceMergeProposal,
       sourcePassports: orderedSources.map(source => ({ file: source.file, id: source.id, passport: source.passport })),
       conceptNotes,
       noteAnchorConflicts: pair.notes.anchorConflicts,
