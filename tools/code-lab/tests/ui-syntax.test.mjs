@@ -15,7 +15,7 @@ test('публичные JS-файлы и встроенные скрипты с
     assert.doesNotThrow(()=>new vm.Script(source,{filename:file.name}),file.name);
   }
   const variantTree=await fs.readFile(path.join(PUBLIC,'vtree.js'),'utf8');
-  assert.match(variantTree,/paint\\(n\\.code\\s*\\|\\|\\s*n\\.show\\s*\\|\\|\\s*n\\.term/,'дерево должно показывать текстовые отношения, у которых нет вставляемого кода');
+  assert.match(variantTree,/paint\(n\.code\s*\|\|\s*n\.show\s*\|\|\s*n\.term/,'дерево должно показывать текстовые отношения, у которых нет вставляемого кода');
   const html=await fs.readFile(path.join(PUBLIC,'schema-json.html'),'utf8');
   const scripts=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(x=>x[1]).filter(x=>x.trim());
   assert.ok(scripts.length>0,'в schema-json.html должны быть встроенные скрипты');
