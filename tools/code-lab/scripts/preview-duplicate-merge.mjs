@@ -187,6 +187,10 @@ const summary = {
   metadataOnlyNoteConflicts: previews.reduce((n, item) => n + item.review.noteAnchorConflicts.filter(note => (note.explanations || []).length === 1 && ((note.kinds || []).length > 1 || (note.sources || []).length > 1)).length, 0),
   componentDataPreservedInSourcePassports: previews.reduce((n, item) => n + item.review.componentSources.filter(x => x.component != null).length, 0),
   provenanceSourcePassportsPreserved: previews.reduce((n, item) => n + item.review.provenanceSources.filter(x => x.source != null).length, 0),
+  componentFieldConflicts: previews.reduce((n, item) => n + item.review.componentMergeProposal.conflicts.length, 0),
+  provenanceFieldConflicts: previews.reduce((n, item) => n + item.review.provenanceMergeProposal.conflicts.length, 0),
+  componentMergeCompletePairs: previews.filter(item => item.review.componentMergeProposal.complete).length,
+  provenanceMergeCompletePairs: previews.filter(item => item.review.provenanceMergeProposal.complete).length,
   importablePairs: 0
 };
 const result = {
