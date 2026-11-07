@@ -91,7 +91,15 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
   // корни: термины, у которых синоним совпал со смыслом запроса, сам термин равен запросу или начинается с него
   const roots = [];
   const seen = new Set();
-  const add = (term, L, label, score) => { const k = L + '\u0000' + term; if(seen.has(k)) return; seen.add(k); roots.push({ term, lang: L, label, score }); };
+  const add = (term, L, label, score) => {
+    // Язык определяется синтаксисом самой конструкции, а не тем,
+    // в каком базовом словаре встретилась её синонимичная запись.
+    if (/^[:@]/.test(String(term).toLowerCase())) L = 'css';
+    const k = L + '\\u0000' + term;
+    if(seen.has(k)) return;
+    seen.add(k);
+    roots.push({ term, lang: L, label, score });
+  };
   const W = (dict && dict.words) || {};
   const tokRe = t => new RegExp('(^|[^\\w-])' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\w-])');
   // синонимы и словарь записаны по-разному (.settimeout / settimeout, for / «for (const item of items)»):
