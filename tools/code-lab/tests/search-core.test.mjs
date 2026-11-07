@@ -317,6 +317,45 @@ test('для вывода данных не подменяет textContent чи�
 });
 
 
+test('не превращает обычную кнопку в форму и список данных в выпадающий select', () => {
+  const button = combineTaskSearch({
+    query: 'кнопка по нажатию показывает сообщение',
+    directed: {
+      hits: [
+        { targetKey: '<button>', score: 48, pieces: [{ id: 'button', title: 'Кнопка', lang: 'html' }] },
+        { targetKey: '<form>', score: 43, pieces: [{ id: 'form', title: 'Форма', lang: 'html' }] }
+      ],
+      rankedPieces: [
+        { id: 'button', title: 'Кнопка', lang: 'html', targetKey: '<button>', position: 1 },
+        { id: 'form', title: 'Форма', lang: 'html', targetKey: '<form>', position: 2 }
+      ]
+    },
+    library: { hits: [] },
+    variants: { roots: [{ term: 'button', lang: 'html' }, { term: 'form', lang: 'html' }] }
+  });
+  assert.deepEqual(button.targets.map(target => target.targetKey), ['<button>']);
+  assert.ok(!button.roots.some(root => String(root.term).toLowerCase().includes('form')));
+
+  const list = combineTaskSearch({
+    query: 'получить данные из двух источников и вывести список в основной блок',
+    directed: {
+      hits: [
+        { targetKey: '<ul>', score: 45, pieces: [{ id: 'ul', title: 'Список', lang: 'html' }] },
+        { targetKey: '<select>', score: 39, pieces: [{ id: 'select', title: 'Выпадающий список', lang: 'html' }] }
+      ],
+      rankedPieces: [
+        { id: 'ul', title: 'Список', lang: 'html', targetKey: '<ul>', position: 1 },
+        { id: 'select', title: 'Выпадающий список', lang: 'html', targetKey: '<select>', position: 2 }
+      ]
+    },
+    library: { hits: [] },
+    variants: { roots: [] }
+  });
+  assert.ok(list.targets.some(target => target.targetKey === '<ul>'));
+  assert.ok(!list.targets.some(target => target.targetKey === '<select>'));
+});
+
+
 test('область задачи распознаёт веб-сборку и не путает её с задачей по массивам', () => {
   assert.equal(inferTaskScope('Добавить кнопку, которая показывает сообщение при нажатии'), 'web');
   assert.equal(inferTaskScope('Свернуть массив в одно значение'), '');
