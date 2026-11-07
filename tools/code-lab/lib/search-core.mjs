@@ -74,13 +74,13 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     if (linkTask && !/worker|данн|json|api|fetch|запрос|сохран|сериализ/.test(q) && /web worker|service worker|сериализуем|передача больших данных|обработка данных/.test(text)) return false;
     if (linkTask && !/динамич|вставить|заменить|создать элемент/.test(q) && /insertadjacenthtml|replacechildren/.test(text)) return false;
     if (linkTask && !asksTesting && /playwright|jest|vitest|тест/.test(text)) return false;
-    if (linkTask && !/динамич|вставить|создать элемент|dom/.test(q) && /element\\.before|insertbefore|insertadjacent|replacechildren/.test(text)) return false;
+    if (linkTask && !/динамич|вставить|создать элемент|dom/.test(q) && /element\.before|insertbefore|insertadjacent|replacechildren/.test(text)) return false;
     if (headingTask && !buttonTask && /кнопк/.test(text)) return false;
     if (hoverTask && !asksSpacing && /letter-spacing|line-height|white-space/.test(text)) return false;
     if (hoverTask && !asksSorting && /sort(?:ed|ing)?|сортир/.test(text)) return false;
     if (hoverTask && headingTask && !/список|маркер|list/.test(q) && /маркер списка|list marker/.test(text)) return false;
-    if (hoverTask && headingTask && !/аббр|сокращ|расшифров/.test(q) && /\\babbr\\b|сокращённый текст/.test(text)) return false;
-    if (hoverTask && headingTask && !/ссылк|кнопк|кликаб|указател/.test(q) && /курсор-указатель|cursor:\\s*pointer/.test(text)) return false;
+    if (hoverTask && headingTask && !/аббр|сокращ|расшифров/.test(q) && /\babbr\b|сокращённый текст/.test(text)) return false;
+    if (hoverTask && headingTask && !/ссылк|кнопк|кликаб|указател/.test(q) && /курсор-указатель|cursor:\s*pointer/.test(text)) return false;
     if (collapseTask && !/свер|раскры|toggle|переключ|панел|sidebar|aside|details|summary|hidden|aria-expanded|display|visibility|overflow|classlist|скрыть|закрыть/.test(text)) return false;
     if (collapseTask && !asksMessageGroup && /групп.*сообщен|сообщен.*групп|message group|chat group/.test(text)) return false;
     if (collapseTask && !asksFile && /канонический путь|symbolic link|symlink|файловый путь/.test(text)) return false;
@@ -103,7 +103,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     if (webTask && key === 'list' && !/input|datalist|поле ввода|список вариантов|подсказк/.test(q)) return false;
     if (webTask && key === 'sum' && !asksArithmetic) return false;
     if (hoverTask && key.startsWith('<font') && !/font|шрифт/.test(q)) return false;
-    if (multiSourceTask && !asksForm && /^<(?:form|input|datalist)\\b/.test(key)) return false;
+    if (multiSourceTask && !asksForm && /^<(?:form|input|datalist)\b/.test(key)) return false;
     if (buttonTask && !asksMouse && key.includes('event.button')) return false;
     if (buttonTask && !asksForm && key === 'form') return false;
     if (key === 'disabled' && !/отключ|заблок|неактив|запрет|disable/.test(q)) return false;
