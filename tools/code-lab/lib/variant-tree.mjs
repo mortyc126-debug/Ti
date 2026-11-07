@@ -91,14 +91,14 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
   // корни: термины, у которых синоним совпал со смыслом запроса, сам термин равен запросу или начинается с него
   const roots = [];
   const seen = new Set();
-  const add = (term, L, label, score) => {
+  const add = (term, L, label, score, phraseCoverage = 1) => {
     // Язык определяется синтаксисом самой конструкции, а не тем,
     // в каком базовом словаре встретилась её синонимичная запись.
     if (/^[:@]/.test(String(term).toLowerCase())) L = 'css';
     const k = L + '\u0000' + term;
     if(seen.has(k)) return;
     seen.add(k);
-    roots.push({ term, lang: L, label, score });
+    roots.push({ term, lang: L, label, score, phraseCoverage });
   };
   const W = (dict && dict.words) || {};
   const tokRe = t => new RegExp('(^|[^\\w-])' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\w-])');
@@ -131,7 +131,7 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
         .filter(item => item.match).sort((a, b) => b.match.score - a.match.score);
       const hit = matches[0]; if(!hit) continue;
       const res = resolve(term, D, L); if(!res) continue;
-      add(res.key, L, hit.phrase, 2 + hit.match.score / 20 + res.rank);
+      add(res.key, L, hit.phrase, 2 + hit.match.score / 20 + res.rank, hit.match.phraseCoverage ?? 1);
     }
     // латиницей пишут начало имени («quer») — совпадение по началу важнее смысла по синонимам
     const latin = /^[a-z]/.test(qn);
@@ -142,7 +142,11 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
   if(/^[a-z]/.test(qn) && roots.some(r => r.score >= 5)) for(let i = roots.length - 1; i >= 0; i--) if(roots[i].score < 5) roots.splice(i, 1);
   // если корень — разновидность другого корня (margin-top при margin), прячем его внутрь
   const top = roots.filter(r => !roots.some(o => o !== r && o.lang === r.lang && r.term.startsWith(o.term + '-')))
-    .sort((a, b) => b.score - a.score || a.term.length - b.term.length).slice(0, MAX_ROOTS);
+    // Сначала предпочитаем фразы, чья смысловая часть покрыта запросом целиком.
+    // Это не даёт длинной составной фразе («обработчик нажатия кнопки»)
+    // вытеснить точное название основного объекта («кнопка») только за счёт лишнего совпавшего слова.
+    .sort((a, b) => (b.phraseCoverage ?? 1) - (a.phraseCoverage ?? 1) ||
+      b.score - a.score || a.term.length - b.term.length).slice(0, MAX_ROOTS);
 
   // Единый парсер структуры — тот же, который использует сервер и редактор правил.
   // Дерево не пытается повторно интерпретировать грамматику регулярными выражениями.
