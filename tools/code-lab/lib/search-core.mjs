@@ -193,7 +193,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
       sections: hit.sections || [],
       pieceCount: matchedPieces.length,
       rootTerm: root?.term || hit.targetKey,
-      rootLang: root?.lang || matchedPieces[0]?.lang || null
+      rootLang: matchedPieces[0]?.lang || root?.lang || null
     };
   });
 
