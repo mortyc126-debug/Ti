@@ -206,7 +206,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     (a._lexicalRank ?? Infinity) - (b._lexicalRank ?? Infinity) ||
     String(a.title).localeCompare(String(b.title), 'ru')
   ).slice(0, max).map((item, index) => ({
-    id: item.id, title: item.title, lang: item.lang, group: item.group,
+    id: item.id, title: item.title, lang: canonicalLanguage(item.lang || ''), group: item.group,
     desc: item.desc, tags: item.tags, aliases: item.aliases,
     score: round(item._rankScore), position: index + 1,
     contextBoost: item._languageMatch ? 'язык активного файла' : null,
@@ -227,7 +227,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
       sections: hit.sections || [],
       pieceCount: matchedPieces.length,
       rootTerm: root?.term || hit.targetKey,
-      rootLang: matchedPieces[0]?.lang || root?.lang || null
+      rootLang: canonicalLanguage(matchedPieces[0]?.lang || root?.lang || '') || null
     };
   });
 
