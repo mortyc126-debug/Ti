@@ -142,7 +142,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     }
     directedById = makeCandidateMap(fallback, false);
   }
-  const directedPieces = [...directedById.values()].sort((a, b) => {
+  const directedPieces = [...directedById.values()].filter(inTaskScope).sort((a, b) => {
     const rank = item => item._rankPosition ?? (-(item.combinedScore || 0));
     return rank(a) - rank(b) ||
       (a.targetPosition || Infinity) - (b.targetPosition || Infinity) ||
@@ -150,7 +150,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
       String(a.title || a.id).localeCompare(String(b.title || b.id), 'ru');
   }).slice(0, max).map(({ _rankPosition, ...piece }) => piece);
 
-  directedPieces.filter(inTaskScope).forEach((piece, index) => {
+  directedPieces.forEach((piece, index) => {
     const item = ensure(piece.id);
     Object.assign(item, {
       title: piece.title || item.title, lang: piece.lang || item.lang,
@@ -258,7 +258,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
       pieces: pieces.length,
       directedRawPieces: (directed?.rankedPieces || []).length,
       directedRawLanguages: [...new Set((directed?.rankedPieces || []).map(piece => String(piece.lang || '')))].slice(0, 8),
-      directedPieces: directedPieces.filter(inTaskScope).length,
+      directedPieces: directedPieces.length,
       lexicalPieces: (library?.hits || []).filter(inTaskScope).length
     }
   };
