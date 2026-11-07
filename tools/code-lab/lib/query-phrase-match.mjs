@@ -6,6 +6,8 @@ const normalize = value => String(value == null ? '' : value)
 // Убираем только грамматический шум. Отрицание, условия и смысловые предлоги сохраняем.
 const STOP = new Set('и а но или что который которая которые которое это этот эта эти мне мне надо нужно хочу сделать сделай сделайте добавить добавь добавьте создать создай создайте чтобы который которая которое которые когда как'.split(' '));
 const NEGATION = new Set(['не', 'без', 'нельзя', 'запрещено', 'кроме']);
+// Общие существительные не должны сами по себе притягивать несвязанные конструкции.
+const GENERIC_CONTEXT_TOKENS = new Set(['блок', 'элемент', 'текст', 'страниц', 'дан', 'объект', 'мест', 'результат', 'содержим', 'част', 'област']);
 const UNIQUE = values => [...new Set(values)];
 const RAW_WORD = /[\p{L}\p{N}]+(?:[-_][\p{L}\p{N}]+)*/gu;
 const rawWords = value => normalize(value).match(RAW_WORD) || [];
@@ -109,6 +111,7 @@ export function matchQueryPhrase(query, phrase, targetKey = '') {
   const qSet = new Set(qt);
   const matched = UNIQUE(pt.filter(token => qSet.has(token)));
   if (!matched.length) return null;
+  if (qt.length > 1 && matched.length === 1 && GENERIC_CONTEXT_TOKENS.has(matched[0])) return null;
 
   const phraseCoverage = matched.length / pt.length;
   const queryCoverage = matched.length / qt.length;
