@@ -33,6 +33,8 @@ function contextConflict(query, phrase, targetKey) {
   const pCollection = /массив|список|коллекц|последовательност/.test(p);
   const qInside = /внутр/.test(q), qOutside = /снаруж/.test(q);
   const pInside = /внутр/.test(p), pOutside = /снаруж/.test(p);
+  const qSpacing = /отступ|padding|margin/.test(q);
+  if (qSpacing && (target === 'in' || target.endsWith('appendchild') || target.endsWith('textcontent'))) return true;
   if ((qInside && !qOutside && pOutside && !pInside) || (qOutside && !qInside && pInside && !pOutside)) return true;
   if ((qInside && !qOutside && !pInside) || (qOutside && !qInside && !pOutside)) return true;
   const qThickness = /толщин|жирност/.test(q), qSize = /размер/.test(q);

@@ -44,6 +44,15 @@ test('контрастные уточнения не смешиваются пр
   assert.equal(matchQueryPhrase('выровнять текст по центру', 'выровнять элементы по центру'), null);
 });
 
+test('контекст отступов не притягивает DOM API и оператор in', () => {
+  assert.equal(matchQueryPhrase('отступ внутри элемента', 'вставить элемент внутрь', 'appendChild'), null);
+  assert.equal(matchQueryPhrase('отступ внутри элемента', 'текст внутри элемента', 'textContent'), null);
+  assert.equal(matchQueryPhrase('отступ внутри элемента', 'внутри списка', 'in'), null);
+  assert.ok(matchQueryPhrase('оператор in для проверки вхождения в список', 'оператор in для проверки вхождения в список', 'in'));
+  assert.ok(matchQueryPhrase('получить текст внутри элемента', 'текст внутри элемента', 'textContent'));
+  assert.ok(matchQueryPhrase('добавить элемент внутрь контейнера', 'вставить элемент внутрь', 'appendChild'));
+});
+
 test('ссылка и кнопка не подменяют друг друга при совпадении действия', () => {
   assert.equal(matchQueryPhrase('ссылка по клику', 'действие по клику', '<button>'), null);
   assert.equal(matchQueryPhrase('кнопка', 'ссылка', 'href'), null);
