@@ -62,7 +62,7 @@ export function matchQueryPhrase(query, phrase, targetKey = '') {
   const phraseCoverage = matched.length / pt.length;
   const queryCoverage = matched.length / qt.length;
   // Одиночный общий короткий токен слишком часто даёт ложные связи.
-  if (matched.length === 1 && pt.length > 1 && matched[0].length < 5) return null;
+  if (matched.length === 1 && pt.length > 1 && matched[0].length < 4) return null;
 
   let ordered = 0;
   let cursor = 0;
