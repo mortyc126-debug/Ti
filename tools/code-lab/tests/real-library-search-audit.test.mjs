@@ -262,6 +262,38 @@ async function main() {
 
   console.log('TASK SEARCH REAL SCENARIOS:', JSON.stringify(taskResults));
 
+  // Диагностика ранга курируемых целей: наличие где-либо в hits недостаточно,
+  // поэтому отдельно фиксируем позицию в первых 20 целях, не меняя поисковую выдачу.
+  const rankingMetrics = (() => {
+    const rows = Object.entries(expectedCuratedTargets).map(([query, expected]) => {
+      const result = results.find(item => item.query === query);
+      const ranked = (result?.shadowTop20 || []).map((hit, index) => ({ key: String(hit.targetKey || '').toLowerCase(), rank: index + 1 }));
+      const targets = expected.map(target => {
+        const match = ranked.find(item => item.key === String(target).toLowerCase());
+        return { target, rank: match?.rank ?? null };
+      });
+      return {
+        query,
+        expected: targets.length,
+        foundTop3: targets.filter(item => item.rank != null && item.rank <= 3).length,
+        foundTop10: targets.filter(item => item.rank != null && item.rank <= 10).length,
+        foundTop20: targets.filter(item => item.rank != null && item.rank <= 20).length,
+        targets
+      };
+    });
+    const total = rows.reduce((sum, row) => sum + row.expected, 0);
+    const count = limit => rows.reduce((sum, row) => sum + row.targets.filter(item => item.rank != null && item.rank <= limit).length, 0);
+    return {
+      curatedQueries: rows.length,
+      expectedTargets: total,
+      foundTop3: count(3),
+      foundTop10: count(10),
+      foundTop20: count(20),
+      missingTop20: rows.flatMap(row => row.targets.filter(item => item.rank == null).map(item => ({ query: row.query, target: item.target }))),
+      byQuery: rows
+    };
+  })();
+
   const report = {
     generatedAt: new Date().toISOString(),
     branch: 'audit/fixes-2026-11-06',
@@ -270,6 +302,7 @@ async function main() {
     shadowRanking: 'fragment-level; exact and token-overlap phrase matches with Russian stemming, plus title/description/tags/aliases relevance; deterministic heuristic, not semantic model ranking',
     comparisonNote: 'shadow and legacy now expose fragment positions; their scoring systems differ, so compare rank movement and content relevance rather than raw score values',
     queryCount: queries.length,
+    rankingMetrics,
     phraseCount: (await get('/api/search/shadow?q=' + encodeURIComponent(queries[0]) + '&limit=1')).shadowPhraseCount,
     templateCount: templateCache.size,
     taskResults,
@@ -280,6 +313,7 @@ async function main() {
   assert.equal(httpErrors.length, 0, 'Один или несколько ответов не подтвердили неизменность production search');
   console.log(`REAL LIBRARY HTTP AUDIT: ${queries.length} queries; ${templateCache.size} full fragments; report: ${OUT}`);
   console.log(`Queries with shadow hits: ${results.filter(result => result.shadowTotal > 0).length}`);
+  console.log('CURATED TARGET RANKS:', JSON.stringify({ expected: rankingMetrics.expectedTargets, top3: rankingMetrics.foundTop3, top10: rankingMetrics.foundTop10, top20: rankingMetrics.foundTop20, missingTop20: rankingMetrics.missingTop20 }));
   console.log(`Queries with ambiguous targets: ${results.filter(result => result.shadowAmbiguous).length}`);
 }
 
