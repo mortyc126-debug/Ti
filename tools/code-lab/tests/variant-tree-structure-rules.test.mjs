@@ -58,6 +58,7 @@ test('общий парсер распознаёт все типы правил 
     assert.ok(verbs.has(verb), `парсер должен распознавать «${verb}»`);
   }
   assert.equal(parsed.bad.length, 0);
+  assert.equal(StructureRules.parse('try: можно содержать catch, finally').rules[0].verb, 'содержит');
 });
 
 test('дерево использует общий парсер для вложенности и обратных связей', () => {
