@@ -7,7 +7,7 @@ const read = path => JSON.parse(fs.readFileSync(new URL(path, import.meta.url), 
 const dict = read('../public/keyword-dict.json');
 dict.langs = {};
 for (const lang of ['css', 'html', 'js', 'python', 'sql', 'ts']) {
-  dict.langs[lang] = read(\`../public/dict/langs/\${lang}.json\`);
+  dict.langs[lang] = read('../public/dict/langs/' + lang + '.json');
 }
 const synonyms = read('../public/dict/synonyms.json');
 const hasRussian = value => /[А-Яа-яЁё]/.test(String(value || ''));
@@ -24,15 +24,15 @@ test('реальные варианты конструкций имеют рус
   for (const item of cases) {
     const result = buildVariants({ ...item, dict, rows: [], synonyms });
     const root = result.roots.find(node => node.term.toLowerCase() === item.term.toLowerCase());
-    assert.ok(root, \`не найден вариант \${item.term} для запроса «\${item.q}»\`);
-    assert.ok(hasRussian(root.label) || hasRussian(root.note), \`\${item.term}: нет русской подписи или пояснения\`);
+    assert.ok(root, 'не найден вариант ' + item.term + ' для запроса «' + item.q + '»');
+    assert.ok(hasRussian(root.label) || hasRussian(root.note), item.term + ': нет русской подписи или пояснения');
     for (const node of flatten(root.children)) {
       if (node.group) {
-        assert.ok(hasRussian(node.label), \`\${item.term}: группа \${node.label} не подписана по-русски\`);
+        assert.ok(hasRussian(node.label), item.term + ': группа ' + node.label + ' не подписана по-русски');
       } else if (node.term || node.show) {
         assert.ok(
           hasRussian(node.label) || hasRussian(node.note) || hasRussian(node.show),
-          \`\${item.term} → \${node.term || node.show}: нет русской подписи или пояснения\`
+          item.term + ' → ' + (node.term || node.show) + ': нет русской подписи или пояснения'
         );
       }
     }
