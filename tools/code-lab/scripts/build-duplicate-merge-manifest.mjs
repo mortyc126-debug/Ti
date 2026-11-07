@@ -50,6 +50,20 @@ const pairs = report.duplicateReview.map((group, index) => {
       noteConflicts.push({ anchor, explanations, kinds, sources, records: notes });
     }
   }
+  const conflictSummary = {
+    anchorCount: noteConflicts.length,
+    sameExplanationCount: noteConflicts.filter(item => item.explanations.length === 1).length,
+    differentExplanationCount: noteConflicts.filter(item => item.explanations.length > 1).length,
+    kindDifferenceCount: noteConflicts.filter(item => item.kinds.length > 1).length,
+    sourceDifferenceCount: noteConflicts.filter(item => item.sources.length > 1).length,
+    metadataOnlyCount: noteConflicts.filter(item => item.explanations.length === 1 && (item.kinds.length > 1 || item.sources.length > 1)).length,
+    orphanNoteRecords: allNotes.filter(note => note.collection === 'orphanNotes' && note.kind !== 'concept').length,
+    uniqueOrphanNotes: unique(allNotes.filter(note => note.collection === 'orphanNotes' && note.kind !== 'concept').map(note => ({
+      line: note.line, col: note.col, text: note.text, kind: note.kind, note: note.note, source: note.source
+    }))).length
+  };
+  conflictSummary.duplicateOrphanNotes = conflictSummary.orphanNoteRecords - conflictSummary.uniqueOrphanNotes;
+
   const metas = files.map(f => ({ file: f.file, id: f.id, meta: f.metaSummary || {} }));
   const fields = ['title', 'group', 'desc', 'tags', 'aliases', 'status', 'component', 'source', 'externalLinks'];
   const differences = fields.filter(field => {
@@ -83,7 +97,8 @@ const pairs = report.duplicateReview.map((group, index) => {
       wordNotes: allNotes.filter(n => n.collection === 'wordNotes' && n.kind !== 'concept'),
       orphanNotes: allNotes.filter(n => n.collection === 'orphanNotes' && n.kind !== 'concept'),
       conceptNotes: allNotes.filter(n => n.kind === 'concept'),
-      anchorConflicts: noteConflicts
+      anchorConflicts: noteConflicts,
+      conflictSummary
     },
     urls: { code: codeUrls, passport: metaUrls, union: unique([...codeUrls, ...metaUrls]) }
   };
@@ -98,6 +113,11 @@ const summary = {
   noteRecords: pairs.reduce((n, p) => n + p.notes.sourceRecordCount, 0),
   deduplicatedNoteRecords: pairs.reduce((n, p) => n + p.notes.exactRecordCountAfterDeduplication, 0),
   noteAnchorConflicts: pairs.reduce((n, p) => n + p.notes.anchorConflicts.length, 0),
+  differentExplanationConflicts: pairs.reduce((n, p) => n + p.notes.conflictSummary.differentExplanationCount, 0),
+  metadataOnlyNoteConflicts: pairs.reduce((n, p) => n + p.notes.conflictSummary.metadataOnlyCount, 0),
+  orphanNoteRecords: pairs.reduce((n, p) => n + p.notes.conflictSummary.orphanNoteRecords, 0),
+  uniqueOrphanNotes: pairs.reduce((n, p) => n + p.notes.conflictSummary.uniqueOrphanNotes, 0),
+  duplicateOrphanNotes: pairs.reduce((n, p) => n + p.notes.conflictSummary.duplicateOrphanNotes, 0),
   conceptNotes: pairs.reduce((n, p) => n + p.notes.conceptNotes.length, 0),
   urls: unique(pairs.flatMap(p => p.urls.union)).length
 };
