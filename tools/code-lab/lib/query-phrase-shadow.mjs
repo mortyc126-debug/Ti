@@ -107,7 +107,6 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
     if (!q) return { query: q, total: 0, hits: [], rankedPieces: [], ambiguous: false };
     const grouped = new Map();
     const allowedLanguages = scopeLanguages(scope);
-    const candidateLanguages = Object.create(null);
 
     for (const [phrase, records] of byPhrase) {
       for (const record of records) {
@@ -138,8 +137,6 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
           if (hit.pieces.some(piece => piece.id === id)) continue;
           const piece = usage.pieceInfo(id);
           if (!piece) continue;
-          const pieceLanguage = canonicalLanguage(piece.lang || '') || '(empty)';
-          candidateLanguages[pieceLanguage] = (candidateLanguages[pieceLanguage] || 0) + 1;
           if (language && canonicalLanguage(piece.lang) !== canonicalLanguage(language)) continue;
           if (allowedLanguages && !allowedLanguages.has(canonicalLanguage(piece.lang))) continue;
           const relevant = hit.phrases.some(record =>
@@ -185,9 +182,6 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
 
     return {
       query: q,
-      scope: normalize(scope),
-      allowedLanguages: allowedLanguages ? [...allowedLanguages] : [],
-      candidateLanguages,
       total: hits.length,
       ambiguous: new Set(hits.map(hit => conceptIdentity(hit.targetKey))).size > 1,
       hits: hits.slice(0, Math.max(1, Math.min(200, Number(limit) || 60))),
