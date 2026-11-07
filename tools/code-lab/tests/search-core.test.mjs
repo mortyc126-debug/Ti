@@ -124,3 +124,22 @@ test('пустой список matchedTargets не теряет связь с �
   assert.deepEqual(result.pieces[0].matchedTargets, ['button']);
   assert.deepEqual(result.pieces[0].why[0].targets, ['button']);
 });
+
+
+test('цель, отсутствующая среди ограниченных корней дерева, сохраняет термин и язык', () => {
+  const result = combineTaskSearch({
+    query: 'получить данные из двух источников',
+    directed: {
+      hits: [{
+        targetKey: 'Promise.all', score: 47, phrases: [{ phrase: 'дождаться всех источников данных' }],
+        pieces: [{ id: 'promise-piece', lang: 'js' }]
+      }],
+      rankedPieces: [{ id: 'promise-piece', title: 'Дождаться нескольких запросов', lang: 'js', targetKey: 'Promise.all' }]
+    },
+    library: { hits: [] },
+    variants: { roots: [] }
+  });
+  assert.equal(result.targets[0].rootTerm, 'Promise.all');
+  assert.equal(result.targets[0].rootLang, 'js');
+  assert.equal(result.pieces[0].matchedTargets[0], 'Promise.all');
+});
