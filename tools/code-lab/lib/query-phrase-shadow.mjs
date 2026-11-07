@@ -1,15 +1,9 @@
 // Теневой индекс направленных поисковых фраз legacy-словаря и отдельного хранилища понятий.
 // Не меняет рабочий поиск: строит кандидатов и связывает их с проверяемыми фрагментами.
+import { matchQueryPhrase, queryTokens } from './query-phrase-match.mjs';
+
 const normalize = value => String(value == null ? '' : value)
   .trim().toLocaleLowerCase('ru').replace(/ё/g, 'е').replace(/\s+/g, ' ');
-
-function phraseScore(query, phrase) {
-  if (query === phrase) return 100;
-  // Префиксное расширение полезно для уточнённых формулировок, но короткие
-  // однословные запросы не должны размножать десятки частных понятий.
-  if (query.includes(' ') && phrase.startsWith(query + ' ')) return 85;
-  return 0;
-}
 
 const EXCLUDED_PHRASE_TARGETS = new Set([
   'стрелочная функция\u0000lambda',
@@ -74,7 +68,7 @@ function pieceRelevanceScore(piece, phrases) {
   let best = 0;
   for (const record of phrases) {
     const phrase = normalize(record.phrase);
-    const phraseWords = words(phrase);
+    const phraseWords = new Set(queryTokens(phrase));
     let score = title === phrase ? 150 : title.includes(phrase) ? 120 : Math.round(70 * overlap(title, phraseWords));
     score += desc.includes(phrase) ? 40 : Math.round(25 * overlap(desc, phraseWords));
     score += Math.round(15 * overlap(extra, phraseWords));
@@ -108,8 +102,9 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
     const grouped = new Map();
 
     for (const [phrase, records] of byPhrase) {
-      const score = phraseScore(q, phrase);
-      if (!score) continue;
+      const match = matchQueryPhrase(q, phrase);
+      if (!match) continue;
+      const score = match.score;
       for (const record of records) {
         const recordLanguage = normalize(record.language);
         const recordScope = normalize(record.scope);
@@ -121,7 +116,7 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
         hit.score = Math.max(hit.score, score);
         if (!hit.phrases.some(x => x.id === record.id)) hit.phrases.push({
           id: record.id, phrase: record.phrase, language: record.language || '',
-          scope: record.scope || '', note: record.note || '', source: record.source || null
+          scope: record.scope || '', note: record.note || '', source: record.source || null, match
         });
       }
     }
@@ -142,7 +137,7 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
           hit.pieces.push({ ...piece, relevanceScore: pieceRelevanceScore(piece, hit.phrases) });
         }
       }
-      hit.phrases.sort((a, b) => a.phrase.localeCompare(b.phrase, 'ru'));
+      hit.phrases.sort((a, b) => (b.match?.score || 0) - (a.match?.score || 0) || a.phrase.localeCompare(b.phrase, 'ru'));
       hit.sections.sort();
       hit.pieces.sort((a, b) =>
         b.relevanceScore - a.relevanceScore ||
