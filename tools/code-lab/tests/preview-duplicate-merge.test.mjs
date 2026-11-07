@@ -49,7 +49,7 @@ try {
   assert.deepEqual(pair.candidatePassport.component, { provides: ['a'] });
   assert.deepEqual(pair.candidatePassport.source, { desc: 'manual' });
   assert.deepEqual(pair.candidatePassport.tags, ['канонический-тег', 'старый-тег']);
-  assert.deepEqual(pair.candidatePassport.aliases, ['пример', 'старый-вариант']);
+  assert.deepEqual(pair.candidatePassport.aliases, ['пример', 'старый-вариант', 'Коротко']);
   assert.equal(pair.review.conceptNotes.length, 1);
   assert.equal(pair.candidatePassport.wordNotes.filter(note => note.kind === 'concept').length, 1);
   assert.equal(pair.candidatePassport.wordNotes.length, 3);
