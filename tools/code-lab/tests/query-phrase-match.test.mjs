@@ -11,7 +11,7 @@ test('длинный запрос сопоставляется с отдельн
 
 test('точное совпадение выше частичного', () => {
   const exact = matchQueryPhrase('отступ внутри элемента', 'отступ внутри элемента');
-  const partial = matchQueryPhrase('отступ внутри элемента', 'отступ');
+  const partial = matchQueryPhrase('отступ внутри элемента', 'отступ внутри блока');
   assert.equal(exact.score, 100);
   assert.ok(partial && partial.score < exact.score);
 });
