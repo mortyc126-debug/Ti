@@ -15,20 +15,20 @@ export function queryTokens(value) {
 export function matchQueryPhrase(query, phrase) {
   const q = normalize(query), p = normalize(phrase);
   if (!q || !p) return null;
-  if (q === p) return { score: 100, kind: 'exact', matchedTokens: queryTokens(p), phraseCoverage: 1, queryCoverage: 1 };
-  if (p.startsWith(q + ' ')) return { score: 90, kind: 'query-prefix', matchedTokens: queryTokens(q), phraseCoverage: 1, queryCoverage: 1 };
-  if (q.includes(' ' + p + ' ' ) || q.startsWith(p + ' ') || q.endsWith(' ' + p))
-    return { score: 88, kind: 'phrase-contained', matchedTokens: queryTokens(p), phraseCoverage: 1, queryCoverage: 1 };
-
   const qt = queryTokens(q), pt = queryTokens(p);
   if (!qt.length || !pt.length) return null;
-  const qSet = new Set(qt);
-  const matched = UNIQUE(pt.filter(token => qSet.has(token)));
-  if (!matched.length) return null;
-
   const qNeg = qt.filter(token => NEGATION.has(token));
   const pNeg = pt.filter(token => NEGATION.has(token));
   if (qNeg.length !== pNeg.length || qNeg.some(token => !pNeg.includes(token))) return null;
+
+  if (q === p) return { score: 100, kind: 'exact', matchedTokens: pt, phraseCoverage: 1, queryCoverage: 1 };
+  if (p.startsWith(q + ' ')) return { score: 90, kind: 'query-prefix', matchedTokens: qt, phraseCoverage: 1, queryCoverage: 1 };
+  if (q.includes(' ' + p + ' ' ) || q.startsWith(p + ' ') || q.endsWith(' ' + p))
+    return { score: 88, kind: 'phrase-contained', matchedTokens: pt, phraseCoverage: 1, queryCoverage: 1 };
+
+  const qSet = new Set(qt);
+  const matched = UNIQUE(pt.filter(token => qSet.has(token)));
+  if (!matched.length) return null;
 
   const phraseCoverage = matched.length / pt.length;
   const queryCoverage = matched.length / qt.length;
