@@ -86,9 +86,11 @@
     const roots = ((r && r.roots) || []).filter(n => n.label !== 'куски из библиотеки');
     const pieces = (r && r.pieces) || [];
     const canonical = value => String(value || '').toLowerCase().replace(/^<([a-z][a-z0-9-]*)>$/, '$1');
-    const targetLabels = new Map(roots.map(root => [
-      canonical(root.term), root.note || root.show || root.label || root.term
-    ]));
+    const targetLabels = new Map();
+    for(const root of roots){
+      const key = canonical(root.term);
+      if(!targetLabels.has(key)) targetLabels.set(key, root.note || root.show || root.label || root.term);
+    }
     for(const target of (r && r.targets) || []){
       const root = roots.find(item => canonical(item.term) === canonical(target.targetKey));
       if(root) targetLabels.set(canonical(target.targetKey), root.note || root.show || root.label || root.term);
