@@ -41,6 +41,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     if (hoverTask && !asksSorting && /sort(?:ed|ing)?|сортир/.test(text)) return false;
     if (webTask && !asksFile && (text.includes('document.write') || /записать файл/.test(text))) return false;
     if (multiSourceTask && /источник узла|идентификатор источника узла|заголовок источника узла|описание источника узла/.test(text) && !/dom|узел|node/.test(q)) return false;
+    if (multiSourceTask && /узел|node|indexeddb|localstorage|sessionstorage|ковариац|корреляц|статист/.test(text) && !/dom|узел|node|indexeddb|localstorage|хранилищ|корреляц|статист|ряд/.test(q)) return false;
     return true;
   };
   const targetCompatible = target => {
@@ -52,6 +53,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     if (hoverTask && !asksSorting && /^(?:sort|sorted|write)$/.test(key)) return false;
     if (multiSourceTask && key.includes('event.target') && !/клик|нажат|событ/.test(q)) return false;
     if (multiSourceTask && /^(?:sort|sorted)$/.test(key) && !asksSorting) return false;
+    if (multiSourceTask && key.includes('math.floor') && !/округл|floor|дроб|десятичн|точност/.test(q)) return false;
     if (collapseTask && !/подвал|footer|низ страницы/.test(q) && /^(?:<footer>|footer)$/.test(key)) return false;
     if (collapseTask && !/абзац|параграф|текст/.test(q) && /^(?:p|<p>)$/.test(key)) return false;
     return true;
