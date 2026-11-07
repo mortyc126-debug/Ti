@@ -315,5 +315,27 @@ await test('алиас на отсутствующий канонический 
   assert.equal(await aliases.get('legacy-missing'), null);
 });
 
+await test('устаревшая словарная заметка заменяется языковым словарём, своя сохраняется', async () => {
+  const root = path.join(tmp, 'refresh-dictionary-notes');
+  const sqlDict = { words: {}, langs: { sql: { from: 'FROM — источник таблиц SQL' } } };
+  const sqlStore = createLibraryStore({ root, getDict: async () => sqlDict });
+  await sqlStore.init();
+  const dir = path.join(root, 'sql');
+  await fs.mkdir(dir, { recursive: true });
+  const code = 'FROM table_name;';
+  await fs.writeFile(path.join(dir, 'sql-note.sql'), code, 'utf8');
+  await fs.writeFile(path.join(dir, 'sql-note.sql.meta.json'), JSON.stringify({
+    schema: 1, id: 'sql-note', file: 'sql-note.sql', title: 'SQL note', lang: 'sql',
+    wordNotes: [
+      { line: 0, col: 0, text: 'FROM', kind: 'kw', note: 'from — часть JS import', source: 'dict' },
+      { line: 0, col: 5, text: 'table_name', kind: 'name', note: 'Имя таблицы, заданное в примере.', source: 'custom' }
+    ]
+  }), 'utf8');
+  await sqlStore.refresh();
+  const loaded = await sqlStore.get('sql-note');
+  assert.equal(tokenAt(loaded.lines, 'FROM').e, 'FROM — источник таблиц SQL');
+  assert.equal(tokenAt(loaded.lines, 'table_name').e, 'Имя таблицы, заданное в примере.');
+});
+
 await fs.rm(tmp, { recursive: true, force: true });
 console.log(`library-store: ${n} проверок пройдено`);
