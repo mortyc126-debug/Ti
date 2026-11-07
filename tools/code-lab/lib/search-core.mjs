@@ -15,7 +15,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
   const q = normalize(query);
   const activeLanguage = canonicalLanguage(language);
   const hasUiObject = /кнопк|ссылк|страниц|шапк|заголов|панел|блок|раздел|наведен|hover|подсвет|css|html|dom|форм|поле|цвет|текст|элемент/.test(q);
-  const hasCollectionObject = /массив|список|коллекц|последовательност/.test(q);
+  const hasCollectionObject = /массив|список|коллекц|последовательност|в одно значение|агрегир|reduce/.test(q);
   const webTask = hasUiObject && (!hasCollectionObject || /панел|блок|раздел|страниц|кнопк|ссылк/.test(q));
   const backendTask = /python|питон|сервер|backend|бэкенд|django|flask|fastapi|sql|postgres|баз данных/.test(q);
   const webOnly = webTask && !backendTask;
@@ -39,7 +39,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     if (buttonTask && !asksGamepad && /геймпад|gamepad/.test(text)) return false;
     if (webTask && !asksServiceWorker && /service worker|web worker/.test(text)) return false;
     if (linkTask && !/файл|каталог|путь|символическ|symlink|filesystem|linux|unix/.test(q) && /символическ ссылк|symlink|удаление файла/.test(text)) return false;
-    if (collapseTask && !hasCollectionObject && /свёртк|свертк|reduce|массив|список элементов/.test(text)) return false;
+    if (collapseTask && !hasCollectionObject && /свёртк|свертк|свернуть в одно значение|reduce|массив|список элементов/.test(text)) return false;
     if (buttonTask && !asksKeyboard && /keydown|keyup|клавиатур|keyboard/.test(text)) return false;
     if (buttonTask && !asksMouse && (text.includes('event.button') || /кнопку мыши|кнопка мыши/.test(text))) return false;
     if (buttonTask && !/ошиб|исключ|error|exception/.test(q) && /ошибка|исключение|error|exception|assertion/.test(text)) return false;
