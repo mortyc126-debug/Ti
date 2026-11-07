@@ -52,7 +52,7 @@ function groupFor(result, term, label) {
 }
 
 test('общий парсер распознаёт все типы правил структуры', () => {
-  const parsed = StructureRules.parse(rules.join('\\n'));
+  const parsed = StructureRules.parse(rules.join('\n'));
   const verbs = new Set(parsed.rules.map(r => r.verb));
   for (const verb of ['внутри','не внутри','не содержит','содержит','первым в','после','требует','пишется','связывает','читает','обязательно','можно','значения','заметка']) {
     assert.ok(verbs.has(verb), `парсер должен распознавать «${verb}»`);
