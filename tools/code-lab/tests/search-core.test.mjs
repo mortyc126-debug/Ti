@@ -88,3 +88,39 @@ test('объясняет результаты, найденные только �
 });
 
 console.log('search-core: source fusion tests passed');
+
+
+test('язык активного файла мягко повышает релевантные фрагменты, не скрывая остальные языки', () => {
+  const result = combineTaskSearch({
+    query: 'найти и показать данные',
+    language: 'python',
+    directed: { hits: [], rankedPieces: [
+      { id: 'js-piece', title: 'JavaScript fragment', lang: 'javascript', targetKey: 'fetch' },
+      { id: 'py-piece', title: 'Python fragment', lang: 'python', targetKey: 'requests' }
+    ] },
+    library: { hits: [
+      { id: 'js-piece', title: 'JavaScript fragment', lang: 'javascript' },
+      { id: 'py-piece', title: 'Python fragment', lang: 'python' }
+    ] },
+    variants: { roots: [] }
+  });
+
+  assert.equal(result.pieces[0].id, 'py-piece', 'совпадающий язык должен получить небольшой контекстный приоритет');
+  assert.deepEqual(new Set(result.pieces.map(piece => piece.id)), new Set(['js-piece', 'py-piece']));
+  assert.equal(result.pieces[0].contextBoost, 'язык активного файла');
+  assert.ok(result.pieces[0].why.some(reason => reason.source === 'контекст'));
+  assert.equal(result.pieces.find(piece => piece.id === 'js-piece').contextBoost, null);
+});
+
+test('пустой список matchedTargets не теряет связь с единственной найденной конструкцией', () => {
+  const result = combineTaskSearch({
+    query: 'кнопка',
+    directed: { hits: [], rankedPieces: [
+      { id: 'button-piece', title: 'Кнопка', lang: 'html', targetKey: 'button', matchedTargets: [] }
+    ] },
+    library: { hits: [] },
+    variants: { roots: [] }
+  });
+  assert.deepEqual(result.pieces[0].matchedTargets, ['button']);
+  assert.deepEqual(result.pieces[0].why[0].targets, ['button']);
+});
