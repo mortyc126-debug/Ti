@@ -28,6 +28,7 @@ test('объект запроса снимает ложную неоднозна
   assert.equal(matchQueryPhrase('свернуть блок', 'свернуть массив', '.reduce'), null);
   assert.equal(matchQueryPhrase('свернуть массив', 'раскрывающийся блок', '<details>'), null);
   assert.ok(matchQueryPhrase('свернуть блок', 'раскрывающийся блок', '<details>'));
+  assert.ok(matchQueryPhrase('сделать блок который можно раскрыть и свернуть', 'раскрывающийся блок', '<details>'));
 });
 
 test('ссылка и кнопка не подменяют друг друга при совпадении действия', () => {
