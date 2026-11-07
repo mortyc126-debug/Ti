@@ -40,7 +40,7 @@ const dict = {
       reader: 'чтение данных', fetch: 'сетевой запрос', getelementbyid: 'поиск элемента'
     }
   },
-  structure: { html: rules.slice(0, 3).concat(rules.slice(8, 11), rules.slice(13, 14)), css: [rules[7], rules[11]], js: rules.slice(3, 8).concat(rules.slice(12, 13), rules.slice(14)) }
+  structure: { html: rules.slice(0, 3).concat(rules.slice(8, 12), rules.slice(13, 14)), css: [rules[7]], js: rules.slice(3, 8).concat(rules.slice(12, 13), rules.slice(14)) }
 };
 
 function groupFor(result, term, label) {
@@ -93,6 +93,26 @@ test('связи между языками сохраняются как отд�
   const group = groupFor(result, 'id', 'Связи с другими языками');
   assert.ok(group.children.some(x => x.lang === 'css' && /#\\*/.test(x.show)));
   assert.ok(group.children.some(x => x.lang === 'js' && /getElementById/.test(x.show)));
+});
+
+test('запрет контекста, зависимости, чтение данных и заметка имеют свои типы', () => {
+  const forbidden = buildVariants({ q: 'unsafe', lang: 'js', dict, rows: [], synonyms: {} });
+  groupFor(forbidden, 'unsafe', 'Запрещённое расположение');
+  const dependency = buildVariants({ q: 'gap', lang: 'css', dict, rows: [], synonyms: {} });
+  const required = groupFor(dependency, 'gap', 'Зависимости');
+  assert.ok(required.children.some(x => /display: flex \\| grid/.test(x.show)));
+  const reader = buildVariants({ q: 'reader', lang: 'js', dict, rows: [], synonyms: {} });
+  const reads = groupFor(reader, 'reader', 'Читаемые данные');
+  assert.ok(reads.children.some(x => /fetch/.test(x.show)));
+  const header = buildVariants({ q: 'header', lang: 'html', dict, rows: [], synonyms: {} });
+  const notes = groupFor(header, 'header', 'Пояснения');
+  assert.ok(notes.children.some(x => /семантическая шапка/.test(x.show)));
+});
+
+test('правило «содержит» не превращается в правило «после»', () => {
+  const result = buildVariants({ q: 'try', lang: 'js', dict, rows: [], synonyms: {} });
+  groupFor(result, 'try', 'Состав конструкции');
+  assert.equal(result.roots.find(x => x.term === 'try').children.some(x => x.label === 'Следует после'), false);
 });
 
 test('шаблон синтаксиса берётся из общего парсера', () => {
