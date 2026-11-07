@@ -37,6 +37,24 @@ const uniqueList = values => {
   }
   return out;
 };
+const objectMergeProposal = sources => {
+  const keys = [...new Set(sources.flatMap(source =>
+    source.value && typeof source.value === 'object' && !Array.isArray(source.value)
+      ? Object.keys(source.value) : []
+  ))].sort();
+  const nonConflicting = {};
+  const conflicts = [];
+  for (const key of keys) {
+    const values = sources
+      .filter(source => source.value && typeof source.value === 'object' &&
+        !Array.isArray(source.value) && Object.prototype.hasOwnProperty.call(source.value, key))
+      .map(source => ({ file: source.file, value: source.value[key] }));
+    const distinct = new Map(values.map(item => [JSON.stringify(item.value), item.value]));
+    if (distinct.size === 1) nonConflicting[key] = values[0].value;
+    else conflicts.push({ key, values });
+  }
+  return { nonConflicting, conflicts, complete: conflicts.length === 0 };
+};
 async function readSafe(relative) {
   const clean = String(relative || '').replace(/\\/g, '/');
   if (!clean || clean.startsWith('/') || /^[a-z]:/i.test(clean) || clean.split('/').some(part => part === '..' || part === '')) {
@@ -90,8 +108,10 @@ for (const pair of manifest.pairs) {
   const provenanceKeys = [...new Set(orderedSources.flatMap(source =>
     Object.keys(source.passport.source && typeof source.passport.source === 'object' ? source.passport.source : {})
   ))].sort();
+  const provenanceSources = orderedSources.map(source => ({ file: source.file, value: source.passport.source ?? null }));
   const provenanceMergeProposal = {
-    mode: 'preserve-all-values; manual schema reconciliation required',
+    mode: 'merge only identical or one-sided provenance fields; retain conflicts without choosing a winner',
+    ...objectMergeProposal(provenanceSources),
     fields: provenanceKeys.map(key => ({
       key,
       values: orderedSources
@@ -99,6 +119,12 @@ for (const pair of manifest.pairs) {
           Object.prototype.hasOwnProperty.call(source.passport.source, key))
         .map(source => ({ file: source.file, value: source.passport.source[key] }))
     }))
+  };
+  const componentSources = orderedSources.map(source => ({ file: source.file, value: source.passport.component ?? null }));
+  const componentMergeProposal = {
+    mode: 'merge only identical or one-sided component fields; retain conflicts without choosing a winner',
+    ...objectMergeProposal(componentSources),
+    values: componentSources
   };
   const candidatePassport = {
     ...canonical.passport,
@@ -135,13 +161,10 @@ for (const pair of manifest.pairs) {
       reason: 'Временный кандидат; component, provenance и concept-записи требуют отдельного решения',
       fieldConflicts,
       descSourceFile: descSource.file,
-      componentSources: orderedSources.map(source => ({ file: source.file, component: source.passport.component ?? null })),
-      provenanceSources: orderedSources.map(source => ({ file: source.file, source: source.passport.source ?? null })),
+      componentSources: componentSources.map(source => ({ file: source.file, component: source.value })),
+      provenanceSources: provenanceSources.map(source => ({ file: source.file, source: source.value })),
       provenanceMergeProposal,
-      componentMergeProposal: {
-        mode: 'preserve-original-objects; schema review required',
-        values: orderedSources.map(source => ({ file: source.file, value: source.passport.component ?? null }))
-      },
+      componentMergeProposal,
       sourcePassports: orderedSources.map(source => ({ file: source.file, id: source.id, passport: source.passport })),
       conceptNotes,
       conceptNoteHandling: 'not moved into candidate wordNotes; original collection and record retained in sourcePassports',
