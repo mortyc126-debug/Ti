@@ -7,7 +7,7 @@ const normalize = value => String(value == null ? '' : value)
 const STOP = new Set('и а но или что который которая которые которое это этот эта эти мне мне надо нужно хочу сделать сделай сделайте добавить добавь добавьте создать создай создайте чтобы который которая которое которые когда как'.split(' '));
 const NEGATION = new Set(['не', 'без', 'нельзя', 'запрещено', 'кроме']);
 // Общие существительные не должны сами по себе притягивать несвязанные конструкции.
-const GENERIC_CONTEXT_TOKENS = new Set(['блок', 'элемент', 'текст', 'страниц', 'дан', 'объект', 'мест', 'результат', 'содержим', 'част', 'област']);
+const GENERIC_CONTEXT_TOKENS = new Set(['блок', 'элемент', 'текст', 'страниц', 'дан', 'объект', 'мест', 'результат', 'содержим', 'част', 'област', 'на']);
 const UNIQUE = values => [...new Set(values)];
 const RAW_WORD = /[\p{L}\p{N}]+(?:[-_][\p{L}\p{N}]+)*/gu;
 const rawWords = value => normalize(value).match(RAW_WORD) || [];
@@ -114,7 +114,7 @@ export function matchQueryPhrase(query, phrase, targetKey = '') {
   const target = normalize(targetKey);
   const structuralCollapse = /details|summary/.test(target) && /свер|раскры|collapse|expand/.test(q);
   const bottomRegion = /footer/.test(target) && /внизу|нижн|подвал|footer/.test(q);
-  if (qt.length > 1 && matched.length === 1 && GENERIC_CONTEXT_TOKENS.has(matched[0]) && !structuralCollapse && !bottomRegion) return null;
+  if (qt.length > 1 && matched.every(token => GENERIC_CONTEXT_TOKENS.has(token)) && pt.some(token => !GENERIC_CONTEXT_TOKENS.has(token)) && !structuralCollapse && !bottomRegion) return null;
 
   const phraseCoverage = matched.length / pt.length;
   const queryCoverage = matched.length / qt.length;
