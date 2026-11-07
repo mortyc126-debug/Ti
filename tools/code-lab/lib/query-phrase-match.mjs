@@ -114,7 +114,7 @@ export function matchQueryPhrase(query, phrase, targetKey = '') {
   const target = normalize(targetKey);
   const structuralCollapse = /details|summary/.test(target) && /свер|раскры|collapse|expand/.test(q);
   const bottomRegion = /footer/.test(target) && /внизу|нижн|подвал|footer/.test(q);
-  if (qt.length > 1 && matched.every(token => GENERIC_CONTEXT_TOKENS.has(token)) && pt.some(token => !GENERIC_CONTEXT_TOKENS.has(token)) && !structuralCollapse && !bottomRegion) return null;
+  if (qt.length > 1 && matched.every(token => GENERIC_CONTEXT_TOKENS.has(token)) && !structuralCollapse && !bottomRegion) return null;
 
   const phraseCoverage = matched.length / pt.length;
   const queryCoverage = matched.length / qt.length;
