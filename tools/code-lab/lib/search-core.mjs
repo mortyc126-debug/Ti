@@ -3,12 +3,17 @@ import { queryTokens } from './query-phrase-match.mjs';
 const normalize = value => String(value == null ? '' : value).trim().toLocaleLowerCase('ru').replace(/ё/g, 'е');
 const round = value => Math.round(value * 1e6) / 1e6;
 const canonicalTerm = value => normalize(value).replace(/^<([a-z][a-z0-9-]*)>$/, '$1');
+const canonicalLanguage = value => {
+  const lang = normalize(value);
+  return ({ javascript: 'js', node: 'js', typescript: 'ts', python3: 'python', html5: 'html', css3: 'css' })[lang] || lang;
+};
 
 // Reciprocal-rank fusion: независимые поиски имеют разные шкалы score,
 // поэтому объединяем позиции в выдаче, а не сравниваем несопоставимые числа.
 export function combineTaskSearch({ query, language = '', limit = 60, library, directed, variants }) {
   const max = Math.max(1, Math.min(200, Number(limit) || 60));
   const q = normalize(query);
+  const activeLanguage = canonicalLanguage(language);
   const hasUiObject = /кнопк|ссылк|страниц|шапк|заголов|панел|блок|раздел|наведен|hover|подсвет|css|html|dom|форм|поле|цвет|текст|элемент/.test(q);
   const hasCollectionObject = /массив|список|коллекц|последовательност/.test(q);
   const webTask = hasUiObject && (!hasCollectionObject || /панел|блок|раздел|страниц|кнопк|ссылк/.test(q));
@@ -88,12 +93,14 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     item._phraseRank = index + 1;
     item._rrf += 1.2 / (60 + index + 1);
     if (!item.sources.includes('направленные фразы')) item.sources.push('направленные фразы');
-    for (const target of piece.matchedTargets || [piece.targetKey].filter(Boolean)) {
+    const matchedTargets = Array.isArray(piece.matchedTargets) && piece.matchedTargets.length
+      ? piece.matchedTargets : [piece.targetKey].filter(Boolean);
+    for (const target of matchedTargets) {
       if (!item.matchedTargets.includes(target)) item.matchedTargets.push(target);
     }
     item.why.push({
       source: 'направленные фразы',
-      targets: [...(piece.matchedTargets || [piece.targetKey].filter(Boolean))],
+      targets: [...matchedTargets],
       phraseRank: index + 1,
       targetScore: piece.targetScore ?? null
     });
@@ -117,15 +124,25 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     });
   });
 
+  // Язык активного файла — мягкий контекстный сигнал, а не фильтр:
+  // составная задача по-прежнему может вернуть HTML, CSS и JS вместе.
+  for (const item of byId.values()) {
+    item._languageMatch = Boolean(activeLanguage && canonicalLanguage(item.lang) === activeLanguage);
+    item._rankScore = item._rrf * (item._languageMatch ? 1.12 : 1);
+    if (item._languageMatch) item.why.push({
+      source: 'контекст', reason: 'язык активного файла', language: item.lang, boost: 1.12
+    });
+  }
   const pieces = [...byId.values()].sort((a, b) =>
-    b._rrf - a._rrf ||
+    b._rankScore - a._rankScore ||
     (a._phraseRank ?? Infinity) - (b._phraseRank ?? Infinity) ||
     (a._lexicalRank ?? Infinity) - (b._lexicalRank ?? Infinity) ||
     String(a.title).localeCompare(String(b.title), 'ru')
   ).slice(0, max).map((item, index) => ({
     id: item.id, title: item.title, lang: item.lang, group: item.group,
     desc: item.desc, tags: item.tags, aliases: item.aliases,
-    score: round(item._rrf), position: index + 1,
+    score: round(item._rankScore), position: index + 1,
+    contextBoost: item._languageMatch ? 'язык активного файла' : null,
     sources: item.sources, matchedTargets: item.matchedTargets,
     phraseRank: item._phraseRank, lexicalRank: item._lexicalRank, why: item.why
   }));
