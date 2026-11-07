@@ -209,7 +209,7 @@ const summary = {
   provenanceSourcePassportsPreserved: previews.reduce((n, item) => n + item.review.provenanceSources.filter(x => x.source != null).length, 0),
   componentFieldConflicts: previews.reduce((n, item) => n + item.review.componentMergeProposal.conflicts.length, 0),
   provenanceFieldConflicts: previews.reduce((n, item) => n + item.review.provenanceMergeProposal.conflicts.length, 0),
-  provenanceOriginalFieldConflicts: previews.reduce((n, item) => n + item.review.provenanceMergeProposal.resolvedFields.filter(field => field.hadConflict).length, 0),
+  provenanceOriginalDescConflicts: previews.reduce((n, item) => n + item.review.provenanceMergeProposal.resolvedFields.filter(field => field.hadConflict).length, 0),
   descSourceProvenanceResolvedPairs: previews.filter(item => item.review.provenanceMergeProposal.resolvedFields.some(field => field.key === 'desc')).length,
   componentMergeCompletePairs: previews.filter(item => item.review.componentMergeProposal.complete).length,
   provenanceMergeCompletePairs: previews.filter(item => item.review.provenanceMergeProposal.complete).length,
