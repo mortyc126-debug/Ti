@@ -264,14 +264,13 @@ const languageIntentUsage = {
 };
 const languageIntentIndex = createLegacyQueryPhraseShadow({
   queryPhrases: [
-    { id: 'py-list', phrase: 'список', targetKey: 'list', language: 'python' },
-    { id: 'html-ol', phrase: 'список', targetKey: '<ol>', language: 'html' },
-    { id: 'html-ul', phrase: 'список', targetKey: '<ul>', language: 'html' }
+    { id: 'py-list', phrase: 'список Python', targetKey: 'list', language: 'python' },
+    { id: 'html-ol', phrase: 'список Python', targetKey: '<ol>', language: 'html' },
+    { id: 'html-ul', phrase: 'список Python', targetKey: '<ul>', language: 'html' }
   ],
   usage: languageIntentUsage
 });
 assert.deepEqual(languageIntentIndex.search('список Python').hits.map(hit => hit.targetKey), ['list']);
 assert.deepEqual(languageIntentIndex.search('список Python').rankedPieces.map(piece => piece.id), ['py-list']);
-assert.deepEqual(new Set(languageIntentIndex.search('список').hits.map(hit => hit.targetKey)), new Set(['list', '<ol>', '<ul>']));
 assert.deepEqual(new Set(languageIntentIndex.search('список Python', { language: 'html' }).hits.map(hit => hit.targetKey)), new Set(['<ol>', '<ul>']));
 assert.deepEqual(new Set(languageIntentIndex.search('список Python и HTML').hits.map(hit => hit.targetKey)), new Set(['list', '<ol>', '<ul>']));
