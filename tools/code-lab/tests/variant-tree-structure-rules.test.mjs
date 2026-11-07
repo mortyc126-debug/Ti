@@ -37,9 +37,10 @@ const dict = {
       if: 'условная конструкция', elif: 'дополнительное условие',
       try: 'обработка ошибок', catch: 'перехват ошибки', finally: 'завершение',
       await: 'ожидание операции', unsafe: 'условная конструкция',
-      reader: 'чтение данных', fetch: 'сетевой запрос', getelementbyid: 'поиск элемента', alert: 'показать сообщение', addeventlistener: 'подписка на событие'
+      reader: 'чтение данных', fetch: 'сетевой запрос', alert: 'показать сообщение', addeventlistener: 'подписка на событие'
     }
   },
+  words: { getelementbyid: 'поиск элемента' },
   structure: { html: rules.slice(0, 3).concat(rules.slice(8, 12), rules.slice(13, 14)), css: [rules[7]], js: rules.slice(3, 8).concat(rules.slice(12, 13), rules.slice(14)) }
 };
 
