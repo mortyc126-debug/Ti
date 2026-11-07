@@ -34,6 +34,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     if (buttonTask && !asksGamepad && /геймпад|gamepad/.test(text)) return false;
     if (buttonTask && !asksKeyboard && /keydown|keyup|клавиатур|keyboard/.test(text)) return false;
     if (buttonTask && !asksMouse && (text.includes('event.button') || /кнопку мыши|кнопка мыши/.test(text))) return false;
+    if (buttonTask && !/ошиб|исключ|error|exception/.test(q) && /ошибка|исключение|error|exception|assertion/.test(text)) return false;
     if (linkTask && !asksServiceWorker && /service worker|кэш сразу|кеш сразу/.test(text)) return false;
     if (headingTask && !buttonTask && /кнопк/.test(text)) return false;
     if (hoverTask && !asksSpacing && /letter-spacing|line-height|white-space/.test(text)) return false;
