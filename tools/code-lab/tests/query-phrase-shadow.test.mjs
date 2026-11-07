@@ -130,4 +130,31 @@ const deepCopyIndex = createLegacyQueryPhraseShadow({
 assert.equal(deepCopyIndex.search('глубокая копия').total, 2);
 assert.equal(deepCopyIndex.search('глубокая копия').ambiguous, false);
 
+const taskPieces = {
+  html: [{ id: 'button-piece', title: 'Кнопка страницы', lang: 'html', code: '<button type="button">Показать</button>' }],
+  js: [
+    { id: 'message-piece', title: 'Показать сообщение', lang: 'js', code: "alert('Готово')" },
+    { id: 'click-piece', title: 'Обработчик нажатия', lang: 'js', code: "button.addEventListener('click', showMessage)" }
+  ]
+};
+const taskUsage = {
+  terms: { html: { button: {} }, js: { alert: {}, addeventlistener: {} } },
+  piecesOf(section, key) { return (taskPieces[section] || []).filter(piece =>
+    section === 'html' ? key === 'button' : key === 'alert' ? piece.id === 'message-piece' : piece.id === 'click-piece'
+  ).map(piece => piece.id); },
+  pieceInfo(id) { return Object.values(taskPieces).flat().find(piece => piece.id === id) || null; },
+  pieceText(id) { return this.pieceInfo(id)?.code || ''; }
+};
+const taskIndex = createLegacyQueryPhraseShadow({
+  queryPhrases: [
+    { id: 'button', phrase: 'кнопка', targetKey: 'button' },
+    { id: 'message', phrase: 'сообщение', targetKey: 'alert' },
+    { id: 'click', phrase: 'нажатие', targetKey: 'addeventlistener' }
+  ],
+  usage: taskUsage
+});
+const task = taskIndex.search('Добавить кнопку, которая показывает сообщение при нажатии');
+assert.deepEqual(new Set(task.hits.map(hit => hit.targetKey)), new Set(['button', 'alert', 'addeventlistener']));
+assert.ok(task.hits.every(hit => hit.phrases[0].match.kind === 'partial'));
+
 console.log('query-phrase-shadow: isolated index and content-filter tests passed');
