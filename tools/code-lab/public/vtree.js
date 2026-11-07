@@ -69,7 +69,7 @@
 
   function rowHtml(n, depth){
     const has = n.children && n.children.length;
-    const desc = n.piece ? '<span class="vt-d">' + (n.label ? esc(n.label) + ' · ' : '') + 'кусок из библиотеки</span>'
+    const desc = n.piece ? '<span class="vt-d">' + (n.label ? esc(n.label) + ' · ' : '') + (n.detail ? esc(n.detail) + ' · ' : '') + 'кусок из библиотеки</span>'
       : '<span class="vt-d">' + (n.label ? '<b>' + esc(n.label) + '</b>' + (n.note ? ' — ' : '') : '') + esc(n.note || '') + '</span>';
     return '<div class="vt-n"><div class="vt-r' + (n.piece ? ' vt-p' : '') + '" data-code="' + esc(n.code || '') + '" data-piece="' + esc(n.piece || '') + '">'
       + '<span class="vt-t">' + (has ? (depth === 0 ? '▸' : '▸') : '') + '</span>'
@@ -85,6 +85,14 @@
     if(my !== seq || !pop) return;
     const roots = ((r && r.roots) || []).filter(n => n.label !== 'куски из библиотеки');
     const pieces = (r && r.pieces) || [];
+    const canonical = value => String(value || '').toLowerCase().replace(/^<([a-z][a-z0-9-]*)>$/, '$1');
+    const targetLabels = new Map(roots.map(root => [
+      canonical(root.term), root.note || root.show || root.label || root.term
+    ]));
+    for(const target of (r && r.targets) || []){
+      const root = roots.find(item => canonical(item.term) === canonical(target.targetKey));
+      if(root) targetLabels.set(canonical(target.targetKey), root.note || root.show || root.label || root.term);
+    }
     const byLang = new Map();
     roots.forEach(n => { const l = n.lang || ''; if(!byLang.has(l)) byLang.set(l, []); byLang.get(l).push(n); });
     for(const piece of pieces){
@@ -92,9 +100,14 @@
       if(!byLang.has(l)) byLang.set(l, []);
       let group = byLang.get(l).find(n => n.group && n.label === 'Фрагменты библиотеки');
       if(!group){ group = { group: true, lang: l, label: 'Фрагменты библиотеки', note: 'Результаты по смысловым фразам и содержимому библиотеки', children: [] }; byLang.get(l).push(group); }
+      const related = (piece.matchedTargets || []).map(target =>
+        targetLabels.get(canonical(target)) || target
+      ).filter(Boolean);
+      const relationNote = related.length ? 'подобрано для: ' + [...new Set(related)].join(', ') : '';
       group.children.push({
-        term: piece.title, lang: l, code: '', note: piece.title,
-        label: [piece.group, ...(piece.sources || [])].filter(Boolean).join(' · '), piece: piece.id, children: []
+        term: piece.title, lang: l, code: '', note: piece.title, detail: piece.desc || '',
+        label: [piece.group, ...(piece.sources || []), relationNote].filter(Boolean).join(' · '),
+        piece: piece.id, children: []
       });
     }
     if(!byLang.size){ body.innerHTML = '<div class="vt-none">подходящих конструкций и фрагментов не нашлось — попробуй уточнить действие или объект</div>'; return; }
