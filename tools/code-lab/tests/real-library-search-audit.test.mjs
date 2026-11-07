@@ -210,6 +210,7 @@ async function main() {
   assert.ok(!taskResultMap.get(dataQuery).pieces.some(x => /узла|IndexedDB|Ковариация|Корреляция/.test(x.title)), 'не подмешивать метаданные DOM-узлов и статистические фрагменты');
   assert.ok(!taskResultMap.get(dataQuery).pieces.some(x => /Service Worker|Web Worker|push-сообщение/i.test(x.title)), 'не подмешивать фоновые worker-сообщения к обычной загрузке данных');
   assert.ok(taskTerms(sidebarQuery).some(x => x === '<aside>'), 'боковая панель должна находиться как aside');
+  assert.ok(taskResultMap.get(sidebarQuery).roots.some(x => x.term === '<aside>'), 'aside должен быть виден в дереве вариантов, а не только в скрытых метаданных');
   assert.ok(!taskTerms(sidebarQuery).some(x => /reduce/.test(x)), 'сворачивание панели не должно превращаться в свёртку массива');
 
   console.log('TASK SEARCH REAL SCENARIOS:', JSON.stringify(taskResults));
