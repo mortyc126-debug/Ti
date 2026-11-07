@@ -31,10 +31,10 @@ function contextConflict(query, phrase, targetKey) {
   const pCollection = /массив|список|коллекц|последовательност/.test(p);
   if (/(?:^|[.])reduce|fold/.test(target) && qUi && !qCollection) return true;
   if (/(?:details|summary)/.test(target) && qCollection && !qUi) return true;
-  const qLink = /ссылк|переход|href|\\burl\\b/.test(q);
-  const qButton = /кнопк|\\bbutton\\b/.test(q);
-  if (/(?:<button>|^button$|button\\[)/.test(target) && qLink && !qButton) return true;
-  if (/(?:^a$|href)/.test(target) && qButton && !qLink) return true;
+  const qLink = /ссылк|переход|href|url/.test(q);
+  const qButton = /кнопк|button/.test(q);
+  if ((target.includes('<button>') || target === 'button' || target.startsWith('button[')) && qLink && !qButton) return true;
+  if ((target === 'a' || target.includes('href')) && qButton && !qLink) return true;
   if (qUi && pCollection && !pUi && !qCollection) return true;
   if (qCollection && pUi && !pCollection && !qUi) return true;
   return false;
