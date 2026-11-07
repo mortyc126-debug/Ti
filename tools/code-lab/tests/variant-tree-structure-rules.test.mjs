@@ -80,7 +80,7 @@ test('ограничения не смешиваются с допустимым
 
 test('правило «после» показывает предшествующие конструкции отдельным отношением', () => {
   const result = buildVariants({ q: 'elif', lang: 'js', dict, rows: [], synonyms: {} });
-  const group = groupFor(result, 'elif', 'Следует после');
+  const group = groupFor(result, 'elif', 'Предшествующие конструкции');
   assert.ok(group.children.some(x => x.term === 'if'));
   assert.ok(group.children.some(x => x.term === 'elif'));
 });
