@@ -229,6 +229,7 @@ async function main() {
   assert.ok(taskTerms(linkQuery).some(x => x === 'href'), 'для ссылки должен находиться href');
   assert.ok(!taskTerms(linkQuery).some(x => /button/.test(x)), 'ссылка не должна подменяться кнопкой');
   assert.equal(taskResultMap.get(linkQuery).pieces[0]?.title, 'Ссылка на другую страницу', 'точный библиотечный фрагмент ссылки должен быть выше общих совпадений');
+  assert.ok(!taskResultMap.get(linkQuery).pieces.some(piece => /optgroup|picture — адаптивное изображение/i.test(piece.title) && (piece.matchedTargets || []).includes('<a>')), 'случайное слово «a» в атрибуте не должно связывать фрагмент с HTML-тегом ссылки');
   assert.ok(!taskResultMap.get(linkQuery).pieces.some(x => /Web Worker|Service Worker|сериализуем|replaceChildren|insertAdjacentHTML/i.test(x.title)), 'не подмешивать worker и динамическую вставку к обычной ссылке');
   const details = taskResultMap.get(collapseQuery).roots.find(x => x.term === 'details');
   assert.ok(details, 'для раскрываемого блока должен находиться нативный details');
