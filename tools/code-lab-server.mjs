@@ -20,7 +20,7 @@ import { createLegacyQueryPhraseShadow } from './code-lab/lib/query-phrase-shado
 import { CONCEPT_RELATIONS } from './code-lab/lib/concept-model.mjs';
 import { rollbackRestore, prepareRestoreTransaction, markRestoreTransaction, recoverRestoreTransactions } from './code-lab/lib/restore-transaction.mjs';
 import { createSearchService } from './code-lab/lib/search.mjs';
-import { combineTaskSearch } from './code-lab/lib/search-core.mjs';
+import { combineTaskSearch, inferTaskScope } from './code-lab/lib/search-core.mjs';
 import { tokenize } from './code-lab/lib/tokenizer.mjs';   // токенайзер отдельно — его удобнее тестировать
 import { buildUsage, libraryFingerprint } from './code-lab/lib/dict-usage.mjs';   // dict-usage: связь «слово словаря ↔ куски»
 import { parseSnippets } from './code-lab/lib/ingest.mjs';
@@ -1082,7 +1082,7 @@ const server = http.createServer(async (req, res) => {
       const boost = await searchBoost();
       const [library, directed, variants] = await Promise.all([
         search.search(q, { limit, lang, boost }),
-        getQueryPhraseShadow({ includeCurated: false }).then(index => index.search(q, { limit, scope })),
+        getQueryPhraseShadow({ includeCurated: false }).then(index => index.search(q, { limit, scope: scope || inferTaskScope(q) })),
         variantsFor(q, '')
       ]);
       return json(res, 200, combineTaskSearch({
