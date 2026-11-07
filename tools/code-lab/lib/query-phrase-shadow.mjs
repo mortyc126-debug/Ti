@@ -131,7 +131,7 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
 
     for (const hit of grouped.values()) {
       for (const location of termLocations.get(normalize(hit.targetKey)) || []) {
-        if (allowedLanguages && !allowedLanguages.has(canonicalLanguage(location.section))) continue;
+        // Секция словаря может быть общей (например, base words); язык определяем по самому фрагменту.
         const ids = usage.piecesOf(location.section, location.key);
         for (const id of ids) {
           if (hit.pieces.some(piece => piece.id === id)) continue;
