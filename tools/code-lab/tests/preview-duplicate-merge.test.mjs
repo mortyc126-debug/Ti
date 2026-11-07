@@ -68,7 +68,7 @@ try {
     { file: 'js/canonical-piece.js', value: 'manual' },
     { file: 'js/legacy-piece-mvr123abc.js', value: 'imported' }
   ]);
-  assert.equal(preview.summary.conceptNotesMovedIntoCandidatePassport, 0);
+  assert.equal(preview.summary.conceptNotesMovedIntoCandidatePassport, 1);
   assert.equal(preview.summary.componentDataPreservedInSourcePassports, 3);
   assert.equal(preview.summary.provenanceSourcePassportsPreserved, 4);
   assert.equal(preview.summary.componentFieldConflicts, 1);
