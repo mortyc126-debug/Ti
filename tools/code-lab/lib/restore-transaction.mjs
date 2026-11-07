@@ -52,12 +52,32 @@ async function hasSafeMarker(fs, dir, name){
   return true;
 }
 
+// fsync файла обязателен перед публикацией rename: после сбоя содержимое
+// временного файла должно пережить перезапуск, а не только попасть в page cache.
+export async function syncRestoreFile(fs = defaultFs, target){
+  const handle = await fs.open(target, 'r');
+  try { await handle.sync(); }
+  finally { await handle.close(); }
+}
+
+// POSIX позволяет синхронизировать запись каталога после rename/unlink.
+// На Windows открытие каталога как файла не поддерживается; сами файлы всё равно fsync-ятся.
+export async function syncRestoreDirectory(fs = defaultFs, directory){
+  if(process.platform === 'win32') return false;
+  const handle = await fs.open(directory, 'r');
+  try { await handle.sync(); }
+  finally { await handle.close(); }
+  return true;
+}
+
 async function writeAtomicNewFile(fs, target, content){
   const temp = path.join(path.dirname(target), '.restore-journal-' + randomUUID() + '.tmp');
   try {
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.writeFile(temp, content, { encoding: 'utf8', flag: 'wx' });
+    await syncRestoreFile(fs, temp);
     await fs.rename(temp, target);
+    await syncRestoreDirectory(fs, path.dirname(target));
   } finally {
     await removeIfPresent(fs, temp);
   }
@@ -71,7 +91,9 @@ export async function copyFileAtomic(source, target, fs = defaultFs){
   try {
     await fs.mkdir(dir, { recursive: true });
     await fs.copyFile(source, temp);
+    await syncRestoreFile(fs, temp);
     await fs.rename(temp, target);
+    await syncRestoreDirectory(fs, dir);
   } finally {
     await removeIfPresent(fs, temp);
   }
