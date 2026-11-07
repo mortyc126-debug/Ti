@@ -1,0 +1,111 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { buildVariants } from '../lib/variant-tree.mjs';
+
+const require = createRequire(import.meta.url);
+const StructureRules = require('../public/structure-rules.js');
+
+const rules = [
+  'li: внутри ul, ol',
+  'p: не содержит div, ul',
+  'summary: первым в details',
+  'elif: после if, elif',
+  'try: содержит catch, finally',
+  'await: внутри async — работает только внутри async-функции',
+  'unsafe: не внутри script',
+  'gap: требует display: flex | grid',
+  'img: обязательно src',
+  'img: можно alt, width',
+  'button[type]: значения button, submit, reset',
+  "id: связывает css #*, js getElementById('*')",
+  'reader: читает js fetch',
+  'header: заметка семантическая шапка страницы',
+  'if: пишется if (…) {\\n  …\\n}'
+];
+
+const dict = {
+  langs: {
+    html: {
+      li: 'элемент списка', ul: 'маркированный список', ol: 'нумерованный список',
+      p: 'абзац', div: 'контейнер', summary: 'заголовок раскрывающегося блока',
+      details: 'раскрывающийся блок', img: 'изображение', 'button[type]': 'тип кнопки',
+      id: 'идентификатор', header: 'шапка страницы', script: 'скрипт'
+    },
+    css: { gap: 'расстояние между элементами', '#*': 'селектор по id' },
+    js: {
+      if: 'условная конструкция', elif: 'дополнительное условие',
+      try: 'обработка ошибок', catch: 'перехват ошибки', finally: 'завершение',
+      await: 'ожидание операции', unsafe: 'условная конструкция',
+      reader: 'чтение данных', fetch: 'сетевой запрос', getelementbyid: 'поиск элемента'
+    }
+  },
+  structure: { html: rules.slice(0, 3).concat(rules.slice(8, 11), rules.slice(13, 14)), css: [rules[7], rules[11]], js: rules.slice(3, 8).concat(rules.slice(12, 13), rules.slice(14)) }
+};
+
+function groupFor(result, term, label) {
+  const root = result.roots.find(x => x.term === term);
+  assert.ok(root, `не найден корень ${term}`);
+  const group = root.children.find(x => x.group && x.label === label);
+  assert.ok(group, `у ${term} нет группы «${label}»`);
+  return group;
+}
+
+test('общий парсер распознаёт все типы правил структуры', () => {
+  const parsed = StructureRules.parse(rules.join('\\n'));
+  const verbs = new Set(parsed.rules.map(r => r.verb));
+  for (const verb of ['внутри','не внутри','не содержит','содержит','первым в','после','требует','пишется','связывает','читает','обязательно','можно','значения','заметка']) {
+    assert.ok(verbs.has(verb), `парсер должен распознавать «${verb}»`);
+  }
+  assert.equal(parsed.bad.length, 0);
+});
+
+test('дерево использует общий парсер для вложенности и обратных связей', () => {
+  const result = buildVariants({ q: 'ul', lang: 'html', dict, rows: [], synonyms: {} });
+  const group = groupFor(result, 'ul', 'Состав конструкции');
+  assert.ok(group.children.some(x => x.term === 'li'));
+});
+
+test('ограничения не смешиваются с допустимым составом', () => {
+  const result = buildVariants({ q: 'p', lang: 'html', dict, rows: [], synonyms: {} });
+  const group = groupFor(result, 'p', 'Запрещённое содержимое');
+  assert.ok(group.children.some(x => /div/.test(x.show)));
+  assert.equal(result.roots.find(x => x.term === 'p').children.some(x => x.label === 'Состав конструкции'), false);
+});
+
+test('правило первого элемента имеет отдельный тип отношения', () => {
+  const result = buildVariants({ q: 'summary', lang: 'html', dict, rows: [], synonyms: {} });
+  const group = groupFor(result, 'summary', 'Порядок элементов');
+  assert.ok(group.children.some(x => /details/.test(x.show)));
+});
+
+test('требования, обязательные части, необязательные части и значения разделены', () => {
+  const required = buildVariants({ q: 'img', lang: 'html', dict, rows: [], synonyms: {} });
+  groupFor(required, 'img', 'Обязательные части');
+  groupFor(required, 'img', 'Допустимые части');
+  const values = buildVariants({ q: 'button[type]', lang: 'html', dict, rows: [], synonyms: {} });
+  const group = groupFor(values, 'button[type]', 'Допустимые значения');
+  assert.ok(group.children.some(x => /submit/.test(x.show)));
+});
+
+test('связи между языками сохраняются как отдельные описанные отношения', () => {
+  const result = buildVariants({ q: 'id', lang: 'html', dict, rows: [], synonyms: {} });
+  const group = groupFor(result, 'id', 'Связи с другими языками');
+  assert.ok(group.children.some(x => x.lang === 'css' && /#\\*/.test(x.show)));
+  assert.ok(group.children.some(x => x.lang === 'js' && /getElementById/.test(x.show)));
+});
+
+test('шаблон синтаксиса берётся из общего парсера', () => {
+  const result = buildVariants({ q: 'if', lang: 'js', dict, rows: [], synonyms: {} });
+  const root = result.roots.find(x => x.term === 'if');
+  assert.ok(root);
+  assert.match(root.code, /if/);
+  assert.match(root.code, /\\n/);
+});
+
+test('команда удаления не отображается как отношение дерева', () => {
+  const parsed = StructureRules.parse('legacy: удалить');
+  assert.equal(parsed.rules[0].verb, 'удалить');
+  const result = buildVariants({ q: 'ul', lang: 'html', dict, rows: [], synonyms: {} });
+  assert.equal(result.roots.some(root => root.children.some(child => child.relation === 'удалить')), false);
+});
