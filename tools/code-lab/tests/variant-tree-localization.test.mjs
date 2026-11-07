@@ -26,6 +26,7 @@ test('реальные варианты конструкций имеют рус
     const root = result.roots.find(node => node.term.toLowerCase() === item.term.toLowerCase());
     assert.ok(root, 'не найден вариант ' + item.term + ' для запроса «' + item.q + '»');
     assert.ok(hasRussian(root.label) || hasRussian(root.note), item.term + ': нет русской подписи или пояснения');
+    if (item.q === 'кнопка') assert.equal(root.label, 'кнопка');
     for (const node of flatten(root.children)) {
       if (node.group) {
         assert.ok(hasRussian(node.label), item.term + ': группа ' + node.label + ' не подписана по-русски');
