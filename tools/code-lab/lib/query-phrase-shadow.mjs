@@ -4,6 +4,13 @@ import { matchQueryPhrase, queryTokens } from './query-phrase-match.mjs';
 
 const normalize = value => String(value == null ? '' : value)
   .trim().toLocaleLowerCase('ru').replace(/ё/g, 'е').replace(/\s+/g, ' ');
+const canonicalLanguage = value => {
+  const lang = normalize(value);
+  return ({ javascript: 'js', node: 'js', typescript: 'ts', python3: 'python', html5: 'html', css3: 'css' })[lang] || lang;
+};
+const scopeLanguages = scope => normalize(scope) === 'web'
+  ? new Set(['html', 'css', 'js', 'ts', 'svg'])
+  : normalize(scope) === 'python' ? new Set(['python']) : null;
 
 const EXCLUDED_PHRASE_TARGETS = new Set([
   'стрелочная функция\u0000lambda',
@@ -99,6 +106,7 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
     const q = normalize(query);
     if (!q) return { query: q, total: 0, hits: [], rankedPieces: [], ambiguous: false };
     const grouped = new Map();
+    const allowedLanguages = scopeLanguages(scope);
 
     for (const [phrase, records] of byPhrase) {
       for (const record of records) {
@@ -107,8 +115,9 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
         const score = match.score;
         const recordLanguage = normalize(record.language);
         const recordScope = normalize(record.scope);
-        if (recordLanguage && language && recordLanguage !== normalize(language)) continue;
-        if (recordScope && scope && recordScope !== normalize(scope)) continue;
+        if (recordLanguage && language && canonicalLanguage(recordLanguage) !== canonicalLanguage(language)) continue;
+        if (allowedLanguages && recordLanguage && !allowedLanguages.has(canonicalLanguage(recordLanguage))) continue;
+        if (recordScope && scope && recordScope !== normalize(scope) && !(allowedLanguages && allowedLanguages.has(canonicalLanguage(recordScope)))) continue;
         const key = record.targetKey;
         if (!grouped.has(key)) grouped.set(key, { targetKey: key, score, phrases: [], sections: [], pieces: [] });
         const hit = grouped.get(key);
@@ -122,12 +131,14 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
 
     for (const hit of grouped.values()) {
       for (const location of termLocations.get(normalize(hit.targetKey)) || []) {
+        if (allowedLanguages && !allowedLanguages.has(canonicalLanguage(location.section))) continue;
         const ids = usage.piecesOf(location.section, location.key);
         for (const id of ids) {
           if (hit.pieces.some(piece => piece.id === id)) continue;
           const piece = usage.pieceInfo(id);
           if (!piece) continue;
-          if (language && normalize(piece.lang) !== normalize(language)) continue;
+          if (language && canonicalLanguage(piece.lang) !== canonicalLanguage(language)) continue;
+          if (allowedLanguages && !allowedLanguages.has(canonicalLanguage(piece.lang))) continue;
           const relevant = hit.phrases.some(record =>
             pieceMatchesTarget(hit.targetKey, record.phrase, piece, usage)
           );
