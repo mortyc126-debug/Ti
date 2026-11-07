@@ -31,6 +31,15 @@ test('объект запроса снимает ложную неоднозна
   assert.ok(matchQueryPhrase('сделать блок который можно раскрыть и свернуть', 'раскрывающийся блок', '<details>'));
 });
 
+test('контрастные уточнения не смешиваются при частичном совпадении', () => {
+  assert.equal(matchQueryPhrase('отступ внутри элемента', 'отступ снаружи элемента'), null);
+  assert.equal(matchQueryPhrase('толщина шрифта', 'размер шрифта'), null);
+  assert.equal(matchQueryPhrase('межбуквенный интервал', 'межстрочный интервал'), null);
+  assert.equal(matchQueryPhrase('спрятать элемент сохранив место', 'скрыть элемент из потока'), null);
+  assert.equal(matchQueryPhrase('подсветить при наведении', 'действие при нажатии'), null);
+  assert.equal(matchQueryPhrase('выровнять текст по центру', 'выровнять элементы по центру'), null);
+});
+
 test('ссылка и кнопка не подменяют друг друга при совпадении действия', () => {
   assert.equal(matchQueryPhrase('ссылка по клику', 'действие по клику', '<button>'), null);
   assert.equal(matchQueryPhrase('кнопка', 'ссылка', 'href'), null);
