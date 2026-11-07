@@ -36,6 +36,8 @@ test('контрастные уточнения не смешиваются пр
   assert.equal(matchQueryPhrase('толщина шрифта', 'размер шрифта'), null);
   assert.equal(matchQueryPhrase('межбуквенный интервал', 'межстрочный интервал'), null);
   assert.equal(matchQueryPhrase('спрятать элемент сохранив место', 'скрыть элемент из потока'), null);
+  assert.equal(matchQueryPhrase('спрятать элемент сохранив место', 'скрыть элемент', 'display'), null);
+  assert.equal(matchQueryPhrase('скрыть элемент из потока', 'спрятать без удаления места', 'visibility'), null);
   assert.equal(matchQueryPhrase('подсветить при наведении', 'действие при нажатии'), null);
   assert.equal(matchQueryPhrase('выровнять текст по центру', 'выровнять элементы по центру'), null);
 });
