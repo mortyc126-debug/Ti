@@ -240,3 +240,19 @@ test('общий фрагмент сохраняет все цели и лучш
   assert.deepEqual(result.pieces[0].matchedTargets, ['fetch', 'Promise.all']);
   assert.equal(result.pieces[0].why.find(reason => reason.source === 'направленные фразы')?.targetScore, 60);
 });
+
+
+test('языковая область фильтруется до лимита, а не после него', () => {
+  const result = combineTaskSearch({
+    query: 'кнопка по нажатию',
+    limit: 1,
+    directed: { hits: [], rankedPieces: [
+      { id: 'python-first', title: 'Python unrelated', lang: 'python', position: 1 },
+      { id: 'js-second', title: 'JavaScript click handler', lang: 'js', position: 2 }
+    ] },
+    library: { hits: [] },
+    variants: { roots: [] }
+  });
+  assert.equal(result.pieces.length, 1);
+  assert.equal(result.pieces[0].id, 'js-second');
+});
