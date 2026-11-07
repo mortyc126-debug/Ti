@@ -416,3 +416,51 @@ test('область задачи распознаёт веб-сборку и н
   assert.equal(inferTaskScope('Свернуть массив в одно значение'), '');
   assert.equal(inferTaskScope('Python: получить элемент списка'), '');
 });
+
+
+test('общий JavaScript/TypeScript API не дублируется между языками без явного выбора', () => {
+  const input = language => ({
+    query: 'кнопка по нажатию показывает сообщение',
+    language,
+    directed: {
+      hits: [{
+        targetKey: 'addEventListener',
+        score: 60,
+        phrases: [{ phrase: 'подписаться на клик', language: 'ts' }],
+        pieces: [
+          { id: 'ts-handler', title: 'Обработчик TS', lang: 'ts' },
+          { id: 'js-handler', title: 'Обработчик JS', lang: 'js' }
+        ]
+      }],
+      rankedPieces: []
+    },
+    library: { hits: [] },
+    variants: { roots: [
+      { term: 'addEventListener', lang: 'ts', children: [] },
+      { term: 'addEventListener', lang: 'js', children: [] }
+    ] }
+  });
+
+  const general = combineTaskSearch(input(''));
+  const generalRoots = general.roots.filter(root => root.term === 'addEventListener');
+  assert.deepEqual(generalRoots.map(root => root.lang), ['js']);
+  assert.equal(general.targets[0].rootLang, 'js');
+  assert.deepEqual(generalRoots[0].children.map(child => child.piece), ['ts-handler', 'js-handler']);
+
+  const typescript = combineTaskSearch(input('ts'));
+  const tsRoots = typescript.roots.filter(root => root.term === 'addEventListener');
+  assert.deepEqual(tsRoots.map(root => root.lang), ['ts']);
+  assert.equal(typescript.targets[0].rootLang, 'ts');
+
+  const tsOnly = combineTaskSearch({
+    ...input(''),
+    directed: { hits: [{
+      targetKey: 'addEventListener',
+      score: 60,
+      phrases: [{ phrase: 'подписаться на клик', language: 'ts' }],
+      pieces: [{ id: 'ts-only', title: 'Обработчик TS', lang: 'ts' }]
+    }], rankedPieces: [] },
+    variants: { roots: [{ term: 'addEventListener', lang: 'ts', children: [] }] }
+  });
+  assert.equal(tsOnly.roots.find(root => root.term === 'addEventListener')?.lang, 'ts');
+});

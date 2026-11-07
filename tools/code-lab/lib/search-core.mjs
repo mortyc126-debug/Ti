@@ -272,11 +272,34 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     phraseRank: item._phraseRank, lexicalRank: item._lexicalRank, why: item.why
   }));
 
+  const targetHits = (directed?.hits || []).filter(hit => targetCompatible(hit.targetKey) && (hit.pieces || []).some(inTaskScope));
+  // Общие runtime API JavaScript и TypeScript — одна конструкция, а не два варианта дерева.
+  // При поиске без явного языка показываем JS-корень, если библиотека содержит примеры на обоих языках;
+  // при активном TypeScript-контексте сохраняем TS-корень.
+  const languageSets = new Map();
+  const addLanguage = (term, language) => {
+    const lang = canonicalLanguage(language || '');
+    if (!['js', 'ts'].includes(lang)) return;
+    const key = canonicalTerm(term);
+    if (!languageSets.has(key)) languageSets.set(key, new Set());
+    languageSets.get(key).add(lang);
+  };
+  for (const root of variants?.roots || []) addLanguage(root.term, root.lang);
+  for (const hit of targetHits) for (const piece of hit.pieces || []) {
+    if (inTaskScope(piece)) addLanguage(hit.targetKey, piece.lang);
+  }
+  const sharedLanguageTerms = new Set([...languageSets]
+    .filter(([, languages]) => languages.has('js') && languages.has('ts'))
+    .map(([key]) => key));
+  const preferredSharedLanguage = activeLanguage === 'ts' ? 'ts' : 'js';
   const roots = (variants?.roots || []).filter(root => {
     if (!inScope(root) || !targetCompatible(root.term)) return false;
+    const key = canonicalTerm(root.term);
+    const rootLanguage = canonicalLanguage(root.lang || '');
+    if (sharedLanguageTerms.has(key) && ['js', 'ts'].includes(rootLanguage) && rootLanguage !== preferredSharedLanguage) return false;
     // href — HTML-атрибут ссылки, а не CSS-конструкция. Общий синоним
     // не должен создавать второй CSS-корень для обычной навигационной ссылки.
-    if (linkTask && canonicalTerm(root.term) === 'href' && canonicalLanguage(root.lang || '') === 'css') return false;
+    if (linkTask && key === 'href' && rootLanguage === 'css') return false;
     return true;
   });
   const rootByKey = new Map();
@@ -289,7 +312,6 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     const languageKey = key + '\\u0000' + canonicalLanguage(root.lang || '');
     if (!rootByLanguage.has(languageKey)) rootByLanguage.set(languageKey, root);
   }
-  const targetHits = (directed?.hits || []).filter(hit => targetCompatible(hit.targetKey) && (hit.pieces || []).some(inTaskScope));
   const targets = [];
   const addedRoots = [];
   for (const hit of targetHits) {
@@ -298,8 +320,8 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     const phrase = phrases[0] || null;
     const forcedLanguage = /^[:@]/.test(canonicalTerm(hit.targetKey)) ? 'css' : '';
     const phraseLanguage = phrases.map(item => canonicalLanguage(item.language || '')).find(Boolean) || '';
-    const preferredLanguage = forcedLanguage || phraseLanguage;
     const key = canonicalTerm(hit.targetKey);
+    const preferredLanguage = forcedLanguage || (sharedLanguageTerms.has(key) ? preferredSharedLanguage : phraseLanguage);
     let root = preferredLanguage
       ? rootByLanguage.get(key + '\\u0000' + preferredLanguage) || null
       : rootByKey.get(key) || null;
