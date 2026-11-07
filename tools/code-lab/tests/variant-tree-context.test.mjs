@@ -66,7 +66,7 @@ test('показывает условия применения конструк�
   const root = result.roots.find(x => x.term === 'await');
   const group = root.children.find(x => x.group && x.label === 'Расположение внутри');
   assert.ok(group);
-  assert.match(group.children[0].show, /внутри: async/);
+  assert.match(group.children[0].show, /находится внутри async/);
   assert.match(group.children[0].note, /только внутри async-функции/);
 });
 
