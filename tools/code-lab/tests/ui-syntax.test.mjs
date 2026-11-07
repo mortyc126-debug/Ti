@@ -16,6 +16,8 @@ test('публичные JS-файлы и встроенные скрипты с
   }
   const variantTree=await fs.readFile(path.join(PUBLIC,'vtree.js'),'utf8');
   assert.match(variantTree,/n\.show\s*\?\s*esc\(n\.show\)\s*:\s*paint\(n\.code\s*\|\|\s*n\.term/,'дерево должно показывать текстовые отношения, у которых нет вставляемого кода');
+  const insert=await fs.readFile(path.join(PUBLIC,'insert.js'),'utf8');
+  assert.match(insert,/n\.show\s*\?\s*esc\(n\.show\)\s*:\s*paint\(n\.code/,'inline-подсказки должны показывать текстовые отношения без подсветки как кода');
   const html=await fs.readFile(path.join(PUBLIC,'schema-json.html'),'utf8');
   const scripts=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(x=>x[1]).filter(x=>x.trim());
   assert.ok(scripts.length>0,'в schema-json.html должны быть встроенные скрипты');
