@@ -199,10 +199,10 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
     const canonicalTarget = (raw, targetLang) => {
       let value = String(raw || '').trim();
       if (targetLang === 'js' || targetLang === 'ts') {
-        const call = value.match(/^([A-Za-z_$][\\w$]*)\\s*\\(/);
+        const call = value.match(/^([A-Za-z_$][\w$]*)\s*\(/);
         if (call) value = call[1];
       } else if (targetLang === 'html') {
-        const attr = value.match(/^([a-z-]+)\\s*=\\s*["'][^"']*["']$/i);
+        const attr = value.match(/^([a-z-]+)\s*=\s*["'][^"']*["']$/i);
         if (attr) value = attr[1];
       } else if (targetLang === 'css') {
         if (value === '#*' && !exists(value, targetLang) && exists('#id', targetLang)) value = '#id';
