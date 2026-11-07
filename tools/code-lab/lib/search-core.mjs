@@ -104,10 +104,11 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     if (webTask && key === 'sum' && !asksArithmetic) return false;
     if (hoverTask && key.startsWith('<font') && !/font|шрифт/.test(q)) return false;
     if (multiSourceTask && !asksForm && /^<(?:form|input|datalist)\b/.test(key)) return false;
+    if (multiSourceTask && key === 'select' && !/выпадающ|список вариантов|поле выбора|select/.test(q)) return false;
     // innerText читает уже отображённый текст; для вывода загруженных данных нужен textContent.
     if (multiSourceTask && /вывести|показать|вставить|обновить/.test(q) && key === 'innertext' && !/прочитать|считать|получить отображаемый текст/.test(q)) return false;
     if (buttonTask && !asksMouse && key.includes('event.button')) return false;
-    if (buttonTask && !asksForm && key === 'form') return false;
+    if (buttonTask && !asksForm && (key === 'form' || key.startsWith('<form'))) return false;
     if (key === 'disabled' && !/отключ|заблок|неактив|запрет|disable/.test(q)) return false;
     if (key === 'event.target' && !/делегир|всплыти|распростран|event.target|нажатый элемент|определить элемент/.test(q)) return false;
     if (hoverTask && key === 'textcontent' && !/изменить текст|обновить текст|заменить текст|текст при наведении/.test(q)) return false;
