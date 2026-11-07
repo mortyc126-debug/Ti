@@ -52,3 +52,13 @@ test('CSS-псевдокласс не попадает в JavaScript из-за �
   assert.equal(hoverRoots.length, 1);
   assert.equal(hoverRoots[0].lang, 'css');
 });
+
+
+test('CSS-псевдокласс из общего словаря всё равно относится к CSS', () => {
+  const dict = { words: { ':hover': ':hover — состояние наведения' }, langs: { js: {}, css: {} } };
+  const synonyms = { ':hover': ['подсветить при наведении'] };
+  const result = buildVariants({ q: 'подсветить при наведении', dict, rows: [], synonyms });
+  const hover = result.roots.find(root => root.term === ':hover');
+  assert.ok(hover);
+  assert.equal(hover.lang, 'css');
+});
