@@ -52,4 +52,4 @@ for (const name of affectedTasks) {
 }
 const canonicalPassport = JSON.parse(await fs.readFile(path.join(projectRoot, 'tools', 'code-lab', 'library', 'js', canonicalAsyncId + '.js.meta.json'), 'utf8'));
 assert.equal(canonicalPassport.id, canonicalAsyncId);
-console.log('canonical task references: 4 checks passed');
+console.log('canonical task references: 7 checks passed');
