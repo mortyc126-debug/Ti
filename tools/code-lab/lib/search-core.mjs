@@ -20,7 +20,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
   const backendTask = /python|питон|сервер|backend|бэкенд|django|flask|fastapi|sql|postgres|баз данных/.test(q);
   const webOnly = webTask && !backendTask;
   const webLanguages = new Set(['html','css','js','ts','svg']);
-  const inScope = item => !webOnly || webLanguages.has(String(item?.lang || '').toLowerCase());
+  const inScope = item => !webOnly || webLanguages.has(canonicalLanguage(item?.lang || ''));
   const buttonTask = /кнопк|button/.test(q);
   const linkTask = /ссылк|href|переход/.test(q);
   const hoverTask = /наведен|hover/.test(q);
