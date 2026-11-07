@@ -89,7 +89,34 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     return byId.get(id);
   };
 
-  (directed?.rankedPieces || []).filter(inTaskScope).forEach((piece, index) => {
+  // Основной индекс обычно отдаёт уже объединённый rankedPieces. Но hit.pieces —
+  // первичный источник связей; подстраховываемся ими, если агрегированный список
+  // неполон или отсутствует, и сохраняем все цели, к которым относится фрагмент.
+  const directedById = new Map();
+  for (const piece of directed?.rankedPieces || []) {
+    if (!piece?.id) continue;
+    directedById.set(piece.id, { ...piece, matchedTargets: [...(piece.matchedTargets || [])] });
+  }
+  for (const hit of directed?.hits || []) {
+    for (const piece of hit.pieces || []) {
+      if (!piece?.id) continue;
+      const previous = directedById.get(piece.id);
+      if (previous) {
+        if (hit.targetKey && !previous.matchedTargets.includes(hit.targetKey)) previous.matchedTargets.push(hit.targetKey);
+      } else {
+        directedById.set(piece.id, {
+          ...piece, targetKey: hit.targetKey, targetScore: hit.score,
+          matchedTargets: hit.targetKey ? [hit.targetKey] : []
+        });
+      }
+    }
+  }
+  const directedPieces = [...directedById.values()].sort((a, b) =>
+    (a.position || a.targetPosition || Infinity) - (b.position || b.targetPosition || Infinity) ||
+    String(a.title || a.id).localeCompare(String(b.title || b.id), 'ru')
+  );
+
+  directedPieces.filter(inTaskScope).forEach((piece, index) => {
     const item = ensure(piece.id);
     Object.assign(item, {
       title: piece.title || item.title, lang: piece.lang || item.lang,
@@ -189,7 +216,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
       targets: targets.length,
       roots: roots.length,
       pieces: pieces.length,
-      directedPieces: (directed?.rankedPieces || []).filter(inTaskScope).length,
+      directedPieces: directedPieces.filter(inTaskScope).length,
       lexicalPieces: (library?.hits || []).filter(inTaskScope).length
     }
   };
