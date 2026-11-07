@@ -41,10 +41,11 @@ function placeNotes(lines, notes, look, { onlyEmpty = true } = {}){
     const swapped = tokenKinds.has(n.note) && typeof n.kind === 'string' && !tokenKinds.has(n.kind);
     const note = swapped ? n.kind : n.note;
     const normalized = swapped ? { ...n, kind: n.note, note } : n;
-    // Словарные заметки — производные от текущего словаря. Если пояснение изменилось,
-    // не прикрепляем старый текст: annotateLines ниже поставит актуальный. Свои заметки сохраняем.
+    // Словарные заметки — производные от текущего словаря. Если пояснение изменилось
+    // или отсутствует в словаре этого языка, не прикрепляем устаревший текст.
+    // annotateLines ниже добавит актуальное пояснение; свои заметки сохраняем.
     const current = n.source === 'dict' ? look(n.text) : null;
-    if(n.source === 'dict' && current && current !== note) continue;
+    if(n.source === 'dict' && (!current || current !== note)) continue;
     let tok = null;
     const tryLine = li => {
       const line = lines[li]; if(!line) return null;

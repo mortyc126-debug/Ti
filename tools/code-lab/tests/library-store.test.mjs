@@ -335,6 +335,22 @@ await test('устаревшая словарная заметка заменя�
   const loaded = await sqlStore.get('sql-note');
   assert.equal(tokenAt(loaded.lines, 'FROM').e, 'FROM — источник таблиц SQL');
   assert.equal(tokenAt(loaded.lines, 'table_name').e, 'Имя таблицы, заданное в примере.');
+
+  const jsDir = path.join(root, 'js');
+  await fs.mkdir(jsDir, { recursive: true });
+  await fs.writeFile(path.join(jsDir, 'js-note.js'), 'const a = 2; const w = 3;', 'utf8');
+  await fs.writeFile(path.join(jsDir, 'js-note.js.meta.json'), JSON.stringify({
+    schema: 1, id: 'js-note', file: 'js-note.js', title: 'JS note', lang: 'js',
+    wordNotes: [
+      { line: 0, col: 6, text: 'a', kind: 'name', note: 'a — селектор всех ссылок', source: 'dict' },
+      { line: 0, col: 6, text: 'a', kind: 'name', note: 'Пользовательская заметка о переменной a.', source: 'custom' },
+      { line: 0, col: 20, text: 'w', kind: 'name', note: 'w — ширина, h высота прямоугольника', source: 'dict' }
+    ]
+  }), 'utf8');
+  await sqlStore.refresh();
+  const jsLoaded = await sqlStore.get('js-note');
+  assert.equal(tokenAt(jsLoaded.lines, 'a').e, 'Пользовательская заметка о переменной a.');
+  assert.equal(tokenAt(jsLoaded.lines, 'w').e, undefined);
 });
 
 await fs.rm(tmp, { recursive: true, force: true });
