@@ -73,7 +73,7 @@ test('показывает условия применения конструк�
 test('не смешивает правила продолжения разных языков', () => {
   const result = buildVariants({ q: 'if', lang: 'python', dict, rows: [], synonyms: {} });
   const root = result.roots.find(x => x.term === 'if');
-  const group = root.children.find(x => x.group && x.label === 'Предшествующие конструкции');
+  const group = root.children.find(x => x.group && x.label === 'Следующие конструкции');
   assert.deepEqual(group.children.map(x => x.term).sort(), ['elif', 'else']);
 });
 
@@ -90,10 +90,10 @@ test('показывает предшествующую конструкцию �
 test('порядок показывает обе стороны без подмены типа отношения', () => {
   const after = buildVariants({ q: 'if', lang: 'js', dict, rows: [], synonyms: {} });
   const ifRoot = after.roots.find(x => x.term === 'if');
-  const continuations = ifRoot.children.find(x => x.group && x.label === 'Предшествующие конструкции');
+  const continuations = ifRoot.children.find(x => x.group && x.label === 'Следующие конструкции');
   assert.ok(continuations.children.some(x => x.term === 'else'));
   const before = buildVariants({ q: 'finally', lang: 'js', dict, rows: [], synonyms: {} });
   const finallyRoot = before.roots.find(x => x.term === 'finally');
-  const predecessors = finallyRoot.children.find(x => x.group && x.label === 'Следует после');
+  const predecessors = finallyRoot.children.find(x => x.group && x.label === 'Предшествующие конструкции');
   assert.ok(predecessors.children.some(x => x.term === 'try'));
 });
