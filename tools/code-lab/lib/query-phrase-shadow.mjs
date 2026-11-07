@@ -31,7 +31,7 @@ function pieceMatchesTarget(targetKey, phrase, piece, usage) {
   const htmlTag = target.match(/^<([a-z][a-z0-9-]*)>$/);
   if (htmlTag) {
     const tag = htmlTag[1];
-    const tagPattern = new RegExp('<\s*' + tag + '(?=[\s/>])|<\/\s*' + tag + '\s*>', 'i');
+    const tagPattern = new RegExp('<\\s*' + tag + '(?=[\\s/>])|</\\s*' + tag + '\\s*>', 'i');
     return normalize(piece.lang) === 'html' && tagPattern.test(code);
   }
 
