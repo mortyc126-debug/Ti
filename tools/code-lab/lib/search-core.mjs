@@ -49,6 +49,8 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
   const asksTesting = /тест|mock|msw|playwright|jest|vitest|мок/.test(q);
   const asksForm = /форм|submit|отправк|поле/.test(q);
   const asksResourceLink = /css|stylesheet|шрифт|подключ.*файл|ресурс/.test(q);
+  const asksLinkStyle = /hover|цвет|подчерк|стил|css|оформ/.test(q);
+  const asksDefaultAction = /отмен|предотврат|стандартное действие|preventdefault/.test(q);
   const asksImageMap = /карт|изображ|image map|карта изображ/.test(q);
   const asksMessageGroup = /сообщен|чат|message|chat/.test(q);
   const pieceCompatible = item => {
@@ -65,6 +67,8 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     if (buttonTask && !/всплыти|распростран|bubbling|propagation/.test(q) && /stoppropagation|остановить распространение/.test(text)) return false;
     if (linkTask && !asksServiceWorker && /service worker|кэш сразу|кеш сразу/.test(text)) return false;
     if (linkTask && !asksResourceLink && /style\.css|stylesheet|google fonts|подключить css/.test(text)) return false;
+    if (linkTask && !asksLinkStyle && /ссылка при наведении|убрать подчёркивание|text-decoration|a:hover/.test(text)) return false;
+    if (linkTask && !asksDefaultAction && /defaultprevented|preventdefault|отменить стандартное действие/.test(text)) return false;
     if (linkTask && !asksImageMap && /карта областей изображения|image map|image-map/.test(text)) return false;
     if (linkTask && !/worker|данн|json|api|fetch|запрос|сохран|сериализ/.test(q) && /web worker|service worker|сериализуем|передача больших данных|обработка данных/.test(text)) return false;
     if (linkTask && !/динамич|вставить|заменить|создать элемент/.test(q) && /insertadjacenthtml|replacechildren/.test(text)) return false;
@@ -98,6 +102,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     if (key === 'event.target' && !/делегир|всплыти|распростран|event.target|нажатый элемент|определить элемент/.test(q)) return false;
     if (hoverTask && key === 'textcontent' && !/изменить текст|обновить текст|заменить текст|текст при наведении/.test(q)) return false;
     if (linkTask && !asksResourceLink && key === 'link') return false;
+    if (linkTask && !asksLinkStyle && (key === 'none' || key === ':hover' || key === 'hover')) return false;
     if (linkTask && !asksServiceWorker && /serviceworker|service worker/.test(key)) return false;
     if (linkTask && /^(?:self|none)$/.test(key) && !/новом окне|вкладк|target|blank|self/.test(q)) return false;
     if (hoverTask && !asksSpacing && /letter-spacing|line-height|white-space/.test(key)) return false;
