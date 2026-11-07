@@ -193,7 +193,7 @@ assert.deepEqual(webScoped.rankedPieces.map(piece => piece.lang), ['javascript']
 assert.deepEqual(scopedIndex.search('получить данные').rankedPieces.map(piece => piece.id), ['js-fetch', 'py-fetch']);
 
 const htmlTagUsage = {
-  terms: { html: { button: {}, details: {} }, js: { button: {} } },
+  terms: { html: { button: {}, details: {} }, 'lang:js': { button: {} } },
   piecesOf(section, key) {
     if (section === 'html') return key === 'button' ? ['button-example'] : key === 'details' ? ['details-example'] : [];
     if (section === 'lang:js' && key === 'button') return ['js-button-variable'];
