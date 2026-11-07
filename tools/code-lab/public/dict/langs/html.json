@@ -644,5 +644,8 @@
   "<script type=\"speculationrules\">{ \"prerender\": [{ \"where\": { \"href_matches\": \"/*\" }, \"eagerness\": \"moderate\" }] }</script>": "подсказать браузеру страницы для предварительной отрисовки",
   "<style>@media (max-width: 600px) { .full { width: 100% !important } }</style>": "добавить адаптивные стили письма для клиентов с их поддержкой",
   "<input onkeydown=\"if (event.key === 'Enter') send()\">": "обработать нажатие клавиши в поле встроенным обработчиком",
-  "<div itemscope itemtype=\"https://schema.org/Thing\" itemid=\"https://example.com/item/1\">": "задать идентификатор сущности микроданных"
+  "<div itemscope itemtype=\"https://schema.org/Thing\" itemid=\"https://example.com/item/1\">": "задать идентификатор сущности микроданных",
+  "aria-controls": "Указывает id элемента, которым управляет текущий элемент управления.",
+  "aria-expanded": "Сообщает вспомогательным технологиям, раскрыт ли управляемый элемент: true или false.",
+  "hidden": "Булев атрибут, который скрывает элемент и его содержимое из отображения страницы."
 }
