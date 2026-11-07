@@ -131,8 +131,8 @@ test('цель, отсутствующая среди ограниченных �
     query: 'получить данные из двух источников',
     directed: {
       hits: [{
-        targetKey: 'Promise.all', score: 47, phrases: [{ phrase: 'дождаться всех источников данных' }],
-        pieces: [{ id: 'promise-piece', lang: 'js' }]
+        targetKey: 'Promise.all', score: 47, phrases: [{ phrase: 'дождаться всех источников данных', language: 'js', note: 'Дождаться завершения всех запросов' }],
+        pieces: [{ id: 'promise-piece', title: 'Дождаться нескольких запросов', desc: 'Пример с Promise.all', lang: 'js' }]
       }],
       rankedPieces: [{ id: 'promise-piece', title: 'Дождаться нескольких запросов', lang: 'js', targetKey: 'Promise.all' }]
     },
@@ -142,6 +142,12 @@ test('цель, отсутствующая среди ограниченных �
   assert.equal(result.targets[0].rootTerm, 'Promise.all');
   assert.equal(result.targets[0].rootLang, 'js');
   assert.equal(result.pieces[0].matchedTargets[0], 'Promise.all');
+  const root = result.roots.find(item => item.targetKey === 'Promise.all');
+  assert.ok(root, 'направленная цель, которой не было в исходном дереве, становится корнем');
+  assert.equal(root.lang, 'js');
+  assert.equal(root.note, 'Дождаться завершения всех запросов');
+  assert.equal(root.children[0].piece, 'promise-piece');
+  assert.equal(root.children[0].note, 'Пример с Promise.all');
 });
 
 
@@ -181,6 +187,10 @@ test('одноимённая цель сохраняет язык лучшего
     ] }
   });
   assert.equal(result.targets[0].rootLang, 'css');
+  const colorRoots = result.roots.filter(root => root.term === 'color');
+  assert.equal(colorRoots.length, 2, 'оба исходных одноимённых корня сохраняются без дубликата от directed-поиска');
+  assert.equal(colorRoots[0].lang, 'css');
+  assert.equal(colorRoots[0].children[0].piece, 'color-js-example');
 });
 
 
