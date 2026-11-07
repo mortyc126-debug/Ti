@@ -48,7 +48,7 @@ export function matchQueryPhrase(query, phrase) {
 
   let ordered = 0;
   let cursor = 0;
-  for (const token of qt) {
+  for (const token of matched) {
     const index = pt.indexOf(token, cursor);
     if (index >= 0) { ordered++; cursor = index + 1; }
   }
