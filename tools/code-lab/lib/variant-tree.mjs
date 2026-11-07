@@ -192,6 +192,7 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
   const relationGroups = (term, L) => {
     const langRules = rulesFor(L), key = norm(term), D = langs[L] || {};
     const exists = (t, targetLang = L) => Object.prototype.hasOwnProperty.call(langs[targetLang] || {}, String(t).toLowerCase()) ||
+      ((targetLang === 'js' || targetLang === 'ts') && Object.prototype.hasOwnProperty.call(W, String(t).toLowerCase())) ||
       rulesFor(targetLang).some(r => norm(r.term) === norm(t));
     // Правило может указывать не на голое имя, а на рабочий шаблон:
     // «js getElementById('*')», «css querySelector('#*')», «html for="*"».
