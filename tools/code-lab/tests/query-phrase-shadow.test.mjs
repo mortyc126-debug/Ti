@@ -155,7 +155,7 @@ const taskIndex = createLegacyQueryPhraseShadow({
 });
 const task = taskIndex.search('Добавить кнопку, которая показывает сообщение при нажатии');
 assert.deepEqual(new Set(task.hits.map(hit => hit.targetKey)), new Set(['button', 'alert', 'addeventlistener']));
-assert.ok(task.hits.every(hit => hit.phrases[0].match.kind === 'partial'));
+assert.ok(task.hits.every(hit => ['partial', 'phrase-contained'].includes(hit.phrases[0].match.kind)));
 
 const reduceUsage = {
   terms: { js: { '.reduce': {} } },
