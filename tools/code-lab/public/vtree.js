@@ -106,7 +106,7 @@
       const relationNote = related.length ? 'подобрано для: ' + [...new Set(related)].join(', ') : '';
       group.children.push({
         term: piece.title, lang: l, code: '', note: piece.title, detail: piece.desc || '',
-        label: [piece.group, ...(piece.sources || []), relationNote].filter(Boolean).join(' · '),
+        label: [piece.group, ...(piece.sources || []), piece.contextBoost, relationNote].filter(Boolean).join(' · '),
         piece: piece.id, children: []
       });
     }
