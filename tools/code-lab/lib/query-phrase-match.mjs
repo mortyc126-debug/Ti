@@ -68,7 +68,7 @@ function contextConflict(query, phrase, targetKey) {
   if (target.includes('insert into') && !/баз|таблиц|sql|запис|insert/.test(q)) return true;
   if ((target === 'import' || target.startsWith('import ')) && !/импорт|модул|библиотек|подключ/.test(q)) return true;
   if (/(?:^|[.])try|catch|except|finally|^pass$/.test(target) && qUi && !/ошиб|исключ|error|exception|try|catch|except|finally|код/.test(q)) return true;
-  if (/(?:^|[.])open(?:\\(|$)|read_csv|readfile|read_file|writefile|write_file/.test(target) && qUi && !/файл|путь|каталог|csv|кодиров|прочит|запис|открыть файл/.test(q)) return true;
+  if ((target === 'open' || target.startsWith('open(') || /read_csv|readfile|read_file|writefile|write_file/.test(target)) && qUi && !/файл|путь|каталог|csv|кодиров|прочит|запис|открыть файл/.test(q)) return true;
   if ((target === 'str' || target === 'string' || target === 's*n') && qUi && !/строк|тип str|преобразовать|умножить строку/.test(q)) return true;
   if (target === 'headers' && /шапк|заголов/.test(q) && !/http|запрос|ответ|заголовки http/.test(q)) return true;
   const qCollapse = /свер|раскры|открыть|collapse|expand/.test(q);
