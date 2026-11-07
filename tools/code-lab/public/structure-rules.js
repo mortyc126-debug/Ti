@@ -33,8 +33,9 @@
   // вид правила в начале текста: свой или синоним → {verb, len}
   function verbAt(rest){
     const r = rest.toLowerCase().replace(/ё/g, 'е'), ok = (w, n) => r.startsWith(w.replace(/ё/g, 'е')) && (r.length === n || /[\s:]/.test(r[n]));
-    for(const v of VERBS) if(ok(v, v.length)) return { verb: v, len: v.length };
+    // Сначала длинные синонимичные формы: «можно содержать» не должно обрезаться до «можно».
     for(const [a, v] of ALIAS) if(ok(a, a.length)) return { verb: v, len: a.length };
+    for(const v of VERBS) if(ok(v, v.length)) return { verb: v, len: v.length };
     return null;
   }
   function parse(text){
