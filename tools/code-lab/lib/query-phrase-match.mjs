@@ -73,7 +73,7 @@ function contextConflict(query, phrase, targetKey) {
   if (target === 'headers' && /шапк|заголов/.test(q) && !/http|запрос|ответ|заголовки http/.test(q)) return true;
   if ((target === 'pre' || target === '<pre>') && qUi && !/код|пример|предформат/.test(q)) return true;
   if (target === 'value' && qUi && !/поле|input|значение|выбран|ввод/.test(q)) return true;
-  if (target === 'from' && qUi && !/импорт|модул|from\\s/.test(q)) return true;
+  if (target === 'from' && qUi && !(/импорт|модул/.test(q) || q.includes('from '))) return true;
   if (target === 'number' && qUi && !/число|числов|number|количеств/.test(q)) return true;
   if (target === 'select' && qUi && !/выбрать|выпадающ|список вариантов|select|поле выбора/.test(q)) return true;
   const qCollapse = /свер|раскры|открыть|collapse|expand/.test(q);
