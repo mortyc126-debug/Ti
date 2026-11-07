@@ -344,7 +344,7 @@ await test('устаревшая словарная заметка заменя�
     wordNotes: [
       { line: 0, col: 6, text: 'a', kind: 'name', note: 'a — селектор всех ссылок', source: 'dict' },
       { line: 0, col: 6, text: 'a', kind: 'name', note: 'Пользовательская заметка о переменной a.', source: 'custom' },
-      { line: 0, col: 20, text: 'w', kind: 'name', note: 'w — ширина, h высота прямоугольника', source: 'dict' }
+      { line: 0, col: 19, text: 'w', kind: 'name', note: 'w — ширина, h высота прямоугольника', source: 'dict' }
     ]
   }), 'utf8');
   await sqlStore.refresh();
