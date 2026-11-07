@@ -33,18 +33,18 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     const text = normalize([item?.title, item?.group, item?.desc, ...(item?.tags || []), ...(item?.aliases || [])].filter(Boolean).join(' '));
     if (buttonTask && !asksGamepad && /геймпад|gamepad/.test(text)) return false;
     if (buttonTask && !asksKeyboard && /keydown|keyup|клавиатур|keyboard/.test(text)) return false;
-    if (buttonTask && !asksMouse && /event\\.button|кнопку мыши|кнопка мыши/.test(text)) return false;
+    if (buttonTask && !asksMouse && (text.includes('event.button') || /кнопку мыши|кнопка мыши/.test(text))) return false;
     if (linkTask && !asksServiceWorker && /service worker|кэш сразу|кеш сразу/.test(text)) return false;
     if (headingTask && !buttonTask && /кнопк/.test(text)) return false;
     if (hoverTask && !asksSpacing && /letter-spacing|line-height|white-space/.test(text)) return false;
-    if (hoverTask && !asksSorting && /\\bsort(?:ed|ing)?\\b|сортир/.test(text)) return false;
-    if (webTask && !asksFile && /document\\.write|записать файл/.test(text)) return false;
+    if (hoverTask && !asksSorting && /sort(?:ed|ing)?|сортир/.test(text)) return false;
+    if (webTask && !asksFile && (text.includes('document.write') || /записать файл/.test(text))) return false;
     if (multiSourceTask && /источник узла|идентификатор источника узла|заголовок источника узла|описание источника узла/.test(text) && !/dom|узел|node/.test(q)) return false;
     return true;
   };
   const targetCompatible = target => {
     const key = normalize(target);
-    if (buttonTask && !asksMouse && /event\\.button/.test(key)) return false;
+    if (buttonTask && !asksMouse && key.includes('event.button')) return false;
     if (linkTask && !asksServiceWorker && /serviceworker|service worker/.test(key)) return false;
     if (hoverTask && !asksSpacing && /letter-spacing|line-height|white-space/.test(key)) return false;
     if (hoverTask && !asksSorting && /^(?:sort|sorted|write)$/.test(key)) return false;
