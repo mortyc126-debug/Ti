@@ -235,5 +235,5 @@ test('общий фрагмент сохраняет все цели и лучш
     variants: { roots: [] }
   });
   assert.deepEqual(result.pieces[0].matchedTargets, ['fetch', 'Promise.all']);
-  assert.equal(result.pieces[0].targetScore, 60);
+  assert.equal(result.pieces[0].why.find(reason => reason.source === 'направленные фразы')?.targetScore, 60);
 });
