@@ -62,6 +62,20 @@ test('в задачах интерфейса приоритет у веб-язы
   assert.equal(backend.pieces[0].lang, 'python');
 });
 
+test('точное совпадение с названием фрагмента выше слабого совпадения по фразе', () => {
+  const result = combineTaskSearch({
+    query: 'сделать надпись ссылкой на другую страницу',
+    directed: { hits: [], rankedPieces: [
+      { id: 'weak', title: 'Вставить HTML рядом с элементом', lang: 'js', targetKey: 'insertAdjacentHTML' }
+    ] },
+    library: { hits: [
+      { id: 'exact-title', title: 'Ссылка на другую страницу', lang: 'html', why: [{ kind: 'exact', in: 'название/описание' }] }
+    ] },
+    variants: { roots: [] }
+  });
+  assert.equal(result.pieces[0].id, 'exact-title');
+});
+
 test('объясняет результаты, найденные только одним источником', () => {
   const result = combineTaskSearch({
     query: 'отступ',
