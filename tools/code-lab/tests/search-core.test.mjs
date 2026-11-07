@@ -69,7 +69,7 @@ test('точное совпадение с названием фрагмента
       { id: 'weak', title: 'Вставить HTML рядом с элементом', lang: 'js', targetKey: 'insertAdjacentHTML' }
     ] },
     library: { hits: [
-      { id: 'exact-title', title: 'Ссылка на другую страницу', lang: 'html', why: [{ kind: 'exact', in: 'название/описание' }] }
+      { id: 'exact-title', title: 'Ссылка на другую страницу', lang: 'html', why: [{ kind: 'exact', in: 'название' }] }
     ] },
     variants: { roots: [] }
   });
