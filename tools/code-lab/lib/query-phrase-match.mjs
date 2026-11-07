@@ -1,7 +1,7 @@
 import { terms } from './search.mjs';
 
 const normalize = value => String(value == null ? '' : value)
-  .trim().toLocaleLowerCase('ru').replace(/ё/g, 'е').replace(/\\s+/g, ' ');
+  .trim().toLocaleLowerCase('ru').replace(/ё/g, 'е').replace(/\s+/g, ' ');
 
 // Убираем только грамматический шум. Отрицание, условия и смысловые предлоги сохраняем.
 const STOP = new Set('и а но или что который которая которые которое это этот эта эти мне мне надо нужно хочу сделать сделай сделайте добавить добавь добавьте создать создай создайте чтобы который которая которое которые когда как'.split(' '));
