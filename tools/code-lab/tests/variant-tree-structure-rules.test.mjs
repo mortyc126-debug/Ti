@@ -90,7 +90,7 @@ test('шаблон «пишется» не теряется при постро�
   const root = result.roots.find(x => x.term === 'if');
   assert.ok(root);
   assert.match(root.code, /if/);
-  assert.match(root.code, /\\n/);
+  assert.match(root.code, /\n/);
 });
 
 test('правило первого элемента имеет отдельный тип отношения', () => {
