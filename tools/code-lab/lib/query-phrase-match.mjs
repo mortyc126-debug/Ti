@@ -76,6 +76,7 @@ export function matchQueryPhrase(query, phrase, targetKey = '') {
 
   if (q === p) return { score: 100, kind: 'exact', matchedTokens: pt, phraseCoverage: 1, queryCoverage: 1 };
   if (p.startsWith(q + ' ')) return { score: 90, kind: 'query-prefix', matchedTokens: qt, phraseCoverage: 1, queryCoverage: 1 };
+  if (qt.length === 1 && pt[0] === qt[0]) return { score: 86, kind: 'query-token-prefix', matchedTokens: qt, phraseCoverage: 1, queryCoverage: 1 };
   if (q.includes(' ' + p + ' ' ) || q.startsWith(p + ' ') || q.endsWith(' ' + p))
     return { score: 88, kind: 'phrase-contained', matchedTokens: pt, phraseCoverage: 1, queryCoverage: 1 };
 
