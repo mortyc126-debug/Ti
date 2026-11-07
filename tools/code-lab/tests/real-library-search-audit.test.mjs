@@ -193,7 +193,7 @@ async function main() {
   const buttonTitles = taskResultMap.get(buttonQuery).pieces.map(piece => piece.title);
   assert.ok(!buttonTitles.some(title => /форма|formdata|submit|отправк формы/i.test(title)), 'простая кнопка не должна притягивать отправку формы');
   const linkTitles = taskResultMap.get(linkQuery).pieces.map(piece => piece.title);
-  assert.ok(!linkTitles.some(title => /style\.css|stylesheet|google fonts|image map|карта областей изображения/i.test(title)), 'ссылка на страницу не должна смешиваться с подключением ресурсов и image map');
+  assert.ok(!linkTitles.some(title => /style\.css|stylesheet|google fonts|image map|карта областей изображения|ссылка при наведении|убрать подчёркивание|defaultprevented/i.test(title)), 'ссылка на страницу не должна смешиваться с подключением ресурсов и image map');
   const collapseTitles = taskResultMap.get(collapseQuery).pieces.map(piece => piece.title);
   assert.ok(!collapseTitles.some(title => /групп.*сообщен|сообщен.*групп|канонический путь|symbolic link/i.test(title)), 'сворачиваемый блок не должен смешиваться с группами сообщений и файловыми путями');
 
@@ -202,6 +202,7 @@ async function main() {
 
   const linkTerms = taskTerms(linkQuery);
   assert.ok(linkTerms.includes('a') && !linkTerms.includes('link'), 'переход на страницу должен вести к <a>, а не к ресурсному тегу <link>');
+  assert.ok(!linkTerms.includes('none') && !linkTerms.includes(':hover'), 'переход по ссылке не должен превращаться в CSS-состояние или значение оформления');
 
   const collapseTerms = taskTerms(collapseQuery);
   const hoverTerms = taskTerms(hoverQuery);
