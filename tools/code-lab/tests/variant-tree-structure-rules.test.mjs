@@ -77,6 +77,21 @@ test('ограничения не смешиваются с допустимым
   assert.ok(inverseGroup.children.some(x => x.term === 'p'));
 });
 
+test('правило «после» показывает предшествующие конструкции отдельным отношением', () => {
+  const result = buildVariants({ q: 'elif', lang: 'js', dict, rows: [], synonyms: {} });
+  const group = groupFor(result, 'elif', 'Следует после');
+  assert.ok(group.children.some(x => x.term === 'if'));
+  assert.ok(group.children.some(x => x.term === 'elif'));
+});
+
+test('шаблон «пишется» не теряется при построении узла', () => {
+  const result = buildVariants({ q: 'if', lang: 'js', dict, rows: [], synonyms: {} });
+  const root = result.roots.find(x => x.term === 'if');
+  assert.ok(root);
+  assert.match(root.code, /if/);
+  assert.match(root.code, /\\n/);
+});
+
 test('правило первого элемента имеет отдельный тип отношения', () => {
   const result = buildVariants({ q: 'summary', lang: 'html', dict, rows: [], synonyms: {} });
   const group = groupFor(result, 'summary', 'Порядок элементов');
