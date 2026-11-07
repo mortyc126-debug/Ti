@@ -187,11 +187,11 @@ test('резервная сборка сохраняет порядок целе
     directed: {
       hits: [
         { targetKey: 'fetch', score: 56, pieces: [
-          { id: 'fetch-a', title: 'fetch A', lang: 'js' },
-          { id: 'fetch-b', title: 'fetch B', lang: 'js' }
+          { id: 'fetch-a', title: 'fetch A', lang: 'js', position: 99 },
+          { id: 'fetch-b', title: 'fetch B', lang: 'js', position: 1 }
         ] },
         { targetKey: 'Promise.all', score: 47, pieces: [
-          { id: 'promise-all', title: 'Promise.all', lang: 'js' }
+          { id: 'promise-all', title: 'Promise.all', lang: 'js', position: 0 }
         ] }
       ],
       rankedPieces: []
