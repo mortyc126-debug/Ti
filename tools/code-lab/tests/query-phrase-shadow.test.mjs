@@ -219,3 +219,23 @@ const htmlTagIndex = createLegacyQueryPhraseShadow({
 });
 assert.deepEqual(htmlTagIndex.search('кнопка').hits[0].pieces.map(piece => piece.id), ['button-example']);
 assert.deepEqual(htmlTagIndex.search('раскрывающийся блок', { language: 'html' }).hits[0].pieces.map(piece => piece.id), ['details-example']);
+
+const anchorUsage = {
+  terms: { html: { a: {} } },
+  piecesOf(section, key) { return section === 'html' && key === 'a' ? ['anchor-example', 'optgroup-example'] : []; },
+  pieceInfo(id) {
+    return id === 'anchor-example'
+      ? { id, title: 'Ссылка на страницу', lang: 'html' }
+      : { id, title: 'Группа вариантов списка', lang: 'html' };
+  },
+  pieceText(id) {
+    return id === 'anchor-example'
+      ? '<a href="/page">Перейти</a>'
+      : '<select><optgroup label="A"><option>1</option></optgroup></select>';
+  }
+};
+const anchorIndex = createLegacyQueryPhraseShadow({
+  queryPhrases: [{ id: 'anchor', phrase: 'ссылка', targetKey: '<a>', language: 'html' }],
+  usage: anchorUsage
+});
+assert.deepEqual(anchorIndex.search('ссылка').hits[0].pieces.map(piece => piece.id), ['anchor-example']);
