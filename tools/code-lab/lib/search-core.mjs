@@ -33,6 +33,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
   const headingTask = /заголов|шапк|надпис/.test(q);
   const collapseTask = /свер|раскры|collapse|expand/.test(q);
   const multiSourceTask = /источник|сервер|api|данн/.test(q) && /два|нескольк|разных|источник/.test(q);
+  const asksArithmetic = /сумм|слож|арифмет|посчитать|рассчитать/.test(q);
   const asksMouse = /мыш|mouse/.test(q);
   const asksKeyboard = /клавиатур|keyboard|keydown|keyup/.test(q);
   const asksGamepad = /геймпад|gamepad/.test(q);
@@ -96,6 +97,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     const key = normalize(target);
     if (webTask && key === 'get' && !/форма|method|http|метод get|способ отправки/.test(q)) return false;
     if (webTask && key === 'list' && !/input|datalist|поле ввода|список вариантов|подсказк/.test(q)) return false;
+    if (webTask && key === 'sum' && !asksArithmetic) return false;
     if (buttonTask && !asksMouse && key.includes('event.button')) return false;
     if (buttonTask && !asksForm && key === 'form') return false;
     if (key === 'disabled' && !/отключ|заблок|неактив|запрет|disable/.test(q)) return false;
