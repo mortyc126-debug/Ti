@@ -23,6 +23,18 @@ test('отрицание не теряется при сопоставлении
   assert.ok(matchQueryPhrase('не скрывать элемент', 'не скрывать место'));
 });
 
+test('объект запроса снимает ложную неоднозначность между интерфейсом и массивом', () => {
+  assert.equal(matchQueryPhrase('свернуть боковую панель', 'свернуть массив', '.reduce'), null);
+  assert.equal(matchQueryPhrase('свернуть блок', 'свернуть массив', '.reduce'), null);
+  assert.equal(matchQueryPhrase('свернуть массив', 'раскрывающийся блок', '<details>'), null);
+  assert.ok(matchQueryPhrase('свернуть блок', 'раскрывающийся блок', '<details>'));
+});
+
+test('ссылка и кнопка не подменяют друг друга при совпадении действия', () => {
+  assert.equal(matchQueryPhrase('ссылка по клику', 'действие по клику', '<button>'), null);
+  assert.equal(matchQueryPhrase('кнопка', 'ссылка', 'href'), null);
+});
+
 test('короткое совпадение внутри другого слова не считается совпадением', () => {
   assert.equal(matchQueryPhrase('join', 'disjoint'), null);
   assert.equal(matchQueryPhrase('ступ', 'отступ внутри элемента'), null);
