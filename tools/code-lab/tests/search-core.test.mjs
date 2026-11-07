@@ -270,6 +270,7 @@ test('не подменяет вывод итога арифметической
   });
   const display = search('Получить данные из двух источников и вывести итог внизу страницы');
   assert.equal(display.targets.some(x => x.targetKey === 'sum'), false);
+  assert.equal(display.pieces.some(x => (x.matchedTargets || []).includes('sum')), false);
   const arithmetic = search('Получить данные из двух источников, сложить значения и вывести сумму на страницу');
   assert.equal(arithmetic.targets.some(x => x.targetKey === 'sum'), true);
 });
