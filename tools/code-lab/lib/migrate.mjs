@@ -13,10 +13,15 @@ export const lineText = line => line.map(tokText).join('');
 export const codeFromLines = lines => lines.map(lineText).join('\n');
 
 // Пояснение совпало со словарём? (в любом его разделе)
-export function buildDictLookup(dict){
-  const sections = ['words', 'htmlTags', 'htmlAttrs', 'cssProps', 'cssVals'];
+export function buildDictLookup(dict, lang = ''){
+  const L = String(lang || '').toLowerCase();
+  const sources = [
+    dict && dict.langs && dict.langs[L],
+    ...(L === 'ts' ? [dict && dict.langs && dict.langs.js] : []),
+    dict && dict.words, dict && dict.htmlTags, dict && dict.htmlAttrs, dict && dict.cssProps, dict && dict.cssVals
+  ];
   const map = new Map();
-  for(const s of sections) for(const [k, v] of Object.entries((dict && dict[s]) || {})){
+  for(const source of sources) for(const [k, v] of Object.entries(source || {})){
     const key = k.toLowerCase();
     if(!map.has(key)) map.set(key, new Set());
     map.get(key).add(String(v));
@@ -67,11 +72,24 @@ async function indexExistingCode(out){
 }
 
 // src — папка templates, out — папка library
-export async function migrateTemplates({ src, out, dictPath, dry = false, force = false, log = () => {} }){
+export async function migrateTemplates({ src, out, dictPath, dict: suppliedDict = null, dry = false, force = false, log = () => {} }){
   let names = [];
   try { names = (await fs.readdir(src)).filter(n => n.toLowerCase().endsWith('.json')).sort(); } catch(_){ names = []; }
-  const dict = dictPath ? await fs.readFile(dictPath, 'utf8').then(JSON.parse).catch(() => null) : null;
-  const inDict = buildDictLookup(dict);
+  let dict = suppliedDict && typeof suppliedDict === 'object' ? suppliedDict : (dictPath ? await fs.readFile(dictPath, 'utf8').then(JSON.parse).catch(() => ({})) : {});
+  if(!dict || typeof dict !== 'object' || Array.isArray(dict)) dict = {};
+  dict.langs = dict.langs && typeof dict.langs === 'object' ? dict.langs : {};
+  // CLI-миграция получает базовый файл отдельно; подмешиваем соседние языковые словари так же, как сервер.
+  if(dictPath){
+    const langDir = path.join(path.dirname(dictPath), 'dict', 'langs');
+    let langFiles = []; try { langFiles = (await fs.readdir(langDir)).filter(n => n.endsWith('.json')); } catch(_){}
+    for(const file of langFiles){
+      try {
+        const lang = file.replace(/\\.json$/i, '').toLowerCase();
+        const source = JSON.parse(await fs.readFile(path.join(langDir, file), 'utf8'));
+        if(source && typeof source === 'object' && !Array.isArray(source)) dict.langs[lang] = Object.assign({}, dict.langs[lang] || {}, source);
+      } catch(_){}
+    }
+  }
 
   const report = { src, out, dry, total: names.length, created: 0, skippedExisting: 0, skippedDuplicate: 0, duplicateContent: [], codeConflicts: [], errors: [], byLang: {}, notes: { dict: 0, custom: 0 }, emptyDesc: [], withComponent: 0, groupsRemapped: 0, groupMoves: {} };
   let groupRules = [];
@@ -118,7 +136,7 @@ export async function migrateTemplates({ src, out, dictPath, dry = false, force 
       report.duplicateContent.push({ file:name, id, lang, existingFiles:duplicateFiles });
       continue;
     }
-    const notes = wordNotes(j.lines, inDict);
+    const notes = wordNotes(j.lines, buildDictLookup(dict, lang.toLowerCase()));
     notes.forEach(n => { report.notes[n.source]++; });
     const hasDesc = !!(j.desc && String(j.desc).trim());
     const tags = Array.isArray(j.tags) ? [...new Set(j.tags.map(x => String(x).trim()).filter(Boolean))] : [];
