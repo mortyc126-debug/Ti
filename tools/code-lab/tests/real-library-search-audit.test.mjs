@@ -175,7 +175,8 @@ async function main() {
       roots: result.roots.slice(0, 12).map(x => ({ term: x.term || x.label, score: x.score, label: x.label })),
       pieces: result.pieces.slice(0, 8).map(x => ({
         title: x.title, lang: x.lang, score: x.score, sources: x.sources,
-        matchedTargets: x.matchedTargets, contextBoost: x.contextBoost
+        matchedTargets: x.matchedTargets, contextBoost: x.contextBoost,
+        why: (x.why || []).slice(0, 4)
       })),
       counts: result.counts
     });
