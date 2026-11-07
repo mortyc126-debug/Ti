@@ -20,6 +20,8 @@ const KW = {
   python: new Set(['def','return','if','elif','else','for','while','in','not','and','or','import','from','as','class','try','except','finally','raise','with','lambda','None','True','False','pass','break','continue','yield','global','nonlocal','del','assert','is','async','await']),
   sql: new Set(['select','from','where','group','by','order','having','join','left','right','inner','outer','full','cross','on','as','and','or','not','in','is','null','insert','into','values','update','set','delete','create','table','view','index','primary','key','foreign','references','distinct','count','sum','avg','min','max','case','when','then','else','end','limit','offset','union','all','with','desc','asc','between','like','exists']),
 };
+// TypeScript использует JS-синтаксис, но его собственные ключевые слова должны иметь отдельную подсветку.
+KW.ts = new Set([...KW.js, 'type','interface','implements','private','protected','public','readonly','keyof','infer','unknown','never','any','string','number','boolean','void','declare','abstract','override','satisfies','asserts','is']);
 const BUILTIN = {
   js: new Set(['console','log','Math','JSON','Array','Object','String','Number','parseInt','parseFloat','fetch','document','window','map','filter','reduce','forEach','push','length','pow','sqrt','round','floor','random']),
   python: new Set(['print','range','len','int','float','str','list','dict','tuple','set','input','sum','min','max','abs','round','enumerate','zip','sorted','map','filter','open']),
