@@ -2,7 +2,7 @@ import { queryTokens } from './query-phrase-match.mjs';
 
 const normalize = value => String(value == null ? '' : value).trim().toLocaleLowerCase('ru').replace(/ё/g, 'е');
 const round = value => Math.round(value * 1e6) / 1e6;
-const canonicalTerm = value => normalize(value).replace(/^<([a-z][\\w-]*)>$/, '$1');
+const canonicalTerm = value => normalize(value).replace(/^<([a-z][a-z0-9-]*)>$/, '$1');
 
 // Reciprocal-rank fusion: независимые поиски имеют разные шкалы score,
 // поэтому объединяем позиции в выдаче, а не сравниваем несопоставимые числа.
