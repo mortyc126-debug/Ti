@@ -221,7 +221,7 @@ async function main() {
   assert.ok(!taskTerms(hoverQuery).some(x => /letter-spacing|line-height|sort|write/.test(x)), 'не подмешивать несвязанные свойства и команды');
   assert.ok(!taskTerms(dataQuery).some(term => term === 'get' || term === 'list'), 'слова «получить» и «список» не должны превращаться в HTML-метод GET и атрибут list');
   const dataTargets = taskResultMap.get(dataQuery).targets.map(x => x.targetKey);
-  assert.ok(dataTargets.indexOf('fetch') >= 0 && dataTargets.indexOf('response.json()') > dataTargets.indexOf('fetch'), 'получение данных должно стоять выше разбора JSON-ответа: ' + dataTargets.join(', '));
+  assert.ok(dataTargets.indexOf('fetch') >= 0 && dataTargets.indexOf('response.json()') > dataTargets.indexOf('fetch'), 'получение данных должно стоять выше разбора JSON-ответа: ' + dataTargets.join(', ') + '; counts=' + JSON.stringify(taskResultMap.get(dataQuery).counts));
   assert.ok(taskResultMap.get(dataQuery).counts.directedPieces > 0, 'по найденным целям должны подбираться связанные фрагменты');
   assert.ok(taskResultMap.get(dataQuery).pieces.some(piece => (piece.matchedTargets || []).includes('fetch')), 'фрагмент запроса должен быть связан с целью fetch');
   const dataPieceTitles = taskResultMap.get(dataQuery).pieces.map(piece => piece.title);
