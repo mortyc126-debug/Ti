@@ -8,6 +8,14 @@ const canonicalTerm = value => normalize(value).replace(/^<([a-z][a-z0-9-]*)>$/,
 // поэтому объединяем позиции в выдаче, а не сравниваем несопоставимые числа.
 export function combineTaskSearch({ query, language = '', limit = 60, library, directed, variants }) {
   const max = Math.max(1, Math.min(200, Number(limit) || 60));
+  const q = normalize(query);
+  const hasUiObject = /кнопк|ссылк|страниц|шапк|заголов|панел|блок|раздел|наведен|hover|подсвет|css|html|dom|форм|поле|цвет|текст|элемент/.test(q);
+  const hasCollectionObject = /массив|список|коллекц|последовательност/.test(q);
+  const webTask = hasUiObject && (!hasCollectionObject || /панел|блок|раздел|страниц|кнопк|ссылк/.test(q));
+  const backendTask = /python|питон|сервер|backend|бэкенд|django|flask|fastapi|sql|postgres|баз данных/.test(q);
+  const webOnly = webTask && !backendTask;
+  const webLanguages = new Set(['html','css','js','ts','svg']);
+  const inScope = item => !webOnly || webLanguages.has(String(item?.lang || '').toLowerCase());
   const byId = new Map();
   const ensure = id => {
     if (!byId.has(id)) byId.set(id, {
@@ -17,7 +25,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     return byId.get(id);
   };
 
-  (directed?.rankedPieces || []).forEach((piece, index) => {
+  (directed?.rankedPieces || []).filter(inScope).forEach((piece, index) => {
     const item = ensure(piece.id);
     Object.assign(item, {
       title: piece.title || item.title, lang: piece.lang || item.lang,
@@ -38,7 +46,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     });
   });
 
-  (library?.hits || []).forEach((hit, index) => {
+  (library?.hits || []).filter(inScope).forEach((hit, index) => {
     const item = ensure(hit.id);
     item.title = hit.title || item.title;
     item.lang = hit.lang || item.lang;
@@ -67,14 +75,15 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     phraseRank: item._phraseRank, lexicalRank: item._lexicalRank, why: item.why
   }));
 
-  const roots = variants?.roots || [];
+  const roots = (variants?.roots || []).filter(inScope);
   const rootByKey = new Map(roots.map(root => [canonicalTerm(root.term), root]));
-  const targets = (directed?.hits || []).map(hit => ({
+  const targetHits = (directed?.hits || []).filter(hit => !webOnly || (hit.pieces || []).some(inScope));
+  const targets = targetHits.map(hit => ({
     targetKey: hit.targetKey,
     score: hit.score,
     phrases: hit.phrases || [],
     sections: hit.sections || [],
-    pieceCount: (hit.pieces || []).length,
+    pieceCount: (hit.pieces || []).filter(inScope).length,
     root: rootByKey.get(canonicalTerm(hit.targetKey)) || null
   }));
 
@@ -97,8 +106,8 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
       targets: targets.length,
       roots: roots.length,
       pieces: pieces.length,
-      directedPieces: (directed?.rankedPieces || []).length,
-      lexicalPieces: (library?.hits || []).length
+      directedPieces: (directed?.rankedPieces || []).filter(inScope).length,
+      lexicalPieces: (library?.hits || []).filter(inScope).length
     }
   };
 }
