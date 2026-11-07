@@ -8,6 +8,7 @@
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const StructureRules = require('../public/structure-rules.js');
+import { matchQueryPhrase } from './query-phrase-match.mjs';
 
 const MAX_ROOTS = 8, MAX_KIDS = 14;
 const HTML_TAGS = new Set('a abbr address article aside audio b blockquote body br button canvas caption code col datalist dd details dialog div dl dt em fieldset figure footer form h1 h2 h3 h4 h5 h6 head header hr html i iframe img input label legend li link main menu meta nav ol optgroup option output p picture pre progress script section select slot small source span strong style sub summary sup svg table tbody td template textarea tfoot th thead time title tr ul video'.split(' '));
@@ -83,11 +84,9 @@ function dictIndexes(dict){
 
 export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, caseMap = null }){
   const qn = norm(q); if(!qn) return { q, lang, roots: [] };
-  const qw = words(qn).map(stem);
-  const langs = dict && dict.langs ? dict.langs : {};
+    const langs = dict && dict.langs ? dict.langs : {};
   const indexes = dictIndexes(dict);
   const want = lang && langs[lang] ? [lang] : Object.keys(langs);
-  const hasQ = text => { const tw = words(text); return qw.every(w => tw.some(t => t.startsWith(w))); };
 
   // корни: термины, у которых синоним совпал со смыслом запроса, сам термин равен запросу или начинается с него
   const roots = [];
@@ -111,9 +110,11 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
     const D = langs[L] || {};
     for(const [term, phrases] of Object.entries(synonyms || {})){
       if(!Array.isArray(phrases)) continue;
-      const hit = phrases.find(p => hasQ(p)); if(!hit) continue;
+      const matches = phrases.map(phrase => ({ phrase, match: matchQueryPhrase(qn, phrase) }))
+        .filter(item => item.match).sort((a, b) => b.match.score - a.match.score);
+      const hit = matches[0]; if(!hit) continue;
       const res = resolve(term, D, L); if(!res) continue;
-      add(res.key, L, hit, 3 - Math.min(2, words(hit).length - qw.length) + res.rank);
+      add(res.key, L, hit.phrase, 2 + hit.match.score / 20 + res.rank);
     }
     // латиницей пишут начало имени («quer») — совпадение по началу важнее смысла по синонимам
     const latin = /^[a-z]/.test(qn);
@@ -272,7 +273,7 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
   if(/[а-я]/.test(qn)){
     const near = lang === 'html' ? ['html', 'css', 'js'] : lang ? [lang] : [];
     const rank = x => { const i = near.indexOf(x.lang); return i < 0 ? 9 : i; };
-    const hits = rows.filter(x => hasQ(x.title)).sort((a, b) => rank(a) - rank(b) || String(a.title).length - String(b.title).length);
+    const hits = rows.filter(x => matchQueryPhrase(qn, x.title)).sort((a, b) => rank(a) - rank(b) || String(a.title).length - String(b.title).length);
     const pick = hits.slice(0, MAX_KIDS);
     if(pick.length) out.push({ term: '', lang: pick[0].lang, code: '', label: 'куски из библиотеки', note: hits.length + ' по названию', group: true,
       children: pick.map(x => ({ term: x.title, lang: x.lang, code: '', note: x.title + (near.length && x.lang !== near[0] ? ' · ' + x.lang.toUpperCase() : ''), label: '', children: [], piece: x.id })) });
