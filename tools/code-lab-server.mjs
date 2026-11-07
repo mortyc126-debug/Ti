@@ -20,6 +20,7 @@ import { createLegacyQueryPhraseShadow } from './code-lab/lib/query-phrase-shado
 import { CONCEPT_RELATIONS } from './code-lab/lib/concept-model.mjs';
 import { rollbackRestore, prepareRestoreTransaction, markRestoreTransaction, recoverRestoreTransactions } from './code-lab/lib/restore-transaction.mjs';
 import { createSearchService } from './code-lab/lib/search.mjs';
+import { combineTaskSearch } from './code-lab/lib/search-core.mjs';
 import { tokenize } from './code-lab/lib/tokenizer.mjs';   // токенайзер отдельно — его удобнее тестировать
 import { buildUsage, libraryFingerprint } from './code-lab/lib/dict-usage.mjs';   // dict-usage: связь «слово словаря ↔ куски»
 import { parseSnippets } from './code-lab/lib/ingest.mjs';
@@ -552,6 +553,21 @@ function coverage(j){
 let _lblCache = { v: -1, dict: null, map: new Map() };
 let _caseMap = { v: -1, map: null };   // регистр имён из библиотеки (queryselector → querySelector) для дерева вариантов
 let _variantSnapshot = { v: -1, dict: null, rows: [], codes: [] }; // неизменяемый снимок для быстрых повторных подсказок
+async function variantsFor(q, lang = '') {
+  const dict = await kwDict();
+  await store.sync();
+  if(_variantSnapshot.v !== store.version || _variantSnapshot.dict !== dict){
+    const ents = await store.entries();
+    const rows = ents.map(e => ({ id:e.id, lang:e.lang, title:e.title, code:e.code, nlines:String(e.code || '').split('\n').length }));
+    _variantSnapshot = { v:store.version, dict, rows, codes:ents.map(e => e.code) };
+  }
+  if(_caseMap.v !== store.version || _caseMap.dict !== dict)
+    _caseMap = { v:store.version, dict, map:caseMapFrom(_variantSnapshot.codes.concat(_dictRawKeys)) };
+  return buildVariants({
+    q: String(q || '').slice(0, 500), lang: String(lang || '').toLowerCase(),
+    dict, rows:_variantSnapshot.rows, synonyms:dict.synonyms || {}, caseMap:_caseMap.map
+  });
+}
 async function labelsFor(entry, names){
   const dict = await kwDict();
   if(_lblCache.v !== store.version || _lblCache.dict !== dict) _lblCache = { v: store.version, dict, map: new Map() };
@@ -2086,19 +2102,7 @@ const server = http.createServer(async (req, res) => {
     // ── дерево вариантов: «отступ» → margin / padding → margin-top… → конструкции и куски ──
     if(u.pathname === '/api/variants'){
       const q = String(u.searchParams.get('q') || '').slice(0, 80), lang = String(u.searchParams.get('lang') || '').toLowerCase();
-      const dict = await kwDict();
-      // Один синхронный проход по библиотеке; неизменяемые строки и карта регистра переиспользуются между нажатиями.
-      await store.sync();
-      if(_variantSnapshot.v !== store.version || _variantSnapshot.dict !== dict){
-        const ents = await store.entries();
-        const rows = ents.map(e => ({ id:e.id, lang:e.lang, title:e.title, code:e.code, nlines:String(e.code || '').split('\n').length }));
-        _variantSnapshot = { v:store.version, dict, rows, codes:ents.map(e => e.code) };
-      }
-      if(_caseMap.v !== store.version || _caseMap.dict !== dict)
-        _caseMap = { v:store.version, dict, map:caseMapFrom(_variantSnapshot.codes.concat(_dictRawKeys)) };
-      return json(res, 200, buildVariants({
-        q, lang, dict, rows:_variantSnapshot.rows, synonyms:dict.synonyms || {}, caseMap:_caseMap.map
-      }));
+      return json(res, 200, await variantsFor(q, lang));
     }
 
     // ── свои имена в коде песочницы: что внутри, где объявлено, похожие на опечатку ──
