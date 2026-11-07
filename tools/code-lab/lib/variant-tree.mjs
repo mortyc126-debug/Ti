@@ -212,8 +212,9 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
       return value.toLowerCase();
     };
     const groups = new Map();
-    const add = (verb, show, rule, target = '', targetLang = L, actionable = false) => {
-      if(!groups.has(verb)) groups.set(verb, []);
+    const add = (verb, show, rule, target = '', targetLang = L, actionable = false, groupLabel = relationLabels[verb]) => {
+      const groupKey = verb + '\\u0000' + groupLabel;
+      if(!groups.has(groupKey)) groups.set(groupKey, { verb, label: groupLabel, children: [] });
       const note = [rule.note, relationDescriptions[verb]].filter(Boolean).join(' · ');
       let item;
       if(actionable && target && exists(target, targetLang)){
@@ -224,17 +225,17 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
         item = { term: target || '', lang: targetLang, code: '', show, label: '', note, relation: verb, children: [] };
       }
       item.relation = verb;
-      groups.get(verb).push(item);
+      groups.get(groupKey).children.push(item);
     };
     for(const r of langRules){
       const own = norm(r.term) === key;
       const refs = r.args.map(a => norm(a));
       if(r.verb === 'после' && refs.includes(key) && exists(r.term))
-        add('после', r.term + ' — следует после ' + term, r, r.term, L, true);
+        add('после', r.term + ' — следует после ' + term, r, r.term, L, true, 'Следующие конструкции');
       // Показываем и обратную сторону порядка: если текущий термин сам объявлен
       // следующим после другого, предыдущая конструкция должна быть видна прямо здесь.
       if(r.verb === 'после' && own)
-        r.args.forEach(a => add('после', term + ' следует после ' + a, r, a, L, true));
+        r.args.forEach(a => add('после', term + ' следует после ' + a, r, a, L, true, 'Предшествующие конструкции'));
 
       if(r.verb === 'внутри' && own)
         r.args.forEach(a => add('внутри', term + ' находится внутри ' + a, r, a, L, true));
@@ -267,8 +268,8 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
         });
       }
     }
-    return [...groups.entries()].map(([verb, children]) => ({
-      group: true, label: relationLabels[verb], relation: verb,
+    return [...groups.values()].map(({ verb, label, children }) => ({
+      group: true, label, relation: verb,
       note: relationDescriptions[verb], lang: L, children
     }));
   };
