@@ -7,11 +7,14 @@ const normalize = value => String(value == null ? '' : value)
 const STOP = new Set('и а но или что который которая которые которое это этот эта эти мне мне надо нужно хочу сделать сделай сделайте добавить добавь добавьте создать создай создайте чтобы который которая которое которые когда как'.split(' '));
 const NEGATION = new Set(['не', 'без', 'нельзя', 'запрещено', 'кроме']);
 const UNIQUE = values => [...new Set(values)];
+const RAW_WORD = /[\\p{L}\\p{N}]+(?:[-_][\\p{L}\\p{N}]+)*/gu;
+const rawWords = value => normalize(value).match(RAW_WORD) || [];
+const rawNegations = value => rawWords(value).filter(token => NEGATION.has(token));
 const TOKEN_CACHE = new Map();
 function cachedTokens(value) {
   const key = normalize(value);
   if (TOKEN_CACHE.has(key)) return TOKEN_CACHE.get(key);
-  const result = UNIQUE(terms(key).filter(token => token.length > 1 && !STOP.has(token)));
+  const result = UNIQUE(rawWords(key).filter(word => !STOP.has(word)).flatMap(word => terms(word)).filter(token => token.length > 1));
   if (TOKEN_CACHE.size >= 30000) TOKEN_CACHE.delete(TOKEN_CACHE.keys().next().value);
   TOKEN_CACHE.set(key, result);
   return result;
@@ -25,8 +28,8 @@ export function matchQueryPhrase(query, phrase) {
   if (!q || !p) return null;
   const qt = cachedTokens(q), pt = cachedTokens(p);
   if (!qt.length || !pt.length) return null;
-  const qNeg = qt.filter(token => NEGATION.has(token));
-  const pNeg = pt.filter(token => NEGATION.has(token));
+  const qNeg = rawNegations(q);
+  const pNeg = rawNegations(p);
   if (qNeg.length !== pNeg.length || qNeg.some(token => !pNeg.includes(token))) return null;
 
   if (q === p) return { score: 100, kind: 'exact', matchedTokens: pt, phraseCoverage: 1, queryCoverage: 1 };
