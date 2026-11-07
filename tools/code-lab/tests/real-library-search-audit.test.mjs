@@ -159,11 +159,13 @@ async function main() {
     'Свернуть боковую панель, чтобы её можно было снова открыть'
   ];
   const taskResults = [];
+  const taskResultMap = new Map();
   for (const query of taskScenarios) {
     const result = await get('/api/search/task?q=' + encodeURIComponent(query) + '&limit=30');
     assert.equal(result.mode, 'task', `неверный режим единого поиска для «${query}»`);
     assert.ok(Array.isArray(result.roots) && Array.isArray(result.pieces), `нет корней или фрагментов для «${query}»`);
     assert.ok(result.roots.length || result.pieces.length, `поиск не дал ни одной конструкции или фрагмента для «${query}»`);
+    taskResultMap.set(query, result);
     taskResults.push({
       query,
       targets: result.targets.slice(0, 12).map(x => x.targetKey),
@@ -172,6 +174,36 @@ async function main() {
       counts: result.counts
     });
   }
+  const taskTerms = query => {
+    const result = taskResultMap.get(query);
+    return [
+      ...(result?.targets || []).map(x => String(x.targetKey).toLowerCase()),
+      ...(result?.roots || []).map(x => String(x.term || '').toLowerCase())
+    ];
+  };
+  const buttonQuery = taskScenarios[0], linkQuery = taskScenarios[1], collapseQuery = taskScenarios[2];
+  const hoverQuery = taskScenarios[3], dataQuery = taskScenarios[4], sidebarQuery = taskScenarios[5];
+  assert.ok(taskTerms(buttonQuery).some(x => /button/.test(x)), 'кнопка должна находиться в HTML');
+  assert.ok(taskTerms(buttonQuery).some(x => /addeventlistener|click/.test(x)), 'для кнопки должен находиться обработчик события');
+  assert.ok(taskTerms(buttonQuery).some(x => /alert|textcontent|innertext/.test(x)), 'должен находиться способ показать сообщение');
+  assert.ok(!taskResultMap.get(buttonQuery).pieces.some(x => /геймпад|gamepad|keydown|keyup|клавиатур/.test(x.title)), 'не подмешивать игровые и клавиатурные кнопки');
+  assert.ok(taskTerms(linkQuery).some(x => x === 'a' || x === '<a>'), 'ссылка должна находиться как HTML-элемент a');
+  assert.ok(taskTerms(linkQuery).some(x => x === 'href'), 'для ссылки должен находиться href');
+  assert.ok(!taskTerms(linkQuery).some(x => /button/.test(x)), 'ссылка не должна подменяться кнопкой');
+  const details = taskResultMap.get(collapseQuery).roots.find(x => x.term === 'details');
+  assert.ok(details, 'для раскрываемого блока должен находиться нативный details');
+  assert.match(JSON.stringify(details.children), /summary/, 'внутри details должен показываться summary');
+  assert.ok(taskTerms(hoverQuery).some(x => x === ':hover'), 'для наведения должен находиться :hover');
+  assert.ok(taskTerms(hoverQuery).some(x => x === 'color'), 'для подсветки должен находиться цвет текста');
+  assert.ok(taskTerms(hoverQuery).some(x => x === '<header>'), 'должна учитываться шапка страницы');
+  assert.ok(!taskTerms(hoverQuery).some(x => /letter-spacing|line-height|sort|write/.test(x)), 'не подмешивать несвязанные свойства и команды');
+  assert.ok(taskTerms(dataQuery).some(x => /fetch/.test(x)), 'должен находиться запрос данных');
+  assert.ok(taskTerms(dataQuery).some(x => /promise.all/.test(x)), 'для нескольких источников должен находиться Promise.all');
+  assert.ok(taskTerms(dataQuery).some(x => x === '<header>') && taskTerms(dataQuery).some(x => x === '<footer>'), 'должны находиться разные места вывода');
+  assert.ok(!taskTerms(dataQuery).some(x => /math.floor|event.target/.test(x)), 'не подмешивать незаказанные операции');
+  assert.ok(taskTerms(sidebarQuery).some(x => x === '<aside>'), 'боковая панель должна находиться как aside');
+  assert.ok(!taskTerms(sidebarQuery).some(x => /reduce/.test(x)), 'сворачивание панели не должно превращаться в свёртку массива');
+
   console.log('TASK SEARCH REAL SCENARIOS:', JSON.stringify(taskResults));
 
   const report = {
