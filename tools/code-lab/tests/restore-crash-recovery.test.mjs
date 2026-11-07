@@ -10,7 +10,7 @@ const moduleUrl = new URL('../lib/restore-transaction.mjs', import.meta.url).hre
 const childSource = (fixture, stage) => `
   import { promises as fs } from 'node:fs';
   import path from 'node:path';
-  import { prepareRestoreTransaction, markRestoreTransaction } from ${JSON.stringify(moduleUrl)};
+  import { prepareRestoreTransaction, markRestoreTransaction, syncRestoreFile, syncRestoreDirectory } from ${JSON.stringify(moduleUrl)};
   const f = ${JSON.stringify(fixture)};
   const root = f.root;
   const backupRoot = path.join(f.backupDir, f.id);
@@ -22,15 +22,22 @@ const childSource = (fixture, stage) => `
   for (const [target, name] of [[oldFile, 'old.txt'], [deletedFile, 'deleted.txt']]) {
     const backup = path.join(backupRoot, 'files', name);
     await fs.copyFile(target, backup);
+    await syncRestoreFile(fs, backup);
+    await syncRestoreDirectory(fs, path.dirname(backup));
     backups.set(target, backup);
   }
   const writes = [{ abs: oldFile }, { abs: newFile }];
   const deletions = [{ abs: deletedFile }];
   await prepareRestoreTransaction({ fs, backupRoot, root, rootName: 'library', writes, deletions, backups });
   await fs.writeFile(oldFile, 'new old file');
+  await syncRestoreFile(fs, oldFile);
+  await syncRestoreDirectory(fs, path.dirname(oldFile));
   if (${JSON.stringify(stage)} === 'after-first-write') process.exit(71);
   await fs.writeFile(newFile, 'new file');
+  await syncRestoreFile(fs, newFile);
+  await syncRestoreDirectory(fs, path.dirname(newFile));
   await fs.unlink(deletedFile);
+  await syncRestoreDirectory(fs, path.dirname(deletedFile));
   if (${JSON.stringify(stage)} === 'after-all-writes') process.exit(72);
   await markRestoreTransaction({ fs, backupRoot, state: 'COMMITTED' });
   process.exit(0);
