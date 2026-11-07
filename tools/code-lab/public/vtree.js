@@ -94,7 +94,31 @@
       if(root) targetLabels.set(canonical(target.targetKey), root.note || root.show || root.label || root.term);
     }
     const byLang = new Map();
-    roots.forEach(n => { const l = n.lang || ''; if(!byLang.has(l)) byLang.set(l, []); byLang.get(l).push(n); });
+    const existingTargets = new Set();
+    roots.forEach(n => {
+      const l = n.lang || '';
+      if(!byLang.has(l)) byLang.set(l, []);
+      byLang.get(l).push(n);
+      existingTargets.add(l + '\\u0000' + canonical(n.term));
+    });
+    // Вариантов дерева может быть меньше, чем направленных целей запроса.
+    // Не теряем найденные конструкции: добавляем их в обычный языковой раздел,
+    // а не прячем за лимитом корней и не создаём отдельную классификацию.
+    for(const target of (r && r.targets) || []){
+      const l = target.rootLang || '';
+      const key = l + '\\u0000' + canonical(target.rootTerm || target.targetKey);
+      if(existingTargets.has(key)) continue;
+      existingTargets.add(key);
+      if(!byLang.has(l)) byLang.set(l, []);
+      const phrase = target.phrases && target.phrases[0];
+      byLang.get(l).push({
+        term: target.rootTerm || target.targetKey, lang: l,
+        code: target.rootTerm || target.targetKey,
+        label: phrase && phrase.phrase ? 'найдено по фразе: ' + phrase.phrase : 'найдено по описанию задачи',
+        note: phrase && phrase.note || '',
+        children: [], score: target.score, target: true
+      });
+    }
     for(const piece of pieces){
       const l = piece.lang || '';
       if(!byLang.has(l)) byLang.set(l, []);
