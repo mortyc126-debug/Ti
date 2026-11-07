@@ -213,7 +213,7 @@ test('языковой алиас javascript не отбрасывается и�
     variants: { roots: [] }
   });
   assert.equal(result.counts.directedPieces, 1);
-  assert.equal(result.pieces[0].lang, 'javascript');
+  assert.equal(result.pieces[0].lang, 'js');
 });
 
 
