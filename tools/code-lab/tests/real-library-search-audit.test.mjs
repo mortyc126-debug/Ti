@@ -224,8 +224,8 @@ async function main() {
   assert.ok(taskResultMap.get(dataQuery).counts.directedPieces > 0, 'по найденным целям должны подбираться связанные фрагменты');
   assert.ok(taskResultMap.get(dataQuery).pieces.some(piece => (piece.matchedTargets || []).includes('fetch')), 'фрагмент запроса должен быть связан с целью fetch');
   const dataPieceTitles = taskResultMap.get(dataQuery).pieces.map(piece => piece.title);
-  assert.ok(dataPieceTitles.some(title => /fetch \\+ await/i.test(title)), 'основной пример должен показывать получение данных через fetch');
-  assert.ok(!dataPieceTitles.some(title => /fetch post|учётные данные|учетные данные|imagebitmap|insertadjacenthtml|element\\.attributes|первый успешный промис/i.test(title)), 'не подмешивать POST, авторизацию, декодирование изображения, HTML-вставку и атрибуты к задаче чтения данных');
+  assert.ok(dataPieceTitles.some(title => /fetch \+ await/i.test(title)), 'основной пример должен показывать получение данных через fetch');
+  assert.ok(!dataPieceTitles.some(title => /fetch post|учётные данные|учетные данные|imagebitmap|insertadjacenthtml|element\.attributes|первый успешный промис/i.test(title)), 'не подмешивать POST, авторизацию, декодирование изображения, HTML-вставку и атрибуты к задаче чтения данных');
 
 
   assert.ok(!dataTargets.some(x => ['display', 'grid', 'append'].includes(x)), 'вывод данных в блоки не должен притягивать общие CSS-свойства и append по слову «блок»');
