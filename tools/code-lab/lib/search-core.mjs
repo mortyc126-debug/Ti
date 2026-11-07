@@ -38,7 +38,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     const text = normalize([item?.title, item?.group, item?.desc, ...(item?.tags || []), ...(item?.aliases || [])].filter(Boolean).join(' '));
     if (buttonTask && !asksGamepad && /геймпад|gamepad/.test(text)) return false;
     if (webTask && !asksServiceWorker && /service worker|web worker/.test(text)) return false;
-    if (linkTask && !/файл|каталог|путь|символическ|symlink|filesystem|linux|unix/.test(q) && /символическ ссылк|symlink|удаление файла/.test(text)) return false;
+    if (linkTask && !/файл|каталог|путь|символическ|symlink|filesystem|linux|unix/.test(q) && /символическ.*ссылк|symbolic link|symlink|удаление файла/.test(text)) return false;
     if (collapseTask && !hasCollectionObject && /свёртк|свертк|свернуть в одно значение|reduce|массив|список элементов/.test(text)) return false;
     if (buttonTask && !asksKeyboard && /keydown|keyup|клавиатур|keyboard/.test(text)) return false;
     if (buttonTask && !asksMouse && (text.includes('event.button') || /кнопку мыши|кнопка мыши/.test(text))) return false;
