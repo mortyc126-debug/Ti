@@ -200,7 +200,7 @@ async function main() {
 
   const buttonTerms = taskTerms(buttonQuery);
   assert.ok(!buttonTerms.includes('form'), 'обычная кнопка не должна превращаться в форму');
-  assert.ok(!buttonTerms.some(term => term === 'form' || /^<form\\b/.test(term)), 'обычная кнопка не должна получать HTML-цель form');
+  assert.ok(!buttonTerms.some(term => term === 'form' || /^<form\b/.test(term)), 'обычная кнопка не должна получать HTML-цель form');
 
   const linkTerms = taskTerms(linkQuery);
   assert.ok(linkTerms.includes('a') && !linkTerms.includes('link'), 'переход на страницу должен вести к <a>, а не к ресурсному тегу <link>');
@@ -242,7 +242,7 @@ async function main() {
   assert.ok(!taskTerms(dataQuery).some(term => term === 'innertext'), 'вывод полученных данных не должен подменяться чтением уже отображённого текста');
   assert.ok(!taskResultMap.get(linkQuery).pieces.slice(0, 5).some(piece => !(piece.matchedTargets || []).length), 'несвязанные лексические совпадения не должны занимать первые пять позиций, если найдены направленные фрагменты');
   const dataTargets = taskResultMap.get(dataQuery).targets.map(x => x.targetKey);
-  assert.ok(!dataTargets.some(term => /^<select\\b/.test(term)), 'список данных для вывода не должен превращаться в выпадающее поле select');
+  assert.ok(!dataTargets.some(term => /^<select\b/.test(term)), 'список данных для вывода не должен превращаться в выпадающее поле select');
   assert.ok(!taskResultMap.get(dataQuery).roots.some(root => /^<(?:form|input|datalist)\b/i.test(String(root.term || ''))), 'обычный вывод данных на страницу не должен превращаться в форму поиска или поле ввода');
   assert.ok(dataTargets.indexOf('fetch') >= 0 && dataTargets.indexOf('response.json()') > dataTargets.indexOf('fetch'), 'получение данных должно стоять выше разбора JSON-ответа: ' + dataTargets.join(', ') + '; counts=' + JSON.stringify(taskResultMap.get(dataQuery).counts));
   assert.ok(taskResultMap.get(dataQuery).counts.directedPieces > 0, 'по найденным целям должны подбираться связанные фрагменты');
