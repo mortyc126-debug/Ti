@@ -55,7 +55,7 @@ test('TypeScript-only keywords are tokenized as keywords', () => {
 });
 
 test('SQL transaction keywords and COALESCE receive the right token kinds', () => {
-  const tokens = tokenize('DEFAULT 0; COMMIT; ROLLBACK; COALESCE(price, 0);', 'sql').flat();
+  const tokens = tokenize('DEFAULT 0; COMMIT; ROLLBACK; COALESCE(price, 0); COUNT(price); SUM(price); AVG(price); MIN(price); MAX(price);', 'sql').flat();
   const kind = word => tokens.find(t => t.v && t.v.toLowerCase() === word.toLowerCase())?.k;
   for(const word of ['DEFAULT', 'COMMIT', 'ROLLBACK']) assert.equal(kind(word), 'kw', word);
   for(const word of ['COALESCE', 'COUNT', 'SUM', 'AVG', 'MIN', 'MAX']) assert.equal(kind(word), 'fn', word);
