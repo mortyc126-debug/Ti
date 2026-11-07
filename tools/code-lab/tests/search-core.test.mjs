@@ -164,20 +164,23 @@ test('фрагменты и связи восстанавливаются из �
 });
 
 
-test('язык цели определяется по связанному фрагменту, а не по одноимённому корню другого языка', () => {
+test('одноимённая цель сохраняет язык лучшего корня, а не случайного примера', () => {
   const result = combineTaskSearch({
-    query: 'показать сообщение по нажатию кнопки',
+    query: 'подсветить текст при наведении',
     directed: {
       hits: [{
-        targetKey: 'alert', score: 43, phrases: [{ phrase: 'всплывающее сообщение' }],
-        pieces: [{ id: 'alert-js', title: 'alert()', lang: 'js' }]
+        targetKey: 'color', score: 52, phrases: [{ phrase: 'изменить цвет текста при наведении' }],
+        pieces: [{ id: 'color-js-example', title: 'JS fallback', lang: 'js' }]
       }],
       rankedPieces: []
     },
     library: { hits: [] },
-    variants: { roots: [{ term: 'alert', lang: 'html', label: 'одноимённый HTML-корень' }] }
+    variants: { roots: [
+      { term: 'color', lang: 'css', score: 5.6, label: 'CSS-свойство' },
+      { term: 'color', lang: 'html', score: 5.1, label: 'одноимённый HTML-корень' }
+    ] }
   });
-  assert.equal(result.targets[0].rootLang, 'js');
+  assert.equal(result.targets[0].rootLang, 'css');
 });
 
 
