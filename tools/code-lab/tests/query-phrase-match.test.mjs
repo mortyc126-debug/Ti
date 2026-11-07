@@ -44,6 +44,15 @@ test('контрастные уточнения не смешиваются пр
   assert.equal(matchQueryPhrase('выровнять текст по центру', 'выровнять элементы по центру'), null);
 });
 
+test('контекст округления вниз отделяет floor от round', () => {
+  assert.equal(matchQueryPhrase('округлить вниз', 'округлить вниз', 'round'), null);
+  assert.equal(matchQueryPhrase('округлить вниз', 'округлить вниз', 'round(x, n)'), null);
+  assert.ok(matchQueryPhrase('округлить вниз', 'округлить вниз', 'math.floor'));
+  assert.equal(matchQueryPhrase('округлить до двух знаков', 'округлить до двух знаков', 'math.floor'), null);
+  assert.ok(matchQueryPhrase('округлить до двух знаков', 'округлить до двух знаков', 'round(x, n)'));
+  assert.ok(matchQueryPhrase('округлить до двух знаков', 'округлить до двух знаков', 'toFixed(2)'));
+});
+
 test('контекст списка и словаря Python не смешивает два типа коллекций', () => {
   assert.equal(matchQueryPhrase('список Python', 'словарь Python', 'dict'), null);
   assert.equal(matchQueryPhrase('словарь Python', 'список Python', 'list'), null);
