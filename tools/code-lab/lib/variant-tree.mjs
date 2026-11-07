@@ -242,7 +242,7 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
     return { term, lang: L, code, note: (note || '') + (need.length ? (note ? '; ' : '') + 'обязательно: ' + need.join(', ') : ''), label: label || synLabel(term), children: [] };
   };
   const out = top.map(r => {
-    const D = langs[r.lang] || {}; const root = node(r.term, r.lang, r.label);
+    const D = langs[r.lang] || {}; const root = node(r.term, r.lang, r.label); root.score = r.score;
     root.children.push(...relationGroups(r.term, r.lang));
     // разновидности по имени: каждая — под самым длинным уже существующим предком
     // разновидности по имени: margin → margin-inline → margin-inline-start.
