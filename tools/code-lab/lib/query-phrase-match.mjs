@@ -23,9 +23,27 @@ export function queryTokens(value) {
   return cachedTokens(value).slice();
 }
 
-export function matchQueryPhrase(query, phrase) {
+function contextConflict(query, phrase, targetKey) {
+  const q = normalize(query), p = normalize(phrase), target = normalize(targetKey);
+  const qUi = /панел|блок|раздел|страниц|sidebar|меню|вкладк/.test(q);
+  const qCollection = /массив|список|коллекц|последовательност/.test(q);
+  const pUi = /панел|блок|раздел|страниц|sidebar|меню|вкладк/.test(p);
+  const pCollection = /массив|список|коллекц|последовательност/.test(p);
+  if (/(?:^|[.])reduce|fold/.test(target) && qUi && !qCollection) return true;
+  if (/(?:details|summary)/.test(target) && qCollection && !qUi) return true;
+  const qLink = /ссылк|переход|href|\\burl\\b/.test(q);
+  const qButton = /кнопк|\\bbutton\\b/.test(q);
+  if (/(?:<button>|^button$|button\\[)/.test(target) && qLink && !qButton) return true;
+  if (/(?:^a$|href)/.test(target) && qButton && !qLink) return true;
+  if (qUi && pCollection && !pUi && !qCollection) return true;
+  if (qCollection && pUi && !pCollection && !qUi) return true;
+  return false;
+}
+
+export function matchQueryPhrase(query, phrase, targetKey = '') {
   const q = normalize(query), p = normalize(phrase);
   if (!q || !p) return null;
+  if (contextConflict(q, p, targetKey)) return null;
   const qt = cachedTokens(q), pt = cachedTokens(p);
   if (!qt.length || !pt.length) return null;
   const qNeg = rawNegations(q);
