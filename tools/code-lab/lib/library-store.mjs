@@ -294,7 +294,7 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
       await scan(true);
       let migrated = null;
       if(!byId.size && legacyDir){
-        migrated = await migrateTemplates({ src: legacyDir, out: root, dictPath });
+        migrated = await migrateTemplates({ src: legacyDir, out: root, dictPath, dict: await dictOf() });
         if(migrated.created) await scan(true);
       }
       return { count: byId.size, migrated };
