@@ -81,14 +81,24 @@
     const my = ++seq; const body = pop.querySelector('.vt-b');
     if(!q){ body.innerHTML = '<div class="vt-none">напиши, что нужно: «отступ», «найти элемент», «цикл»…</div>'; return; }
     body.innerHTML = '<div class="vt-none">ищу…</div>';
-    const r = await fetch('/api/variants?q=' + encodeURIComponent(q) + '&lang=' + encodeURIComponent(ctx.lang || '')).then(x => x.json()).catch(() => null);
+    const r = await fetch('/api/search/task?q=' + encodeURIComponent(q) + '&lang=' + encodeURIComponent(ctx.lang || '') + '&limit=60').then(x => x.json()).catch(() => null);
     if(my !== seq || !pop) return;
-    let roots = (r && r.roots) || [];
-    // в файле на другом языке ничего — смотрим во всех языках
-    if(!roots.length && ctx.lang){ const r2 = await fetch('/api/variants?q=' + encodeURIComponent(q)).then(x => x.json()).catch(() => null); if(my !== seq || !pop) return; roots = (r2 && r2.roots) || []; }
-    if(!roots.length){ body.innerHTML = '<div class="vt-none">вариантов не нашлось — попробуй другое слово</div>'; return; }
-    const byLang = new Map(); roots.forEach(n => { if(!byLang.has(n.lang)) byLang.set(n.lang, []); byLang.get(n.lang).push(n); });
-    body.innerHTML = [...byLang.entries()].map(([l, list]) => (byLang.size > 1 ? '<div class="vt-g">' + esc(l.toUpperCase()) + '</div>' : '') + list.map(n => rowHtml(n, 0)).join('')).join('');
+    const roots = ((r && r.roots) || []).filter(n => n.label !== 'куски из библиотеки');
+    const pieces = (r && r.pieces) || [];
+    const byLang = new Map();
+    roots.forEach(n => { const l = n.lang || ''; if(!byLang.has(l)) byLang.set(l, []); byLang.get(l).push(n); });
+    for(const piece of pieces){
+      const l = piece.lang || '';
+      if(!byLang.has(l)) byLang.set(l, []);
+      let group = byLang.get(l).find(n => n.group && n.label === 'Фрагменты библиотеки');
+      if(!group){ group = { group: true, lang: l, label: 'Фрагменты библиотеки', note: 'Результаты по смысловым фразам и содержимому библиотеки', children: [] }; byLang.get(l).push(group); }
+      group.children.push({
+        term: piece.title, lang: l, code: '', note: piece.title,
+        label: piece.group || '', piece: piece.id, children: []
+      });
+    }
+    if(!byLang.size){ body.innerHTML = '<div class="vt-none">подходящих конструкций и фрагментов не нашлось — попробуй уточнить действие или объект</div>'; return; }
+    body.innerHTML = [...byLang.entries()].map(([l, list]) => (byLang.size > 1 ? '<div class="vt-g">' + esc(l.toUpperCase() || 'ОБЩЕЕ') + '</div>' : '') + list.map(n => rowHtml(n, 0)).join('')).join('');
   }
 
   function open(){
