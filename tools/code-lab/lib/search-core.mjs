@@ -40,6 +40,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
   const asksMarkup = /html|разметк|innerhtml|insertadjacenthtml/.test(q);
   const asksAttributes = /атрибут/.test(q);
   const asksFirstSuccess = /любой один|первый успешн|хотя бы один|promise\.any/.test(q);
+  const asksTesting = /тест|mock|msw|playwright|jest|vitest|мок/.test(q);
   const pieceCompatible = item => {
     const text = normalize([item?.title, item?.group, item?.desc, ...(item?.tags || []), ...(item?.aliases || [])].filter(Boolean).join(' '));
     if (buttonTask && !asksGamepad && /геймпад|gamepad/.test(text)) return false;
@@ -68,6 +69,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     if (multiSourceTask && !asksImage && /декодирован.*изображ|imagebitmap|blob|пиксел.*canvas/.test(text)) return false;
     if (multiSourceTask && !asksMarkup && /insertadjacenthtml|innerhtml|вставить html/.test(text)) return false;
     if (multiSourceTask && !asksAttributes && /атрибут|attributes/.test(text)) return false;
+    if (multiSourceTask && !asksTesting && /\\bmsw\\b|mock|подменить ответ сервера|сервер подмен/.test(text)) return false;
     if (multiSourceTask && !asksFirstSuccess && /promise\.any|первый успешный промис/.test(text)) return false;
     return true;
   };
