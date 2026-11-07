@@ -158,14 +158,15 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
   const targetHits = (directed?.hits || []).filter(hit => targetCompatible(hit.targetKey) && (hit.pieces || []).some(inTaskScope));
   const targets = targetHits.map(hit => {
     const root = rootByKey.get(canonicalTerm(hit.targetKey)) || null;
+    const matchedPieces = (hit.pieces || []).filter(inTaskScope);
     return {
       targetKey: hit.targetKey,
       score: hit.score,
       phrases: hit.phrases || [],
       sections: hit.sections || [],
-      pieceCount: (hit.pieces || []).filter(inTaskScope).length,
-      rootTerm: root?.term || null,
-      rootLang: root?.lang || null
+      pieceCount: matchedPieces.length,
+      rootTerm: root?.term || hit.targetKey,
+      rootLang: root?.lang || matchedPieces[0]?.lang || null
     };
   });
 
