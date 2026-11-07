@@ -199,7 +199,7 @@ async function main() {
   assert.ok(!taskTerms(hoverQuery).some(x => /letter-spacing|line-height|sort|write/.test(x)), 'не подмешивать несвязанные свойства и команды');
   assert.ok(taskTerms(dataQuery).some(x => /fetch/.test(x)), 'должен находиться запрос данных');
   assert.ok(taskTerms(dataQuery).some(x => /promise.all/.test(x)), 'для нескольких источников должен находиться Promise.all');
-  assert.ok(taskTerms(dataQuery).some(x => /response\\.json/.test(x)), 'должен находиться разбор JSON-ответа');
+  assert.ok(taskTerms(dataQuery).some(x => x.includes('response.json')), 'должен находиться разбор JSON-ответа');
   assert.ok(taskTerms(dataQuery).some(x => /queryselector/.test(x)), 'должен находиться выбор элементов страницы');
   assert.ok(taskTerms(dataQuery).some(x => /textcontent|innertext/.test(x)), 'должен находиться вывод текста в элемент');
   assert.ok(taskTerms(dataQuery).some(x => x === '<header>') && taskTerms(dataQuery).some(x => x === '<footer>'), 'должны находиться разные места вывода');
