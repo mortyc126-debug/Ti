@@ -41,6 +41,23 @@ test('составные имена с точкой сохраняют гото�
 });
 
 
+test('точное название объекта выше составной частичной фразы действия', () => {
+  const dict = { langs: {
+    html: { button: 'кнопка интерфейса' },
+    js: { addeventlistener: 'обработчик события' }
+  } };
+  const synonyms = {
+    button: ['кнопка'],
+    addeventlistener: ['обработчик нажатия кнопки']
+  };
+  const result = buildVariants({
+    q: 'Добавить кнопку, которая по нажатию показывает сообщение',
+    dict, rows: [], synonyms
+  });
+  assert.equal(result.roots[0]?.term, 'button');
+  assert.equal(result.roots[1]?.term, 'addeventlistener');
+});
+
 test('CSS-псевдокласс не попадает в JavaScript из-за одноимённой записи', () => {
   const dict = { langs: {
     js: { ':hover': 'ошибочная запись базового словаря' },
