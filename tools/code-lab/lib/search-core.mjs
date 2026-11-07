@@ -274,26 +274,82 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
 
   const roots = (variants?.roots || []).filter(root => inScope(root) && targetCompatible(root.term));
   const rootByKey = new Map();
+  const rootByLanguage = new Map();
   // Корни уже отсортированы по релевантности; для одноимённых конструкций
   // сохраняем первый (лучший) языковой вариант, а не последний.
   for (const root of roots) {
     const key = canonicalTerm(root.term);
     if (!rootByKey.has(key)) rootByKey.set(key, root);
+    const languageKey = key + '\\u0000' + canonicalLanguage(root.lang || '');
+    if (!rootByLanguage.has(languageKey)) rootByLanguage.set(languageKey, root);
   }
   const targetHits = (directed?.hits || []).filter(hit => targetCompatible(hit.targetKey) && (hit.pieces || []).some(inTaskScope));
-  const targets = targetHits.map(hit => {
-    const root = rootByKey.get(canonicalTerm(hit.targetKey)) || null;
+  const targets = [];
+  const addedRoots = [];
+  for (const hit of targetHits) {
     const matchedPieces = (hit.pieces || []).filter(inTaskScope);
-    return {
+    const phrases = hit.phrases || [];
+    const phrase = phrases[0] || null;
+    const forcedLanguage = /^[:@]/.test(canonicalTerm(hit.targetKey)) ? 'css' : '';
+    const phraseLanguage = phrases.map(item => canonicalLanguage(item.language || '')).find(Boolean) || '';
+    const preferredLanguage = forcedLanguage || phraseLanguage;
+    const key = canonicalTerm(hit.targetKey);
+    let root = preferredLanguage
+      ? rootByLanguage.get(key + '\\u0000' + preferredLanguage) || null
+      : rootByKey.get(key) || null;
+    const rootLanguage = preferredLanguage || canonicalLanguage(root?.lang || matchedPieces[0]?.lang || '');
+    if (!root) {
+      root = {
+        term: hit.targetKey,
+        lang: rootLanguage,
+        code: hit.targetKey,
+        label: phrase?.phrase || '',
+        note: phrase?.note || (phrase?.phrase ? 'Найдено по направленной фразе: «' + phrase.phrase + '»' : 'Найдено по направленному поиску'),
+        children: [],
+        directed: true,
+        targetKey: hit.targetKey,
+        targetScore: hit.score
+      };
+      addedRoots.push(root);
+      rootByKey.set(key, root);
+      rootByLanguage.set(key + '\\u0000' + rootLanguage, root);
+    } else {
+      root.targetKey = hit.targetKey;
+      root.targetScore = hit.score;
+      root.matchedPhrases = phrases;
+      if (!root.note && phrase?.note) root.note = phrase.note;
+    }
+    root.matchedPhrases = phrases;
+    const existingPieceIds = new Set((root.children || []).map(child => child.piece).filter(Boolean));
+    for (const piece of matchedPieces.slice(0, 5)) {
+      if (existingPieceIds.has(piece.id)) continue;
+      root.children.push({
+        term: piece.title || piece.id,
+        lang: canonicalLanguage(piece.lang || rootLanguage),
+        code: '',
+        note: piece.desc || piece.group || 'Связанный фрагмент библиотеки',
+        label: 'Фрагмент библиотеки',
+        piece: piece.id,
+        children: []
+      });
+      existingPieceIds.add(piece.id);
+    }
+    targets.push({
       targetKey: hit.targetKey,
       score: hit.score,
-      phrases: hit.phrases || [],
+      phrases,
       sections: hit.sections || [],
       pieceCount: matchedPieces.length,
-      rootTerm: root?.term || hit.targetKey,
-      rootLang: (/^[:@]/.test(canonicalTerm(hit.targetKey)) ? 'css' : '') || canonicalLanguage(root?.lang || matchedPieces[0]?.lang || '') || null
-    };
-  });
+      rootTerm: root.term,
+      rootLang: canonicalLanguage(root.lang || rootLanguage || '') || null
+    });
+  }
+  if (addedRoots.length) {
+    // Сохраняем порядок существующих содержательных корней; новые цели вставляем
+    // перед общей группой фрагментов, в порядке ранжирования направленного поиска.
+    const groupIndex = roots.findIndex(root => root.group);
+    roots.splice(groupIndex < 0 ? roots.length : groupIndex, 0, ...addedRoots);
+  }
 
   const matchedTokens = new Set();
   for (const target of targets) for (const phrase of target.phrases) {
