@@ -187,10 +187,12 @@ async function main() {
   assert.ok(taskTerms(buttonQuery).some(x => /addeventlistener|click/.test(x)), 'для кнопки должен находиться обработчик события');
   assert.ok(taskTerms(buttonQuery).some(x => /alert|textcontent|innertext/.test(x)), 'должен находиться способ показать сообщение');
   assert.ok(!taskResultMap.get(buttonQuery).pieces.some(x => /геймпад|gamepad|keydown|keyup|клавиатур/.test(x.title)), 'не подмешивать игровые и клавиатурные кнопки');
+  assert.ok(!taskResultMap.get(buttonQuery).pieces.some(x => /getEventListeners|DevTools|stopPropagation/.test(x.title)), 'не подмешивать диагностические и propagation-конструкции без запроса');
   assert.ok(taskTerms(linkQuery).some(x => x === 'a' || x === '<a>'), 'ссылка должна находиться как HTML-элемент a');
   assert.ok(taskTerms(linkQuery).some(x => x === 'href'), 'для ссылки должен находиться href');
   assert.ok(!taskTerms(linkQuery).some(x => /button/.test(x)), 'ссылка не должна подменяться кнопкой');
   assert.equal(taskResultMap.get(linkQuery).pieces[0]?.title, 'Ссылка на другую страницу', 'точный библиотечный фрагмент ссылки должен быть выше общих совпадений');
+  assert.ok(!taskResultMap.get(linkQuery).pieces.some(x => /Web Worker|Service Worker|сериализуем|replaceChildren|insertAdjacentHTML/i.test(x.title)), 'не подмешивать worker и динамическую вставку к обычной ссылке');
   const details = taskResultMap.get(collapseQuery).roots.find(x => x.term === 'details');
   assert.ok(details, 'для раскрываемого блока должен находиться нативный details');
   assert.match(JSON.stringify(details.children), /summary/, 'внутри details должен показываться summary');
@@ -205,6 +207,7 @@ async function main() {
   assert.ok(taskTerms(dataQuery).some(x => /textcontent|innertext/.test(x)), 'должен находиться вывод текста в элемент');
   assert.ok(taskTerms(dataQuery).some(x => x === '<header>') && taskTerms(dataQuery).some(x => x === '<footer>'), 'должны находиться разные места вывода');
   assert.ok(!taskTerms(dataQuery).some(x => /math.floor|event.target/.test(x)), 'не подмешивать незаказанные операции');
+  assert.ok(!taskResultMap.get(dataQuery).pieces.some(x => /узла|IndexedDB|Ковариация|Корреляция/.test(x.title)), 'не подмешивать метаданные DOM-узлов и статистические фрагменты');
   assert.ok(taskTerms(sidebarQuery).some(x => x === '<aside>'), 'боковая панель должна находиться как aside');
   assert.ok(!taskTerms(sidebarQuery).some(x => /reduce/.test(x)), 'сворачивание панели не должно превращаться в свёртку массива');
 
