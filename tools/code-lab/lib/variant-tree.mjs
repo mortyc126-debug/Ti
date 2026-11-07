@@ -132,7 +132,7 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
   const rulesFor = L => {
     if(rulesCache.has(L)) return rulesCache.get(L);
     const lines = (dict && dict.structure && dict.structure[L]) || [];
-    const parsed = StructureRules.parse(lines.join('\\n'));
+    const parsed = StructureRules.parse(lines.join('\n'));
     rulesCache.set(L, parsed.rules);
     return parsed.rules;
   };
@@ -214,7 +214,7 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
         r.args.forEach(a => add(r.verb, r.verb + ': ' + a, r, a));
       if(own && ['связывает','читает'].includes(r.verb)){
         r.args.forEach(a => {
-          const m = String(a).match(/^(html|css|js|ts|python|svg)\\s+(.+)$/i);
+          const m = String(a).match(/^(html|css|js|ts|python|svg)\s+(.+)$/i);
           add(r.verb, a, r, m ? m[2] : a, m ? m[1].toLowerCase() : L, false);
         });
       }
