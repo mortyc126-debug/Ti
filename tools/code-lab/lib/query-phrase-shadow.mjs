@@ -130,7 +130,15 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
     }
 
     for (const hit of grouped.values()) {
-      for (const location of termLocations.get(normalize(hit.targetKey)) || []) {
+      const lookupKeys = [normalize(hit.targetKey)];
+      // HTML tag names in the dictionary are bare, while imported phrase targets may be wrapped.
+      const htmlTag = lookupKeys[0].match(/^<([a-z][a-z0-9-]*)>$/);
+      if (htmlTag) lookupKeys.push(htmlTag[1]);
+      const locations = [...new Map(
+        lookupKeys.flatMap(key => termLocations.get(key) || [])
+          .map(location => [location.section + '|' + location.key, location])
+      ).values()];
+      for (const location of locations) {
         // Секция словаря может быть общей (например, base words); язык определяем по самому фрагменту.
         const ids = usage.piecesOf(location.section, location.key);
         for (const id of ids) {
