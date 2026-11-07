@@ -189,6 +189,18 @@ async function main() {
   };
   const buttonQuery = taskScenarios[0], linkQuery = taskScenarios[1], collapseQuery = taskScenarios[2];
   const hoverQuery = taskScenarios[3], dataQuery = taskScenarios[4], sidebarQuery = taskScenarios[5];
+  const buttonTerms = taskTerms(buttonQuery);
+  const linkTerms = taskTerms(linkQuery);
+  const collapseTerms = taskTerms(collapseQuery);
+  const hoverTerms = taskTerms(hoverQuery);
+  assert.ok(taskResultMap.get(buttonQuery).roots.findIndex(x => /button/.test(String(x.term))) < 3, 'HTML-кнопка должна быть среди первых трёх корней');
+  assert.ok(!buttonTerms.some(x => x === 'disabled' || x === 'event.target'), 'простая кнопка не должна подменяться состоянием disabled или event.target');
+  assert.ok(!linkTerms.some(x => /innertext/.test(x)), 'обычная ссылка не должна притягивать чтение отображаемого текста');
+  assert.ok(!collapseTerms.some(x => ['display', 'grid', 'height', 'position', 'width'].includes(x)), 'сворачивание блока не должно совпадать с общими CSS-свойствами по слову «блок»');
+  assert.ok(!hoverTerms.some(x => x === 'textcontent'), 'подсветка при наведении не должна подменяться изменением текста');
+  assert.ok(!taskResultMap.get(buttonQuery).pieces.some(x => /Service Worker|Web Worker/i.test(x.title)), 'не подмешивать worker-фрагменты к обычной кнопке');
+  assert.ok(!taskResultMap.get(linkQuery).pieces.some(x => /символическ.*ссылк|удаление файла/i.test(x.title)), 'не подмешивать файловые ссылки к HTML-ссылке');
+  assert.ok(!taskResultMap.get(collapseQuery).pieces.some(x => /Свёртка массива|свернуть в одно значение|gl\\.useProgram|экранной клавиатур/i.test(x.title)), 'не подмешивать свёртку массива и посторонние UI-фрагменты к раскрываемому блоку');
   assert.ok(taskTerms(buttonQuery).some(x => /button/.test(x)), 'кнопка должна находиться в HTML');
   assert.ok(taskTerms(buttonQuery).some(x => /addeventlistener|click/.test(x)), 'для кнопки должен находиться обработчик события');
   assert.ok(taskTerms(buttonQuery).some(x => /alert|textcontent|innertext/.test(x)), 'должен находиться способ показать сообщение');
