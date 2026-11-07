@@ -133,6 +133,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
   // иначе широкий набор фрагментов одной цели вытеснит ранжирование теневого индекса.
   const targetMemberships = new Map();
   for (const hit of directed?.hits || []) {
+    if (!targetCompatible(hit.targetKey)) continue;
     for (const piece of hit.pieces || []) {
       if (!piece?.id || !hit.targetKey) continue;
       if (!targetMemberships.has(piece.id)) targetMemberships.set(piece.id, new Set());
@@ -144,10 +145,13 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     const map = new Map();
     for (const piece of source) {
       if (!piece?.id) continue;
-      const targets = new Set([
+      const rawTargets = [
         ...(piece.matchedTargets || []),
-        ...(targetMemberships.get(piece.id) || [])
-      ]);
+        ...(targetMemberships.get(piece.id) || []),
+        ...(piece.targetKey ? [piece.targetKey] : [])
+      ];
+      const targets = new Set(rawTargets.filter(targetCompatible));
+      if (rawTargets.length && !targets.size) continue;
       const candidate = {
         ...piece, matchedTargets: [...targets],
         _rankPosition: ranked ? (Number(piece.position) || null) : null
