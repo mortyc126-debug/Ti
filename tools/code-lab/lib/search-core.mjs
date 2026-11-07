@@ -50,6 +50,8 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     if (linkTask && /^(?:self|none)$/.test(key) && !/новом окне|вкладк|target|blank|self/.test(q)) return false;
     if (hoverTask && !asksSpacing && /letter-spacing|line-height|white-space/.test(key)) return false;
     if (hoverTask && !asksSorting && /^(?:sort|sorted|write)$/.test(key)) return false;
+    if (multiSourceTask && key.includes('event.target') && !/клик|нажат|событ/.test(q)) return false;
+    if (multiSourceTask && /^(?:sort|sorted)$/.test(key) && !asksSorting) return false;
     if (collapseTask && !/подвал|footer|низ страницы/.test(q) && /^(?:<footer>|footer)$/.test(key)) return false;
     if (collapseTask && !/абзац|параграф|текст/.test(q) && /^(?:p|<p>)$/.test(key)) return false;
     return true;
