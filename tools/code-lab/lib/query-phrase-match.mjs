@@ -32,6 +32,7 @@ function contextConflict(query, phrase, targetKey) {
   const qInside = /внутр/.test(q), qOutside = /снаруж/.test(q);
   const pInside = /внутр/.test(p), pOutside = /снаруж/.test(p);
   if ((qInside && !qOutside && pOutside && !pInside) || (qOutside && !qInside && pInside && !pOutside)) return true;
+  if ((qInside && !qOutside && !pInside) || (qOutside && !qInside && !pOutside)) return true;
   const qThickness = /толщин|жирност/.test(q), qSize = /размер/.test(q);
   const pThickness = /толщин|жирност/.test(p), pSize = /размер/.test(p);
   if ((qThickness && !qSize && pSize && !pThickness) || (qSize && !qThickness && pThickness && !pSize)) return true;
