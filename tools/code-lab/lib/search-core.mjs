@@ -7,6 +7,14 @@ const canonicalLanguage = value => {
   const lang = normalize(value);
   return ({ javascript: 'js', node: 'js', typescript: 'ts', python3: 'python', html5: 'html', css3: 'css' })[lang] || lang;
 };
+export function inferTaskScope(query) {
+  const q = normalize(query);
+  const hasUiObject = /кнопк|ссылк|страниц|шапк|заголов|панел|блок|раздел|наведен|hover|подсвет|css|html|dom|форм|поле|цвет|текст|элемент/.test(q);
+  const hasCollectionObject = /массив|список|коллекц|последовательност|в одно значение|агрегир|reduce/.test(q);
+  const webTask = hasUiObject && (!hasCollectionObject || /панел|блок|раздел|страниц|кнопк|ссылк/.test(q));
+  const backendTask = /python|питон|сервер|backend|бэкенд|django|flask|fastapi|sql|postgres|баз данных/.test(q);
+  return webTask && !backendTask ? 'web' : '';
+}
 
 // Reciprocal-rank fusion: независимые поиски имеют разные шкалы score,
 // поэтому объединяем позиции в выдаче, а не сравниваем несопоставимые числа.
@@ -14,11 +22,9 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
   const max = Math.max(1, Math.min(200, Number(limit) || 60));
   const q = normalize(query);
   const activeLanguage = canonicalLanguage(language);
-  const hasUiObject = /кнопк|ссылк|страниц|шапк|заголов|панел|блок|раздел|наведен|hover|подсвет|css|html|dom|форм|поле|цвет|текст|элемент/.test(q);
+  const webOnly = inferTaskScope(q) === 'web';
+  const webTask = webOnly;
   const hasCollectionObject = /массив|список|коллекц|последовательност|в одно значение|агрегир|reduce/.test(q);
-  const webTask = hasUiObject && (!hasCollectionObject || /панел|блок|раздел|страниц|кнопк|ссылк/.test(q));
-  const backendTask = /python|питон|сервер|backend|бэкенд|django|flask|fastapi|sql|postgres|баз данных/.test(q);
-  const webOnly = webTask && !backendTask;
   const webLanguages = new Set(['html','css','js','ts','svg']);
   const inScope = item => !webOnly || webLanguages.has(canonicalLanguage(item?.lang || ''));
   const buttonTask = /кнопк|button/.test(q);
