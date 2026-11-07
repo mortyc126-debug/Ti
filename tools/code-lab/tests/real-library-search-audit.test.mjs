@@ -218,6 +218,9 @@ async function main() {
   assert.ok(taskTerms(hoverQuery).some(x => x === 'color'), 'для подсветки должен находиться цвет текста');
   assert.ok(taskTerms(hoverQuery).some(x => x === '<header>'), 'должна учитываться шапка страницы');
   assert.ok(!taskTerms(hoverQuery).some(x => /letter-spacing|line-height|sort|write/.test(x)), 'не подмешивать несвязанные свойства и команды');
+  const dataTargets = taskResultMap.get(dataQuery).targets.map(x => x.targetKey);
+  assert.ok(dataTargets.indexOf('fetch') >= 0 && dataTargets.indexOf('response.json()') > dataTargets.indexOf('fetch'), 'получение данных должно стоять выше разбора JSON-ответа');
+  assert.ok(!dataTargets.some(x => ['display', 'grid', 'append'].includes(x)), 'вывод данных в блоки не должен притягивать общие CSS-свойства и append по слову «блок»');
   assert.ok(taskTerms(dataQuery).some(x => /fetch/.test(x)), 'должен находиться запрос данных');
   assert.ok(taskTerms(dataQuery).some(x => /promise.all/.test(x)), 'для нескольких источников должен находиться Promise.all');
   assert.ok(taskTerms(dataQuery).some(x => x.includes('response.json')), 'должен находиться разбор JSON-ответа');
