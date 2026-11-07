@@ -15,14 +15,14 @@ const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // словарь: сначала язык куска, потом общие; плюс индекс идиом по «опорному» вызову (getcontext → «получить контекст…»)
 function dictLookup(dict, lang){
-  const L = (dict && dict.langs && dict.langs[lang]) || {}, W = (dict && dict.words) || {};
+  const L = (dict && dict.langs && dict.langs[lang]) || {}, FALLBACK = lang === 'ts' ? ((dict && dict.langs && dict.langs.js) || {}) : {}, W = (dict && dict.words) || {};
   // пояснение, а не список синонимов («ошибка, общая ошибка, исключение…» подписью не годится)
   const isList = t => (String(t).match(/,/g) || []).length >= 3 && !/[—:]/.test(t) && String(t).split(',').every(p => p.trim().split(/\s+/).length <= 3);
-  const word = k => { k = String(k || '').toLowerCase(); const v = L[k] || W[k] || ''; return v && !isList(v) ? v : ''; };
+  const word = k => { k = String(k || '').toLowerCase(); const v = L[k] || FALLBACK[k] || W[k] || ''; return v && !isList(v) ? v : ''; };
   let idioms = null;
   const idiom = member => {
     if(!idioms){ idioms = new Map();
-      for(const src of [L, W]) for(const [k, v] of Object.entries(src)){ if(!/[(.=\s]/.test(k)) continue;
+      for(const src of [L, FALLBACK, W]) for(const [k, v] of Object.entries(src)){ if(!/[(.=\s]/.test(k)) continue;
         if(isList(v)) continue;
         // только вызовы методов через точку: «.getcontext(» — по имени метода, без точки — слишком общо
         for(const m of k.matchAll(/\.([a-z_$][\w$]{4,})\s*\(/g)){ const a = idioms.get(m[1]); if(!a || k.length < a.k.length) idioms.set(m[1], { k, v }); } } }
@@ -100,7 +100,7 @@ const explainExprLite = e => { const x = e.trim(); const r = x.match(/require\(\
 
 export function explainNames(code, lang, names, dict){
   lang = String(lang || 'js').toLowerCase(); code = String(code || '');
-  const D = dictLookup(dict, lang === 'ts' ? 'js' : lang);
+  const D = dictLookup(dict, lang);
   const out = {};
   for(const raw of names || []){
     const name = clean(raw); if(!name || out[name]) continue;
