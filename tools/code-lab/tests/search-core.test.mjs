@@ -201,3 +201,17 @@ test('резервная сборка сохраняет порядок целе
   });
   assert.deepEqual(result.pieces.map(piece => piece.id), ['fetch-a', 'fetch-b', 'promise-all']);
 });
+
+
+test('языковой алиас javascript не отбрасывается из веб-задачи', () => {
+  const result = combineTaskSearch({
+    query: 'кнопка по нажатию показывает сообщение',
+    directed: { hits: [], rankedPieces: [
+      { id: 'js-alias', title: 'Обработчик клика', lang: 'javascript' }
+    ] },
+    library: { hits: [] },
+    variants: { roots: [] }
+  });
+  assert.equal(result.counts.directedPieces, 1);
+  assert.equal(result.pieces[0].lang, 'javascript');
+});
