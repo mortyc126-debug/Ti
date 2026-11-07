@@ -104,6 +104,8 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     if (webTask && key === 'sum' && !asksArithmetic) return false;
     if (hoverTask && key.startsWith('<font') && !/font|шрифт/.test(q)) return false;
     if (multiSourceTask && !asksForm && /^<(?:form|input|datalist)\b/.test(key)) return false;
+    // innerText читает уже отображённый текст; для вывода загруженных данных нужен textContent.
+    if (multiSourceTask && /вывести|показать|вставить|обновить/.test(q) && key === 'innertext' && !/прочитать|считать|получить отображаемый текст/.test(q)) return false;
     if (buttonTask && !asksMouse && key.includes('event.button')) return false;
     if (buttonTask && !asksForm && key === 'form') return false;
     if (key === 'disabled' && !/отключ|заблок|неактив|запрет|disable/.test(q)) return false;
@@ -230,9 +232,14 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     item.group = hit.group || item.group;
     item.desc = hit.desc || item.desc;
     item._lexicalRank = index + 1;
-    item._rrf += 1 / (60 + index + 1);
-    if ((hit.why || []).some(reason => reason.in === 'название' && reason.kind === 'exact')) item._rrf += 0.006;
-    else if ((hit.why || []).some(reason => reason.in === 'название/описание' && reason.kind === 'substring')) item._rrf += 0.003;
+    const exactTitle = (hit.why || []).some(reason => reason.in === 'название' && reason.kind === 'exact');
+    const titleSubstring = (hit.why || []).some(reason => reason.in === 'название/описание' && reason.kind === 'substring');
+    // Когда направленные цели уже найдены, несвязанные полнотекстовые совпадения
+    // остаются запасными, но не вытесняют фрагменты, привязанные к цели задачи.
+    const lexicalWeight = directedPieces.length && !item.matchedTargets.length && !exactTitle ? 0.2 : 1;
+    item._rrf += lexicalWeight / (60 + index + 1);
+    if (exactTitle) item._rrf += 0.006;
+    else if (titleSubstring) item._rrf += 0.003;
     if (!item.sources.includes('полнотекстовый поиск')) item.sources.push('полнотекстовый поиск');
     item.why.push({
       source: 'полнотекстовый поиск',
