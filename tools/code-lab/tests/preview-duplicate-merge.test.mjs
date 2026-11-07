@@ -105,7 +105,7 @@ try {
   const changedRun = spawnSync(process.execPath, [scriptPath, library, manifestPath, outputPath], { encoding: 'utf8' });
   assert.notEqual(changedRun.status, 0);
   assert.match(changedRun.stderr + changedRun.stdout, /Код изменился после аудита/);
-  console.log('preview-duplicate-merge: 16 checks passed');
+  console.log('preview-duplicate-merge: conflict-safe merge checks passed');
 } finally {
   await fs.rm(tmp, { recursive: true, force: true });
 }
