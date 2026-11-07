@@ -8,6 +8,20 @@ const canonicalLanguage = value => {
   const lang = normalize(value);
   return ({ javascript: 'js', node: 'js', typescript: 'ts', python3: 'python', html5: 'html', css3: 'css' })[lang] || lang;
 };
+const QUERY_LANGUAGE_HINTS = [
+  ['ts', /\\b(?:typescript|ts)\\b|тайпскрипт/],
+  ['js', /\\b(?:javascript|js|node(?:\\.js)?)\\b|яваскрипт/],
+  ['python', /\\bpython(?:3)?\\b|питон/],
+  ['sql', /\\bsql\\b/],
+  ['css', /\\bcss\\b/],
+  ['html', /\\bhtml\\b/],
+  ['svg', /\\bsvg\\b/],
+  ['sh', /\\b(?:bash|shell)\\b|оболочк/]
+];
+function inferQueryLanguage(query) {
+  const matches = new Set(QUERY_LANGUAGE_HINTS.filter(([, pattern]) => pattern.test(query)).map(([lang]) => lang));
+  return matches.size === 1 ? [...matches][0] : '';
+}
 const scopeLanguages = scope => normalize(scope) === 'web'
   ? new Set(['html', 'css', 'js', 'ts', 'svg'])
   : normalize(scope) === 'python' ? new Set(['python']) : null;
@@ -114,6 +128,7 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
   function search(query, { language = '', scope = '', limit = 60 } = {}) {
     const q = normalize(query);
     if (!q) return { query: q, total: 0, hits: [], rankedPieces: [], ambiguous: false };
+    const effectiveLanguage = language ? canonicalLanguage(language) : inferQueryLanguage(q);
     const grouped = new Map();
     const allowedLanguages = scopeLanguages(scope);
 
@@ -124,7 +139,7 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
         const score = match.score;
         const recordLanguage = normalize(record.language);
         const recordScope = normalize(record.scope);
-        if (recordLanguage && language && canonicalLanguage(recordLanguage) !== canonicalLanguage(language)) continue;
+        if (recordLanguage && effectiveLanguage && canonicalLanguage(recordLanguage) !== effectiveLanguage) continue;
         if (allowedLanguages && recordLanguage && !allowedLanguages.has(canonicalLanguage(recordLanguage))) continue;
         if (recordScope && scope && recordScope !== normalize(scope) && !(allowedLanguages && allowedLanguages.has(canonicalLanguage(recordScope)))) continue;
         const key = record.targetKey;
@@ -155,7 +170,7 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
           if (hit.pieces.some(piece => piece.id === id)) continue;
           const piece = usage.pieceInfo(id);
           if (!piece) continue;
-          if (language && canonicalLanguage(piece.lang) !== canonicalLanguage(language)) continue;
+          if (effectiveLanguage && canonicalLanguage(piece.lang) !== effectiveLanguage) continue;
           if (allowedLanguages && !allowedLanguages.has(canonicalLanguage(piece.lang))) continue;
           const relevant = hit.phrases.some(record =>
             pieceMatchesTarget(hit.targetKey, record.phrase, piece, usage)

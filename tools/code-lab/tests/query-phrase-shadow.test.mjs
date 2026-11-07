@@ -239,3 +239,39 @@ const anchorIndex = createLegacyQueryPhraseShadow({
   usage: anchorUsage
 });
 assert.deepEqual(anchorIndex.search('ссылка').hits[0].pieces.map(piece => piece.id), ['anchor-example']);
+
+
+// Язык, явно названный в запросе, сужает результаты; без него сохраняются межъязыковые варианты.
+const languageIntentPieces = [
+  { id: 'py-list', title: 'Список Python', lang: 'python' },
+  { id: 'html-ol', title: 'Нумерованный список HTML', lang: 'html' },
+  { id: 'html-ul', title: 'Маркированный список HTML', lang: 'html' }
+];
+const languageIntentUsage = {
+  terms: { python: { list: {} }, html: { ol: {}, ul: {} } },
+  piecesOf(section, key) {
+    if (section === 'python' && key === 'list') return ['py-list'];
+    if (section === 'html' && key === 'ol') return ['html-ol'];
+    if (section === 'html' && key === 'ul') return ['html-ul'];
+    return [];
+  },
+  pieceInfo(id) { return languageIntentPieces.find(piece => piece.id === id) || null; },
+  pieceText(id) {
+    if (id === 'py-list') return 'values = list(items)';
+    if (id === 'html-ol') return '<ol><li>Первый</li></ol>';
+    return '<ul><li>Первый</li></ul>';
+  }
+};
+const languageIntentIndex = createLegacyQueryPhraseShadow({
+  queryPhrases: [
+    { id: 'py-list', phrase: 'список', targetKey: 'list', language: 'python' },
+    { id: 'html-ol', phrase: 'список', targetKey: '<ol>', language: 'html' },
+    { id: 'html-ul', phrase: 'список', targetKey: '<ul>', language: 'html' }
+  ],
+  usage: languageIntentUsage
+});
+assert.deepEqual(languageIntentIndex.search('список Python').hits.map(hit => hit.targetKey), ['list']);
+assert.deepEqual(languageIntentIndex.search('список Python').rankedPieces.map(piece => piece.id), ['py-list']);
+assert.deepEqual(new Set(languageIntentIndex.search('список').hits.map(hit => hit.targetKey)), new Set(['list', '<ol>', '<ul>']));
+assert.deepEqual(new Set(languageIntentIndex.search('список Python', { language: 'html' }).hits.map(hit => hit.targetKey)), new Set(['<ol>', '<ul>']));
+assert.deepEqual(new Set(languageIntentIndex.search('список Python и HTML').hits.map(hit => hit.targetKey)), new Set(['list', '<ol>', '<ul>']));
