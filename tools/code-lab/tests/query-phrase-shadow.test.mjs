@@ -171,3 +171,23 @@ assert.equal(reduceIndex.search('свернуть боковую панель').
 assert.equal(reduceIndex.search('свернуть массив').hits[0].targetKey, '.reduce');
 
 console.log('query-phrase-shadow: isolated index and content-filter tests passed');
+
+
+const scopedUsage = {
+  terms: { JavaScript: { fetch: {} }, python: { fetch: {} } },
+  piecesOf(section) { return section === 'JavaScript' ? ['js-fetch'] : ['py-fetch']; },
+  pieceInfo(id) {
+    return id === 'js-fetch'
+      ? { id, title: 'Получить данные через fetch', lang: 'javascript' }
+      : { id, title: 'Получить данные через Python', lang: 'python' };
+  },
+  pieceText() { return "fetch('/api/data')"; }
+};
+const scopedIndex = createLegacyQueryPhraseShadow({
+  queryPhrases: [{ id: 'fetch', phrase: 'получить данные', targetKey: 'fetch' }],
+  usage: scopedUsage
+});
+const webScoped = scopedIndex.search('получить данные', { scope: 'web' });
+assert.deepEqual(webScoped.rankedPieces.map(piece => piece.id), ['js-fetch']);
+assert.deepEqual(webScoped.rankedPieces.map(piece => piece.lang), ['javascript']);
+assert.deepEqual(scopedIndex.search('получить данные').rankedPieces.map(piece => piece.id), ['js-fetch', 'py-fetch']);
