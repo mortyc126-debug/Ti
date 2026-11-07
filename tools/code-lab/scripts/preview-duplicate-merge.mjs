@@ -28,6 +28,9 @@ const uniqueNotes = notes => {
   }
   return out;
 };
+const noteSourcePriority = note => note.source === 'dict' ? 0 : note.source === 'custom' ? 2 : 1;
+const mergedNotes = notes => uniqueNotes([...notes].sort((a, b) => noteSourcePriority(a) - noteSourcePriority(b)))
+  .map(({ _sourceFile, sourceFile, collection, ...note }) => note);
 const uniqueList = values => {
   const seen = new Set(), out = [];
   for (const value of values.flatMap(x => Array.isArray(x) ? x : [x])) {
@@ -146,30 +149,62 @@ for (const pair of manifest.pairs) {
     ...objectMergeProposal(componentSources),
     values: componentSources
   };
+  const conceptWordNotes = conceptNotes.filter(note => note.collection === 'wordNotes');
+  const conceptOrphanNotes = conceptNotes.filter(note => note.collection === 'orphanNotes');
   const candidatePassport = {
+    ...secondary.passport,
     ...canonical.passport,
     id: canonical.id,
     file: path.posix.basename(canonical.file),
     title: canonical.passport.title || secondary.passport.title || canonical.id,
     group: canonical.passport.group || secondary.passport.group || '',
     desc: descSource.passport.desc || '',
-    descAt: descSource.passport.descAt ?? canonical.passport.descAt ?? secondary.passport.descAt,
     output: canonical.passport.output || secondary.passport.output || '',
     labels: { ...(secondary.passport.labels || {}), ...(canonical.passport.labels || {}) },
-    externalLinks: canonical.passport.externalLinks ?? secondary.passport.externalLinks ?? null,
     tags: uniqueList(orderedSources.map(source => source.passport.tags || [])),
-    aliases: uniqueList(orderedSources.map(source => source.passport.aliases || [])),
+    aliases: uniqueList([
+      ...orderedSources.map(source => source.passport.aliases || []),
+      secondary.passport.title && secondary.passport.title !== canonical.passport.title ? [secondary.passport.title] : []
+    ]),
     status: orderedSources.some(source => source.passport.status === 'described') ? 'described' : (canonical.passport.status || secondary.passport.status || 'needs_description'),
-    // Concepts and component/provenance data stay out of the provisional passport:
-    // their original collection/schema must be reviewed before any import.
-    wordNotes: uniqueNotes(allWordNotes).map(({ _sourceFile, ...note }) => note),
-    orphanNotes: uniqueNotes(allOrphanNotes).map(({ _sourceFile, ...note }) => note),
+    wordNotes: mergedNotes([...allWordNotes, ...conceptWordNotes]),
+    orphanNotes: mergedNotes([...allOrphanNotes, ...conceptOrphanNotes]),
     _mergePreviewOnly: true
   };
-  delete candidatePassport.component;
-  delete candidatePassport.source;
+  if (descSource.passport.descAt != null) candidatePassport.descAt = descSource.passport.descAt;
+  else delete candidatePassport.descAt;
+  if (componentMergeProposal.complete && Object.keys(componentMergeProposal.nonConflicting).length) {
+    candidatePassport.component = componentMergeProposal.nonConflicting;
+  } else delete candidatePassport.component;
+  if (provenanceMergeProposal.complete && Object.keys(provenanceMergeProposal.nonConflicting).length) {
+    candidatePassport.source = provenanceMergeProposal.nonConflicting;
+  } else delete candidatePassport.source;
+  for (const field of ['legacy', 'enriched']) {
+    const values = orderedSources.map(source => source.passport[field]).filter(value => typeof value === 'boolean');
+    if (values.length) candidatePassport[field] = values.some(Boolean);
+    else delete candidatePassport[field];
+  }
+  const externalLinkValues = orderedSources.map(source => source.passport.externalLinks).filter(value => value != null);
+  if (externalLinkValues.length && externalLinkValues.every(Array.isArray)) {
+    candidatePassport.externalLinks = uniqueList(externalLinkValues);
+  } else if (externalLinkValues.length) {
+    const distinctExternalLinks = new Map(externalLinkValues.map(value => [JSON.stringify(value), value]));
+    if (distinctExternalLinks.size === 1) candidatePassport.externalLinks = externalLinkValues[0];
+  } else delete candidatePassport.externalLinks;
   if (!Object.keys(candidatePassport.labels || {}).length) delete candidatePassport.labels;
-  if (candidatePassport.externalLinks == null) delete candidatePassport.externalLinks;
+  if (!candidatePassport.orphanNotes.length) delete candidatePassport.orphanNotes;
+  const mergeableFields = new Set([
+    'desc', 'descAt', 'tags', 'aliases', 'component', 'source', 'wordNotes', 'orphanNotes',
+    'legacy', 'enriched', 'externalLinks', 'labels'
+  ]);
+  const unresolvedFieldConflicts = fieldConflicts.filter(conflict => {
+    if (mergeableFields.has(conflict.field)) return false;
+    const present = conflict.values.filter(item => item.value != null);
+    return new Set(present.map(item => JSON.stringify(item.value))).size > 1;
+  });
+  const differentExplanationConflicts = pair.notes.anchorConflicts.filter(note => (note.explanations || []).length > 1).length;
+  const importable = componentMergeProposal.complete && provenanceMergeProposal.complete &&
+    unresolvedFieldConflicts.length === 0 && differentExplanationConflicts === 0;
   previews.push({
     pair: pair.pair,
     code: { identical: true, hash: pair.codeHash, sourceFiles: orderedSources.map(source => source.file) },
@@ -177,9 +212,10 @@ for (const pair of manifest.pairs) {
     legacyIds: pair.legacyIds,
     candidatePassport,
     review: {
-      importable: false,
-      reason: 'Временный кандидат; component, provenance и concept-записи требуют отдельного решения',
+      importable,
+      reason: importable ? null : 'Есть неразрешённые конфликты component/provenance/пояснений или неизвестных полей',
       fieldConflicts,
+      unresolvedFieldConflicts,
       descSourceFile: descSource.file,
       componentSources: componentSources.map(source => ({ file: source.file, component: source.value })),
       provenanceSources: provenanceSources.map(source => ({ file: source.file, source: source.value })),
@@ -187,9 +223,9 @@ for (const pair of manifest.pairs) {
       componentMergeProposal,
       sourcePassports: orderedSources.map(source => ({ file: source.file, id: source.id, passport: source.passport })),
       conceptNotes,
-      conceptNoteHandling: 'not moved into candidate wordNotes; original collection and record retained in sourcePassports',
+      conceptNoteHandling: 'moved into candidate wordNotes/orphanNotes according to original collection; sourcePassports remain preserved for provenance',
       noteAnchorConflicts: pair.notes.anchorConflicts,
-      noteConflictHandling: 'all distinct note records retained; identical explanation with differing kind/source is metadata-only and no winner is selected',
+      noteConflictHandling: 'all distinct note records retained; dict notes ordered before unlabelled notes and custom notes last; different explanations block import',
       urls: pair.urls
     }
   });
@@ -200,8 +236,8 @@ const summary = {
   sourcePassportsPreserved: previews.reduce((n, item) => n + item.review.sourcePassports.length, 0),
   pairsWithFieldConflicts: previews.filter(item => item.review.fieldConflicts.length).length,
   pairsWithComponentDataOnBothSides: previews.filter(item => item.review.componentSources.every(x => x.component != null)).length,
-  conceptNotesPreservedSeparately: previews.reduce((n, item) => n + item.review.conceptNotes.length, 0),
-  conceptNotesMovedIntoCandidatePassport: 0,
+  conceptNotesPreservedInSourcePassports: previews.reduce((n, item) => n + item.review.conceptNotes.length, 0),
+  conceptNotesMovedIntoCandidatePassport: previews.reduce((n, item) => n + item.candidatePassport.wordNotes.filter(note => note.kind === 'concept').length + (item.candidatePassport.orphanNotes || []).filter(note => note.kind === 'concept').length, 0),
   noteAnchorConflicts: previews.reduce((n, item) => n + item.review.noteAnchorConflicts.length, 0),
   differentExplanationConflicts: previews.reduce((n, item) => n + item.review.noteAnchorConflicts.filter(note => (note.explanations || []).length > 1).length, 0),
   metadataOnlyNoteConflicts: previews.reduce((n, item) => n + item.review.noteAnchorConflicts.filter(note => (note.explanations || []).length === 1 && ((note.kinds || []).length > 1 || (note.sources || []).length > 1)).length, 0),
@@ -213,7 +249,9 @@ const summary = {
   descSourceProvenanceResolvedPairs: previews.filter(item => item.review.provenanceMergeProposal.resolvedFields.some(field => field.key === 'desc')).length,
   componentMergeCompletePairs: previews.filter(item => item.review.componentMergeProposal.complete).length,
   provenanceMergeCompletePairs: previews.filter(item => item.review.provenanceMergeProposal.complete).length,
-  importablePairs: 0
+  unresolvedFieldConflicts: previews.reduce((n, item) => n + item.review.unresolvedFieldConflicts.length, 0),
+  pairsWithUnresolvedFieldConflicts: previews.filter(item => item.review.unresolvedFieldConflicts.length).length,
+  importablePairs: previews.filter(item => item.review.importable).length
 };
 const result = {
   schemaVersion: 1,

@@ -46,15 +46,15 @@ try {
   assert.equal(preview.summary.verifiedCodePairs, 2);
   assert.equal(pair.candidatePassport.id, 'canonical-piece');
   assert.equal(pair.candidatePassport.desc, 'Подробное описание конструкции.');
-  assert.equal(Object.hasOwn(pair.candidatePassport, 'component'), false);
-  assert.equal(Object.hasOwn(pair.candidatePassport, 'source'), false);
+  assert.deepEqual(pair.candidatePassport.component, { provides: ['a'] });
+  assert.deepEqual(pair.candidatePassport.source, { desc: 'manual' });
   assert.deepEqual(pair.candidatePassport.tags, ['канонический-тег', 'старый-тег']);
   assert.deepEqual(pair.candidatePassport.aliases, ['пример', 'старый-вариант']);
   assert.equal(pair.review.conceptNotes.length, 1);
-  assert.equal(pair.candidatePassport.wordNotes.filter(note => note.kind === 'concept').length, 0);
-  assert.equal(pair.candidatePassport.wordNotes.length, 2);
-  assert.match(pair.review.conceptNoteHandling, /not moved into candidate wordNotes/);
-  assert.match(pair.review.noteConflictHandling, /no winner is selected/);
+  assert.equal(pair.candidatePassport.wordNotes.filter(note => note.kind === 'concept').length, 1);
+  assert.equal(pair.candidatePassport.wordNotes.length, 3);
+  assert.match(pair.review.conceptNoteHandling, /moved into candidate wordNotes\/orphanNotes/);
+  assert.match(pair.review.noteConflictHandling, /custom notes last/);
   assert.deepEqual(pair.review.componentMergeProposal.values.map(item => item.value), [null, { provides: ['a'] }]);
   assert.deepEqual(pair.review.componentMergeProposal.nonConflicting, { provides: ['a'] });
   assert.deepEqual(pair.review.componentMergeProposal.conflicts, []);
@@ -102,10 +102,13 @@ try {
     ]
   }]);
   assert.equal(pair.review.componentSources.find(x => x.component)?.file, 'js/legacy-piece-mvr123abc.js');
-  assert.equal(pair.review.importable, false);
+  assert.equal(pair.review.importable, true);
+  assert.deepEqual(pair.review.unresolvedFieldConflicts, []);
   assert.ok(pair.review.fieldConflicts.some(field => field.field === 'extraField'));
   assert.ok(pair.review.fieldConflicts.some(field => field.field === 'wordNotes'));
-  assert.equal(preview.summary.importablePairs, 0);
+  assert.equal(preview.summary.importablePairs, 1);
+  assert.equal(preview.summary.conceptNotesMovedIntoCandidatePassport, 1);
+  assert.equal(preview.pairs[1].review.importable, false);
   await fs.writeFile(path.join(library, 'js', 'canonical-piece.js'), 'const changed = 2;\n');
   const changedRun = spawnSync(process.execPath, [scriptPath, library, manifestPath, outputPath], { encoding: 'utf8' });
   assert.notEqual(changedRun.status, 0);
