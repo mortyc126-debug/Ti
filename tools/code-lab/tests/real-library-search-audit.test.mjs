@@ -169,7 +169,7 @@ async function main() {
     taskResults.push({
       query,
       targets: result.targets.slice(0, 12).map(x => ({
-        key: x.targetKey, score: x.score,
+        key: x.targetKey, score: x.score, pieceCount: x.pieceCount, rootLang: x.rootLang,
         phrases: (x.phrases || []).slice(0, 2).map(p => ({ phrase: p.phrase, match: p.match?.kind, score: p.match?.score }))
       })),
       roots: result.roots.slice(0, 12).map(x => ({ term: x.term || x.label, score: x.score, label: x.label })),
