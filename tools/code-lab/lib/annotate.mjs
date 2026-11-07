@@ -6,8 +6,12 @@ export function makeLook(lang, dict){
   dict = dict || {};
   const W = dict.words || {}, TAGS = dict.htmlTags || {}, ATTRS = dict.htmlAttrs || {}, PROPS = dict.cssProps || {}, VALS = dict.cssVals || {};
   const L = String(lang || '').toLowerCase();
+  const langDicts = L === 'ts'
+    ? [dict.langs?.ts, dict.langs?.js]
+    : [dict.langs?.[L === 'htm' ? 'html' : L]];
   return v => {
     const lw = String(v).toLowerCase();
+    for(const source of langDicts) if(source && source[lw]) return source[lw];
     if(L === 'css') return PROPS[lw] || VALS[lw] || W[lw] || null;
     if(L === 'html' || L === 'htm') return TAGS[lw] || ATTRS[lw] || W[lw] || null;
     return W[lw] || null;
