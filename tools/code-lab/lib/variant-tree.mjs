@@ -95,7 +95,7 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
     // Язык определяется синтаксисом самой конструкции, а не тем,
     // в каком базовом словаре встретилась её синонимичная запись.
     if (/^[:@]/.test(String(term).toLowerCase())) L = 'css';
-    const k = L + '\\u0000' + term;
+    const k = L + '\u0000' + term;
     if(seen.has(k)) return;
     seen.add(k);
     roots.push({ term, lang: L, label, score });
