@@ -33,6 +33,8 @@ function contextConflict(query, phrase, targetKey) {
   if (/(?:details|summary)/.test(target) && qCollection && !qUi) return true;
   const qLink = /ссылк|переход|href|url/.test(q);
   const qButton = /кнопк|button/.test(q);
+  if (qLink && /кнопк|button/.test(p) && !qButton) return true;
+  if (qButton && /ссылк|href|переход/.test(p) && !qLink) return true;
   if ((target.includes('<button>') || target === 'button' || target.startsWith('button[')) && qLink && !qButton) return true;
   if ((target === 'a' || target.includes('href')) && qButton && !qLink) return true;
   if (qUi && pCollection && !pUi && !qCollection) return true;
