@@ -172,7 +172,7 @@ async function main() {
         key: x.targetKey, score: x.score, pieceCount: x.pieceCount, rootLang: x.rootLang,
         phrases: (x.phrases || []).slice(0, 2).map(p => ({ phrase: p.phrase, match: p.match?.kind, score: p.match?.score }))
       })),
-      roots: result.roots.slice(0, 12).map(x => ({ term: x.term || x.label, score: x.score, label: x.label })),
+      roots: result.roots.slice(0, 12).map(x => ({ term: x.term || x.label, lang: x.lang, score: x.score, label: x.label })),
       pieces: result.pieces.slice(0, 8).map(x => ({
         title: x.title, lang: x.lang, score: x.score, sources: x.sources,
         matchedTargets: x.matchedTargets, contextBoost: x.contextBoost,
