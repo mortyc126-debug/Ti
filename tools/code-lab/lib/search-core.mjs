@@ -63,6 +63,8 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     if (multiSourceTask && key === 'src' && !/изображен|картин|img|src|url/.test(q)) return false;
     if (collapseTask && !/подвал|footer|низ страницы/.test(q) && /^(?:<footer>|footer)$/.test(key)) return false;
     if (collapseTask && !/абзац|параграф|текст/.test(q) && /^(?:p|<p>)$/.test(key)) return false;
+    if (collapseTask && key === 'with' && !/python|контекст|with/.test(q)) return false;
+    if (collapseTask && /^(?:append|appendchild)$/.test(key) && !/добавить содержимое|вставить содержимое|append/.test(q)) return false;
     return true;
   };
   const inTaskScope = item => inScope(item) && pieceCompatible(item);
