@@ -251,7 +251,7 @@ export function buildIndex(docs, { synonyms = { groups: [] } } = {}){
         why.push({ q: g.q, kind: b.alt.kind, via: b.alt.kind === 'exact' ? null : b.alt.label, found: f ? f.word : null, in: f ? LABEL[f.field] : null });
       }
       if(x.substring) why.push({ q: raw, kind: 'substring', via: null, found: raw, in: 'название/описание' });
-      return { id: docs[x.di].id, score: Math.round(x.score * 1000) / 1000, why };
+      return { id: docs[x.di].id, title: docs[x.di].title || docs[x.di].id, lang: docs[x.di].lang || '', group: docs[x.di].group || '', desc: docs[x.di].desc || '', score: Math.round(x.score * 1000) / 1000, why };
     });
     return { q: raw, total, hits, terms: groups.map(g => ({ q: g.q, alts: g.alts.filter(a => a.kind !== 'exact').slice(0, 8).map(a => ({ kind: a.kind, label: a.label })) })) };
   }
