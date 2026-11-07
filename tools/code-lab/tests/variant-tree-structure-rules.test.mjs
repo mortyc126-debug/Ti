@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { buildVariants } from '../lib/variant-tree.mjs';
 
 const require = createRequire(import.meta.url);
 const StructureRules = require('../public/structure-rules.js');
+const baseDictionary = JSON.parse(fs.readFileSync(new URL('../public/keyword-dict.json', import.meta.url), 'utf8'));
 
 const rules = [
   'li: внутри ul, ol',
@@ -109,12 +111,14 @@ test('требования, обязательные части, необяза�
 });
 
 test('связи между языками сохраняются как отдельные описанные отношения', () => {
-  const result = buildVariants({ q: 'id', lang: 'html', dict, rows: [], synonyms: {} });
+  const result = buildVariants({ q: 'id', lang: 'html', dict: { ...dict, words: baseDictionary.words }, rows: [], synonyms: {} });
   const group = groupFor(result, 'id', 'Связи с другими языками');
   assert.ok(group.children.some(x => x.lang === 'css' && /#\\*/.test(x.show)));
   assert.ok(group.children.some(x => x.lang === 'css' && x.term === '#*'), 'CSS-цель должна быть узлом, а не только текстом');
   assert.ok(group.children.some(x => x.lang === 'js' && /getElementById/.test(x.show)));
   assert.ok(group.children.some(x => x.lang === 'js' && x.term === 'getelementbyid'), 'JS-вызов должен вести к словарному узлу метода');
+  const jsMethod = group.children.find(x => x.lang === 'js' && x.term === 'getelementbyid');
+  assert.match(jsMethod.note, /находит один элемент по точному значению id/);
 });
 
 test('запрет контекста, зависимости, чтение данных и заметка имеют свои типы', () => {
