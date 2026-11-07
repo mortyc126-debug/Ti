@@ -76,7 +76,7 @@ test('ограничения не смешиваются с допустимым
 test('правило первого элемента имеет отдельный тип отношения', () => {
   const result = buildVariants({ q: 'summary', lang: 'html', dict, rows: [], synonyms: {} });
   const group = groupFor(result, 'summary', 'Порядок элементов');
-  assert.ok(group.children.some(x => /details/.test(x.show)));
+  assert.ok(group.children.some(x => x.term === 'details'));
 });
 
 test('требования, обязательные части, необязательные части и значения разделены', () => {
@@ -120,7 +120,7 @@ test('шаблон синтаксиса берётся из общего пар�
   const root = result.roots.find(x => x.term === 'if');
   assert.ok(root);
   assert.match(root.code, /if/);
-  assert.match(root.code, /\\n/);
+  assert.ok(root.code.includes('\n'));
 });
 
 test('команда удаления не отображается как отношение дерева', () => {
