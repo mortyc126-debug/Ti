@@ -7,7 +7,7 @@ const normalize = value => String(value == null ? '' : value)
 const STOP = new Set('и а но или что который которая которые которое это этот эта эти мне мне надо нужно хочу сделать сделай сделайте добавить добавь добавьте создать создай создайте чтобы который которая которое которые когда как'.split(' '));
 const NEGATION = new Set(['не', 'без', 'нельзя', 'запрещено', 'кроме']);
 const UNIQUE = values => [...new Set(values)];
-const RAW_WORD = /[\\p{L}\\p{N}]+(?:[-_][\\p{L}\\p{N}]+)*/gu;
+const RAW_WORD = /[\p{L}\p{N}]+(?:[-_][\p{L}\p{N}]+)*/gu;
 const rawWords = value => normalize(value).match(RAW_WORD) || [];
 const rawNegations = value => rawWords(value).filter(token => NEGATION.has(token));
 const TOKEN_CACHE = new Map();
