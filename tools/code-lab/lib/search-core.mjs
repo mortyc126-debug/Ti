@@ -46,6 +46,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     const key = normalize(target);
     if (buttonTask && !asksMouse && key.includes('event.button')) return false;
     if (linkTask && !asksServiceWorker && /serviceworker|service worker/.test(key)) return false;
+    if (linkTask && /^(?:self|none)$/.test(key) && !/новом окне|вкладк|target|blank|self/.test(q)) return false;
     if (hoverTask && !asksSpacing && /letter-spacing|line-height|white-space/.test(key)) return false;
     if (hoverTask && !asksSorting && /^(?:sort|sorted|write)$/.test(key)) return false;
     if (collapseTask && !/подвал|footer|низ страницы/.test(q) && /^(?:<footer>|footer)$/.test(key)) return false;
