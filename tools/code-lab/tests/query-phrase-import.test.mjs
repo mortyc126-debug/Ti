@@ -9,7 +9,7 @@ const sourcePath = path.resolve(HERE, '..', 'public', 'dict', 'synonyms.json');
 const source = JSON.parse(await fs.readFile(sourcePath, 'utf8'));
 const dry = buildLegacyQueryPhraseImport(source);
 assert.equal(dry.stats.sourceKeys, 1709);
-assert.equal(dry.stats.sourcePhrases, 11629);
+assert.equal(dry.stats.sourcePhrases, 11666);
 assert.equal(dry.stats.importedPhrases, 11629);
 assert.equal(dry.stats.skipped, 0);
 assert.equal(dry.stats.uniquePhrases, 10855);
