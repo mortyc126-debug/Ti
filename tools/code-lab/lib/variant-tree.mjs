@@ -13,6 +13,15 @@ import { matchQueryPhrase } from './query-phrase-match.mjs';
 const MAX_ROOTS = 8, MAX_KIDS = 14;
 const HTML_TAGS = new Set('a abbr address article aside audio b blockquote body br button canvas caption code col datalist dd details dialog div dl dt em fieldset figure footer form h1 h2 h3 h4 h5 h6 head header hr html i iframe img input label legend li link main menu meta nav ol optgroup option output p picture pre progress script section select slot small source span strong style sub summary sup svg table tbody td template textarea tfoot th thead time title tr ul video'.split(' '));
 const norm = s => String(s || '').toLowerCase().replace(/ё/g, 'е').trim();
+const preferredSynonymLabel = (synonyms, term, fallback = '') => {
+  const keys = [String(term || ''), '<' + String(term || '').replace(/^<|>$/g, '') + '>'];
+  for (const key of keys) {
+    const phrases = synonyms && synonyms[key];
+    if (!Array.isArray(phrases) || !phrases.length) continue;
+    return phrases.find(phrase => /[А-Яа-яЁё]/.test(String(phrase))) || fallback || phrases[0];
+  }
+  return fallback;
+};
 const stem = w => w.length > 5 ? w.slice(0, w.length - 2) : w;   // отступы/отступ/отступов → «отсту…»
 const words = s => norm(s).split(/[^\p{L}\p{N}_-]+/u).filter(w => w.length > 1);
 const isIdiom = k => /[\s(=.:]/.test(k.replace(/^[.#@]/, ''));
@@ -131,7 +140,7 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
         .filter(item => item.match).sort((a, b) => b.match.score - a.match.score);
       const hit = matches[0]; if(!hit) continue;
       const res = resolve(term, D, L); if(!res) continue;
-      add(res.key, L, hit.phrase, 2 + hit.match.score / 20 + res.rank, hit.match.phraseCoverage ?? 1);
+      add(res.key, L, preferredSynonymLabel(synonyms, res.key, hit.phrase), 2 + hit.match.score / 20 + res.rank, hit.match.phraseCoverage ?? 1);
     }
     // латиницей пишут начало имени («quer») — совпадение по началу важнее смысла по синонимам
     const latin = /^[a-z]/.test(qn);
@@ -277,7 +286,7 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
       note: relationDescriptions[verb], lang: L, children
     }));
   };
-  const synLabel = term => { const p = synonyms[term]; return Array.isArray(p) && p.length ? p[0] : ''; };
+  const synLabel = term => preferredSynonymLabel(synonyms, term);
   const node = (term, L, label) => {
     const D = langs[L] || {}; const own = D[term] || ((L === 'js' || L === 'ts') ? W[term] : '');
     const { ex, note } = splitNote(own);

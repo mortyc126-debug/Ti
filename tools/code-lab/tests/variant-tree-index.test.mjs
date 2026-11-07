@@ -79,3 +79,22 @@ test('CSS-псевдокласс из общего словаря всё рав�
   assert.ok(hover);
   assert.equal(hover.lang, 'css');
 });
+
+
+test('предпочитает русскую подпись, даже если запрос совпал с английским синонимом', () => {
+  const dict = { langs: { css: { ':hover': 'CSS-псевдокласс состояния наведения' } } };
+  const synonyms = { ':hover': ['hover эффект', 'при наведении мыши', 'подсветить при наведении'] };
+  const result = buildVariants({ q: 'hover эффект', lang: 'css', dict, rows: [], synonyms });
+  const root = result.roots.find(node => node.term === ':hover');
+  assert.ok(root);
+  assert.equal(root.label, 'при наведении мыши');
+});
+
+test('подбирает русскую подпись HTML-тега по синониму с угловыми скобками', () => {
+  const dict = { langs: { html: { button: 'кнопка интерфейса' } } };
+  const synonyms = { '<button>': ['button', 'кнопка', 'кнопка интерфейса'] };
+  const result = buildVariants({ q: 'button', lang: 'html', dict, rows: [], synonyms });
+  const root = result.roots.find(node => node.term === 'button');
+  assert.ok(root);
+  assert.equal(root.label, 'кнопка');
+});
