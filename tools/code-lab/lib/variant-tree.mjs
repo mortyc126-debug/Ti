@@ -5,6 +5,10 @@
 //   buildVariants({ q, lang, dict, rows, synonyms, caseMap }) → { q, lang, roots: [узел] }
 //   узел = { term, lang, code, note, label, children: [узел], piece? }
 
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const StructureRules = require('../public/structure-rules.js');
+
 const MAX_ROOTS = 8, MAX_KIDS = 14;
 const HTML_TAGS = new Set('a abbr address article aside audio b blockquote body br button canvas caption code col datalist dd details dialog div dl dt em fieldset figure footer form h1 h2 h3 h4 h5 h6 head header hr html i iframe img input label legend li link main menu meta nav ol optgroup option output p picture pre progress script section select slot small source span strong style sub summary sup svg table tbody td template textarea tfoot th thead time title tr ul video'.split(' '));
 const norm = s => String(s || '').toLowerCase().replace(/ё/g, 'е').trim();
@@ -122,57 +126,103 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
   const top = roots.filter(r => !roots.some(o => o !== r && o.lang === r.lang && r.term.startsWith(o.term + '-')))
     .sort((a, b) => b.score - a.score || a.term.length - b.term.length).slice(0, MAX_ROOTS);
 
-  // шаблон «пишется» из правил структуры (dict.structure): <img src="…" alt="…">, if (…) { … } — вместо голого имени
-  const tplOf = (L, term) => { const lines = (dict && dict.structure && dict.structure[L]) || []; const pre = String(term).toLowerCase().replace(/^<|>$/g, '') + ': пишется ';
-    const l = lines.find(x => x.toLowerCase().startsWith(pre)); return l ? l.slice(pre.length).trim().replace(/\\n/g, '\n').replace(/\\t/g, '  ') : ''; };
-  const needOf = (L, term) => { const lines = (dict && dict.structure && dict.structure[L]) || []; const pre = String(term).toLowerCase().replace(/^<|>$/g, '') + ': обязательно ';
-    return lines.filter(x => x.toLowerCase().startsWith(pre)).map(x => x.slice(pre.length).split(' — ')[0].trim()); };
-  // Связи продолжения и условия применения берём из существующих правил языка.
-  // «else: после if» разворачивается в подсказку для if; это не синонимы и не варианты написания.
+  // Единый парсер структуры — тот же, который использует сервер и редактор правил.
+  // Дерево не пытается повторно интерпретировать грамматику регулярными выражениями.
   const rulesCache = new Map();
   const rulesFor = L => {
     if(rulesCache.has(L)) return rulesCache.get(L);
-    const rules = ((dict && dict.structure && dict.structure[L]) || []).map(raw => {
-      const m = String(raw).match(/^(.+):\s*(после|можно содержать|можно|содержит|внутри|не внутри|требует|обязательно|заметка)\s+(.+)$/i);
-      if(!m) return null;
-      const term = m[1].trim(), verb = m[2].toLowerCase() === 'можно содержать' ? 'содержит' : m[2].toLowerCase();
-      const cut = m[3].split(/\s+[—–]\s+/);
-      const body = cut.shift().trim(), note = cut.join(' — ').trim();
-      const args = ['требует','заметка'].includes(verb) ? [body] : body.split(/\s*[,|;]\s*|\s+или\s+/).map(x => x.trim()).filter(Boolean);
-      return { term, verb, args, note };
-    }).filter(Boolean);
-    rulesCache.set(L, rules); return rules;
+    const lines = (dict && dict.structure && dict.structure[L]) || [];
+    const parsed = StructureRules.parse(lines.join('\\n'));
+    rulesCache.set(L, parsed.rules);
+    return parsed.rules;
+  };
+  const tplOf = (L, term) => StructureRules.templateFor(String(term).replace(/^<|>$/g, ''), rulesFor(L)) || '';
+  const needOf = (L, term) => rulesFor(L)
+    .filter(r => norm(r.term) === norm(String(term).replace(/^<|>$/g, '')) && r.verb === 'обязательно')
+    .flatMap(r => r.args);
+
+  const relationLabels = {
+    'после': 'Следует после',
+    'внутри': 'Расположение внутри',
+    'не внутри': 'Запрещённое расположение',
+    'содержит': 'Состав конструкции',
+    'не содержит': 'Запрещённое содержимое',
+    'первым в': 'Порядок элементов',
+    'требует': 'Зависимости',
+    'обязательно': 'Обязательные части',
+    'можно': 'Допустимые части',
+    'значения': 'Допустимые значения',
+    'связывает': 'Связи с другими языками',
+    'читает': 'Читаемые данные',
+    'заметка': 'Пояснения'
+  };
+  const relationDescriptions = {
+    'после': 'Порядок относительно предыдущей конструкции',
+    'внутри': 'Контекст, в котором допустима конструкция',
+    'не внутри': 'Контексты, в которых конструкция запрещена',
+    'содержит': 'Элементы, входящие в состав конструкции',
+    'не содержит': 'Элементы, которые нельзя помещать внутрь',
+    'первым в': 'Требование к позиции внутри родителя',
+    'требует': 'Необходимые свойства, условия или зависимости',
+    'обязательно': 'Обязательные атрибуты или части',
+    'можно': 'Необязательные атрибуты или части',
+    'значения': 'Допустимые значения свойства или атрибута',
+    'связывает': 'Связь с конструкциями другого языка',
+    'читает': 'Источник или формат читаемых данных',
+    'заметка': 'Справочное пояснение без проверки'
   };
   const relationGroups = (term, L) => {
-    const langRules = rulesFor(L), key = norm(term), D = langs[L] || {}, after = [], inside = [], context = [];
-    const exists = t => Object.prototype.hasOwnProperty.call(D, String(t).toLowerCase()) || langRules.some(r => norm(r.term) === norm(t));
-    for(const r of langRules){
-      if(r.verb === 'после' && r.args.some(a => norm(a) === key)) after.push(r);
-      if(norm(r.term) === key && ['можно','содержит'].includes(r.verb)) inside.push(r);
-      if(norm(r.term) === key && ['внутри','не внутри','требует','обязательно','заметка'].includes(r.verb)) context.push(r);
-    }
-    const continuations = new Map();
-    const addContinuation = (target, relation, rule) => {
-      if(!exists(target)) return;
-      const key = norm(target);
-      if(!continuations.has(key)) continuations.set(key, { term:target, relations:new Set(), notes:[] });
-      const item = continuations.get(key); item.relations.add(relation); if(rule.note) item.notes.push(rule.note);
+    const langRules = rulesFor(L), key = norm(term), D = langs[L] || {};
+    const exists = t => Object.prototype.hasOwnProperty.call(D, String(t).toLowerCase()) ||
+      langRules.some(r => norm(r.term) === norm(t));
+    const groups = new Map();
+    const add = (verb, show, rule, target = '', targetLang = L, actionable = false) => {
+      if(!groups.has(verb)) groups.set(verb, []);
+      const note = [rule.note, relationDescriptions[verb]].filter(Boolean).join(' · ');
+      let item;
+      if(actionable && target && targetLang === L && exists(target)){
+        item = node(target, targetLang, verb);
+        item.note = [item.note, rule.note, relationDescriptions[verb]].filter(Boolean).join(' · ');
+      } else {
+        item = { term: target || '', lang: targetLang, code: '', show, label: '', note, relation: verb, children: [] };
+      }
+      item.relation = verb;
+      groups.get(verb).push(item);
     };
-    after.forEach(r => addContinuation(r.term, 'после', r));
-    inside.forEach(r => r.args.forEach(t => addContinuation(t, 'внутри', r)));
-    const groups = [];
-    if(continuations.size) groups.push({ group:true, label:'Варианты продолжения', note:'Что может следовать за конструкцией или входить в неё', lang:L,
-      children:[...continuations.values()].map(item => {
-        const after = item.relations.has('после');
-        const child = node(item.term, L, after ? 'после' : 'часть конструкции');
-        const extra = item.notes.length ? [...new Set(item.notes)].join(' — ')
-          : after ? 'Допустимо после: ' + term : 'Допустимая часть конструкции «' + term + '»';
-        child.note = [child.note, extra].filter(Boolean).join(' — ');
-        return child;
-      }) });
-    if(context.length) groups.push({ group:true, label:'Условия применения', note:'Ограничения и контекст конструкции', lang:L,
-      children:context.map(r => ({ show:r.verb + ': ' + r.args.join(', '), code:'', lang:L, label:'', note:r.note || '', children:[] })) });
-    return groups;
+    for(const r of langRules){
+      const own = norm(r.term) === key;
+      const refs = r.args.map(a => norm(a));
+      if(r.verb === 'после' && refs.includes(key) && exists(r.term))
+        add('после', r.term + ' — следует после ' + term, r, r.term, L, true);
+      if(r.verb === 'внутри' && own)
+        r.args.forEach(a => add('внутри', term + ' находится внутри ' + a, r, a, L, true));
+      if(r.verb === 'внутри' && refs.includes(key) && exists(r.term))
+        add('содержит', r.term + ' может содержать ' + term, r, r.term, L, true);
+      if(r.verb === 'не внутри' && own)
+        r.args.forEach(a => add('не внутри', term + ' нельзя размещать внутри ' + a, r, a));
+      if(r.verb === 'содержит' && own)
+        r.args.forEach(a => add('содержит', term + ' содержит ' + a, r, a, L, true));
+      if(r.verb === 'содержит' && refs.includes(key) && exists(r.term))
+        add('содержит', r.term + ' содержит ' + term, r, r.term, L, true);
+      if(r.verb === 'не содержит' && own)
+        r.args.forEach(a => add('не содержит', term + ' не может содержать ' + a, r, a));
+      if(r.verb === 'первым в' && own)
+        r.args.forEach(a => add('первым в', term + ' должен быть первым в ' + a, r, a, L, true));
+      if(r.verb === 'первым в' && refs.includes(key) && exists(r.term))
+        add('первым в', r.term + ' должен быть первым в ' + term, r, r.term, L, true);
+      if(own && ['требует','обязательно','можно','значения','заметка'].includes(r.verb))
+        r.args.forEach(a => add(r.verb, r.verb + ': ' + a, r, a));
+      if(own && ['связывает','читает'].includes(r.verb)){
+        r.args.forEach(a => {
+          const m = String(a).match(/^(html|css|js|ts|python|svg)\\s+(.+)$/i);
+          add(r.verb, a, r, m ? m[2] : a, m ? m[1].toLowerCase() : L, false);
+        });
+      }
+    }
+    return [...groups.entries()].map(([verb, children]) => ({
+      group: true, label: relationLabels[verb], relation: verb,
+      note: relationDescriptions[verb], lang: L, children
+    }));
   };
   const synLabel = term => { const p = synonyms[term]; return Array.isArray(p) && p.length ? p[0] : ''; };
   const node = (term, L, label) => {
