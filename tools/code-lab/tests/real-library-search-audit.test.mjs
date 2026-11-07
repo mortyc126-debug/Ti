@@ -194,6 +194,7 @@ async function main() {
   assert.ok(!buttonTitles.some(title => /форма|formdata|submit|отправк формы/i.test(title)), 'простая кнопка не должна притягивать отправку формы');
   const linkTitles = taskResultMap.get(linkQuery).pieces.map(piece => piece.title);
   assert.ok(!linkTitles.some(title => /style\.css|stylesheet|google fonts|image map|карта областей изображения|ссылка при наведении|убрать подчёркивание|defaultprevented/i.test(title)), 'ссылка на страницу не должна смешиваться с подключением ресурсов и image map');
+  assert.ok(!linkTitles.some(title => /Playwright|ожидание видимого текста|ожидание появления элемента|element\.before/i.test(title)), 'обычная ссылка не должна притягивать тестирование и вставку соседних DOM-узлов');
   const collapseTitles = taskResultMap.get(collapseQuery).pieces.map(piece => piece.title);
   assert.ok(!collapseTitles.some(title => /групп.*сообщен|сообщен.*групп|канонический путь|symbolic link/i.test(title)), 'сворачиваемый блок не должен смешиваться с группами сообщений и файловыми путями');
 
@@ -206,6 +207,8 @@ async function main() {
 
   const collapseTerms = taskTerms(collapseQuery);
   const hoverTerms = taskTerms(hoverQuery);
+  const hoverTitles = taskResultMap.get(hoverQuery).pieces.map(piece => piece.title);
+  assert.ok(!hoverTitles.some(title => /abbr|сокращённый текст|курсор-указатель/i.test(title)), 'подсветка текста не должна притягивать сокращения и указатель курсора');
   assert.equal(taskResultMap.get(hoverQuery).targets.find(target => target.targetKey === ':hover')?.rootLang, 'css', ':hover должен оставаться CSS-псевдоклассом в целях поиска');
   assert.ok(taskResultMap.get(buttonQuery).roots.findIndex(x => /button/.test(String(x.term))) < 3, 'HTML-кнопка должна быть среди первых трёх корней');
   assert.ok(!buttonTerms.some(x => x === 'disabled' || x === 'event.target'), 'простая кнопка не должна подменяться состоянием disabled или event.target');
@@ -234,6 +237,7 @@ async function main() {
   assert.ok(!taskTerms(hoverQuery).some(x => /letter-spacing|line-height|sort|write/.test(x)), 'не подмешивать несвязанные свойства и команды');
   assert.ok(!taskTerms(dataQuery).some(term => term === 'get' || term === 'list'), 'слова «получить» и «список» не должны превращаться в HTML-метод GET и атрибут list');
   const dataTargets = taskResultMap.get(dataQuery).targets.map(x => x.targetKey);
+  assert.ok(!taskResultMap.get(dataQuery).roots.some(root => /^<(?:form|input|datalist)\b/i.test(String(root.term || ''))), 'обычный вывод данных на страницу не должен превращаться в форму поиска или поле ввода');
   assert.ok(dataTargets.indexOf('fetch') >= 0 && dataTargets.indexOf('response.json()') > dataTargets.indexOf('fetch'), 'получение данных должно стоять выше разбора JSON-ответа: ' + dataTargets.join(', ') + '; counts=' + JSON.stringify(taskResultMap.get(dataQuery).counts));
   assert.ok(taskResultMap.get(dataQuery).counts.directedPieces > 0, 'по найденным целям должны подбираться связанные фрагменты');
   assert.ok(taskResultMap.get(dataQuery).pieces.some(piece => (piece.matchedTargets || []).includes('fetch')), 'фрагмент запроса должен быть связан с целью fetch');
