@@ -191,8 +191,25 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
   };
   const relationGroups = (term, L) => {
     const langRules = rulesFor(L), key = norm(term), D = langs[L] || {};
-    const exists = t => Object.prototype.hasOwnProperty.call(D, String(t).toLowerCase()) ||
-      langRules.some(r => norm(r.term) === norm(t));
+    const exists = (t, targetLang = L) => Object.prototype.hasOwnProperty.call(langs[targetLang] || {}, String(t).toLowerCase()) ||
+      rulesFor(targetLang).some(r => norm(r.term) === norm(t));
+    // Правило может указывать не на голое имя, а на рабочий шаблон:
+    // «js getElementById('*')», «css querySelector('#*')», «html for="*"».
+    // Извлекаем каноническую конструкцию, но исходную запись сохраняем в show.
+    const canonicalTarget = (raw, targetLang) => {
+      let value = String(raw || '').trim();
+      if (targetLang === 'js' || targetLang === 'ts') {
+        const call = value.match(/^([A-Za-z_$][\\w$]*)\\s*\\(/);
+        if (call) value = call[1];
+      } else if (targetLang === 'html') {
+        const attr = value.match(/^([a-z-]+)\\s*=\\s*["'][^"']*["']$/i);
+        if (attr) value = attr[1];
+      } else if (targetLang === 'css') {
+        if (value === '#*' && !exists(value, targetLang) && exists('#id', targetLang)) value = '#id';
+        if (value === '.*' && !exists(value, targetLang) && exists('.class', targetLang)) value = '.class';
+      }
+      return value.toLowerCase();
+    };
     const groups = new Map();
     const add = (verb, show, rule, target = '', targetLang = L, actionable = false) => {
       if(!groups.has(verb)) groups.set(verb, []);
@@ -242,7 +259,9 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
       if(own && ['связывает','читает'].includes(r.verb)){
         r.args.forEach(a => {
           const m = String(a).match(/^(html|css|js|ts|python|svg)\s+(.+)$/i);
-          add(r.verb, a, r, m ? m[2] : a, m ? m[1].toLowerCase() : L, false);
+          const targetLang = m ? m[1].toLowerCase() : L;
+          const target = canonicalTarget(m ? m[2] : a, targetLang);
+          add(r.verb, a, r, target, targetLang, exists(target, targetLang));
         });
       }
     }
