@@ -32,6 +32,36 @@ test('объединяет направленные фразы и полноте
   assert.equal(result.counts.pieces, 3);
 });
 
+test('в задачах интерфейса приоритет у веб-языков, но явный backend-запрос сохраняет Python', () => {
+  const web = combineTaskSearch({
+    query: 'свернуть боковую панель',
+    directed: { hits: [{ targetKey: 'reduce', pieces: [{ id: 'py', lang: 'python' }] }], rankedPieces: [
+      { id: 'aside', title: 'Боковая панель', lang: 'html' },
+      { id: 'reduce', title: 'Свёртка массива', lang: 'python' }
+    ] },
+    library: { hits: [
+      { id: 'aside', title: 'Боковая панель', lang: 'html' },
+      { id: 'reduce', title: 'Свёртка массива', lang: 'python' }
+    ] },
+    variants: { roots: [
+      { term: 'aside', lang: 'html' },
+      { term: 'reduce', lang: 'python' }
+    ] }
+  });
+  assert.deepEqual(web.roots.map(x => x.lang), ['html']);
+  assert.deepEqual(web.pieces.map(x => x.id), ['aside']);
+  assert.equal(web.targets.length, 0);
+
+  const backend = combineTaskSearch({
+    query: 'получить данные из Python backend и вывести их на страницу',
+    directed: { hits: [], rankedPieces: [{ id: 'py', title: 'Python API', lang: 'python' }] },
+    library: { hits: [] },
+    variants: { roots: [{ term: 'fetch', lang: 'js' }, { term: 'python', lang: 'python' }] }
+  });
+  assert.deepEqual(backend.roots.map(x => x.lang), ['js', 'python']);
+  assert.equal(backend.pieces[0].lang, 'python');
+});
+
 test('объясняет результаты, найденные только одним источником', () => {
   const result = combineTaskSearch({
     query: 'отступ',
