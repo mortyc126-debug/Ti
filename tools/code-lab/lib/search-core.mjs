@@ -30,7 +30,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
   const asksMouse = /мыш|mouse/.test(q);
   const asksKeyboard = /клавиатур|keyboard|keydown|keyup/.test(q);
   const asksGamepad = /геймпад|gamepad/.test(q);
-  const asksServiceWorker = /service worker|offline|кэш|кеш/.test(q);
+  const asksServiceWorker = /worker|воркер|offline|кэш|кеш/.test(q);
   const asksSpacing = /межбуквен|межстроч|интервал|перенос|пробел|высота строки/.test(q);
   const asksSorting = /сортир|упорядоч|sort/.test(q);
   const asksFile = /файл|путь|каталог|запис|write/.test(q);
