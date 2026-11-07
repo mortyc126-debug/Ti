@@ -35,10 +35,16 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     if (buttonTask && !asksKeyboard && /keydown|keyup|клавиатур|keyboard/.test(text)) return false;
     if (buttonTask && !asksMouse && (text.includes('event.button') || /кнопку мыши|кнопка мыши/.test(text))) return false;
     if (buttonTask && !/ошиб|исключ|error|exception/.test(q) && /ошибка|исключение|error|exception|assertion/.test(text)) return false;
+    if (buttonTask && !/отлад|devtools|inspect|диагност/.test(q) && /geteventlisteners|devtools/.test(text)) return false;
+    if (buttonTask && !/всплыти|распростран|bubbling|propagation/.test(q) && /stoppropagation|остановить распространение/.test(text)) return false;
     if (linkTask && !asksServiceWorker && /service worker|кэш сразу|кеш сразу/.test(text)) return false;
+    if (linkTask && !/worker|данн|json|api|fetch|запрос|сохран|сериализ/.test(q) && /web worker|service worker|сериализуем|передача больших данных|обработка данных/.test(text)) return false;
+    if (linkTask && !/динамич|вставить|заменить|создать элемент/.test(q) && /insertadjacenthtml|replacechildren/.test(text)) return false;
     if (headingTask && !buttonTask && /кнопк/.test(text)) return false;
     if (hoverTask && !asksSpacing && /letter-spacing|line-height|white-space/.test(text)) return false;
     if (hoverTask && !asksSorting && /sort(?:ed|ing)?|сортир/.test(text)) return false;
+    if (hoverTask && headingTask && !/список|маркер|list/.test(q) && /маркер списка|list marker/.test(text)) return false;
+    if (collapseTask && !/свер|раскры|toggle|переключ|панел|sidebar|aside|details|summary|hidden|aria-expanded|display|visibility|overflow|classlist|скрыть|закрыть/.test(text)) return false;
     if (webTask && !asksFile && (text.includes('document.write') || /записать файл/.test(text))) return false;
     if (multiSourceTask && /источник узла|идентификатор источника узла|заголовок источника узла|описание источника узла/.test(text) && !/dom|узел|node/.test(q)) return false;
     if (multiSourceTask && /узл|node|indexeddb|localstorage|sessionstorage|ковариац|корреляц|статист/.test(text) && !/dom|узел|node|indexeddb|localstorage|хранилищ|корреляц|статист|ряд/.test(q)) return false;
@@ -98,6 +104,8 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     item.desc = hit.desc || item.desc;
     item._lexicalRank = index + 1;
     item._rrf += 1 / (60 + index + 1);
+    if ((hit.why || []).some(reason => reason.in === 'название/описание' && reason.kind === 'exact')) item._rrf += 0.006;
+    else if ((hit.why || []).some(reason => reason.in === 'название/описание' && reason.kind === 'substring')) item._rrf += 0.003;
     if (!item.sources.includes('полнотекстовый поиск')) item.sources.push('полнотекстовый поиск');
     item.why.push({
       source: 'полнотекстовый поиск',
