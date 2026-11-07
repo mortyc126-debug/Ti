@@ -320,7 +320,8 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
       if (!root.note && phrase?.note) root.note = phrase.note;
     }
     root.matchedPhrases = phrases;
-    const existingPieceIds = new Set((root.children || []).map(child => child.piece).filter(Boolean));
+    if (!Array.isArray(root.children)) root.children = [];
+    const existingPieceIds = new Set(root.children.map(child => child.piece).filter(Boolean));
     for (const piece of matchedPieces.slice(0, 5)) {
       if (existingPieceIds.has(piece.id)) continue;
       root.children.push({
