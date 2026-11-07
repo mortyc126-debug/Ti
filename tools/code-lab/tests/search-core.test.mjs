@@ -143,3 +143,22 @@ test('цель, отсутствующая среди ограниченных �
   assert.equal(result.targets[0].rootLang, 'js');
   assert.equal(result.pieces[0].matchedTargets[0], 'Promise.all');
 });
+
+
+test('фрагменты и связи восстанавливаются из целей, если агрегированный список пуст', () => {
+  const result = combineTaskSearch({
+    query: 'получить данные из двух источников',
+    directed: {
+      hits: [{
+        targetKey: 'fetch', score: 56, phrases: [{ phrase: 'получить данные из нескольких источников' }],
+        pieces: [{ id: 'fetch-piece', title: 'fetch + await', lang: 'js', desc: 'Получить данные из источника' }]
+      }],
+      rankedPieces: []
+    },
+    library: { hits: [] },
+    variants: { roots: [] }
+  });
+  assert.equal(result.counts.directedPieces, 1);
+  assert.equal(result.pieces[0].id, 'fetch-piece');
+  assert.deepEqual(result.pieces[0].matchedTargets, ['fetch']);
+});
