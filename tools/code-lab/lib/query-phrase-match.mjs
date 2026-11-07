@@ -25,9 +25,9 @@ export function queryTokens(value) {
 
 function contextConflict(query, phrase, targetKey) {
   const q = normalize(query), p = normalize(phrase), target = normalize(targetKey);
-  const qUi = /панел|блок|раздел|страниц|sidebar|меню|вкладк/.test(q);
+  const qUi = /панел|блок|раздел|страниц|sidebar|меню|вкладк|шапк|заголов|кнопк|ссылк|текст|надпис|элемент|карточк|поле|форм/.test(q);
   const qCollection = /массив|список|коллекц|последовательност/.test(q);
-  const pUi = /панел|блок|раздел|страниц|sidebar|меню|вкладк/.test(p);
+  const pUi = /панел|блок|раздел|страниц|sidebar|меню|вкладк|шапк|заголов|кнопк|ссылк|текст|надпис|элемент|карточк|поле|форм/.test(p);
   const pCollection = /массив|список|коллекц|последовательност/.test(p);
   const qInside = /внутр/.test(q), qOutside = /снаруж/.test(q);
   const pInside = /внутр/.test(p), pOutside = /снаруж/.test(p);
@@ -67,6 +67,14 @@ function contextConflict(query, phrase, targetKey) {
   if ((target.includes('console.log') || target.includes('console.error') || target === 'print') && !/консол|вывод|напечат|print/.test(q)) return true;
   if (target.includes('insert into') && !/баз|таблиц|sql|запис|insert/.test(q)) return true;
   if ((target === 'import' || target.startsWith('import ')) && !/импорт|модул|библиотек|подключ/.test(q)) return true;
+  if (/(?:^|[.])try|catch|except|finally|^pass$/.test(target) && qUi && !/ошиб|исключ|error|exception|try|catch|except|finally|код/.test(q)) return true;
+  if (/(?:^|[.])open(?:\\(|$)|read_csv|readfile|read_file|writefile|write_file/.test(target) && qUi && !/файл|путь|каталог|csv|кодиров|прочит|запис|открыть файл/.test(q)) return true;
+  if ((target === 'str' || target === 'string' || target === 's*n') && qUi && !/строк|тип str|преобразовать|умножить строку/.test(q)) return true;
+  if (target === 'headers' && /шапк|заголов/.test(q) && !/http|запрос|ответ|заголовки http/.test(q)) return true;
+  const qCollapse = /свер|раскры|открыть|collapse|expand/.test(q);
+  if ((target === 'div' || target === '<div>') && qCollapse && !/раскрывающ|свернуть блок|раскрыть блок|toggle|aria-expanded/.test(p)) return true;
+  const qVisual = /цвет|фон|тень|скруг|подсвет|границ|анимац|плавн|прозрачн|шрифт|размер|отступ/.test(q);
+  if (/^(?:box-shadow|border-radius|background-color|opacity|animation|text-transform)$/.test(target) && !qVisual) return true;
   return false;
 }
 
