@@ -44,6 +44,13 @@ test('контрастные уточнения не смешиваются пр
   assert.equal(matchQueryPhrase('выровнять текст по центру', 'выровнять элементы по центру'), null);
 });
 
+test('контекст списка и словаря Python не смешивает два типа коллекций', () => {
+  assert.equal(matchQueryPhrase('список Python', 'словарь Python', 'dict'), null);
+  assert.equal(matchQueryPhrase('словарь Python', 'список Python', 'list'), null);
+  assert.ok(matchQueryPhrase('список и словарь Python', 'словарь Python', 'dict'));
+  assert.ok(matchQueryPhrase('список и словарь Python', 'список Python', 'list'));
+});
+
 test('контекст отступов не притягивает DOM API и оператор in', () => {
   assert.equal(matchQueryPhrase('отступ внутри элемента', 'вставить элемент внутрь', 'appendChild'), null);
   assert.equal(matchQueryPhrase('отступ внутри элемента', 'текст внутри элемента', 'textContent'), null);
