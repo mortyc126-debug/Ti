@@ -101,10 +101,10 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
     const grouped = new Map();
 
     for (const [phrase, records] of byPhrase) {
-      const match = matchQueryPhrase(q, phrase);
-      if (!match) continue;
-      const score = match.score;
       for (const record of records) {
+        const match = matchQueryPhrase(q, phrase, record.targetKey);
+        if (!match) continue;
+        const score = match.score;
         const recordLanguage = normalize(record.language);
         const recordScope = normalize(record.scope);
         if (recordLanguage && language && recordLanguage !== normalize(language)) continue;
