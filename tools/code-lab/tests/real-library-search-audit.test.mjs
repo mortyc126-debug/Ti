@@ -150,6 +150,30 @@ async function main() {
   assert.ok(!pythonFunctionHits.some(hit => hit.targetKey === 'function'), 'Python-контекст не должен подмешивать JS function');
   assert.ok(pythonFunctionHits.flatMap(hit => hit.pieces || []).every(piece => piece.lang === 'python'), 'Python-контекст не должен возвращать фрагменты другого языка');
 
+  const taskScenarios = [
+    'Добавить кнопку, которая по нажатию показывает сообщение',
+    'Сделать надпись ссылкой на другую страницу',
+    'Сделать блок, который можно раскрыть и свернуть',
+    'Подсветить текст заголовка в шапке при наведении курсора',
+    'Получить данные из двух источников и вывести имя в шапку, список в основной блок, итог внизу',
+    'Свернуть боковую панель, чтобы её можно было снова открыть'
+  ];
+  const taskResults = [];
+  for (const query of taskScenarios) {
+    const result = await get('/api/search/task?q=' + encodeURIComponent(query) + '&limit=30');
+    assert.equal(result.mode, 'task', `неверный режим единого поиска для «${query}»`);
+    assert.ok(Array.isArray(result.roots) && Array.isArray(result.pieces), `нет корней или фрагментов для «${query}»`);
+    assert.ok(result.roots.length || result.pieces.length, `поиск не дал ни одной конструкции или фрагмента для «${query}»`);
+    taskResults.push({
+      query,
+      targets: result.targets.slice(0, 12).map(x => x.targetKey),
+      roots: result.roots.slice(0, 12).map(x => x.term || x.label),
+      pieces: result.pieces.slice(0, 8).map(x => ({ title: x.title, lang: x.lang, sources: x.sources })),
+      counts: result.counts
+    });
+  }
+  console.log('TASK SEARCH REAL SCENARIOS:', JSON.stringify(taskResults));
+
   const report = {
     generatedAt: new Date().toISOString(),
     branch: 'audit/fixes-2026-11-06',
