@@ -99,6 +99,7 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
   const resolve = (term, D, L) => {
     const t = String(term).toLowerCase().trim().replace(/^\.(?=[a-z])/, '').replace(/^<([a-z][\w-]*)>$/, (L === 'html' || L === 'svg') ? '$1' : '<$1>');   // синоним «<img>» ↔ запись словаря «img»
     if(D[t]) return { key: t, rank: 1 };
+    if((L === 'html' || L === 'svg') && D['<' + t + '>']) return { key: '<' + t + '>', rank: 1 };
     if((L === 'js' || L === 'ts') && W[t]) return { key: t, rank: 1.5 };   // for, while — базовые слова языка
     if(t.length < 2 || /\s/.test(t)) return null;
     const re = tokRe(t), ix = indexes[L];
