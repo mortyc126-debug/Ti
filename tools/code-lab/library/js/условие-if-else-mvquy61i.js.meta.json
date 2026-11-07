@@ -3,9 +3,9 @@
   "id": "условие-if-else-mvquy61i",
   "file": "условие-if-else-mvquy61i.js",
   "lang": "js",
-  "title": "Условие if else",
-  "group": "Основы языка / Синтаксис",
-  "desc": "",
+  "title": "Выбрать действие по условию if/else",
+  "group": "Основы языка / Условия и логика",
+  "desc": "Проверяет, истинно ли условие возраст >= 18. При истинном результате выполняется первый блок, иначе — блок else.",
   "output": "",
   "descAt": 1793115965718,
   "component": {
@@ -15,13 +15,17 @@
     "requires": []
   },
   "tags": [],
-  "aliases": [],
+  "aliases": [
+    "if",
+    "else",
+    "условное ветвление"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 5,

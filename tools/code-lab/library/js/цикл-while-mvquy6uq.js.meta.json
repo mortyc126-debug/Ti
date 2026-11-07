@@ -3,9 +3,9 @@
   "id": "цикл-while-mvquy6uq",
   "file": "цикл-while-mvquy6uq.js",
   "lang": "js",
-  "title": "Цикл while",
-  "group": "Не разобрано",
-  "desc": "",
+  "title": "Цикл while: повторять, пока условие истинно",
+  "group": "Основы языка / Условия и логика",
+  "desc": "Проверяет условие n > 0 перед каждым проходом и повторяет блок, пока оно истинно. В теле n уменьшается, поэтому цикл завершается, когда значение достигает нуля.",
   "output": "",
   "descAt": 1793115966770,
   "component": {
@@ -15,13 +15,16 @@
     "requires": []
   },
   "tags": [],
-  "aliases": [],
+  "aliases": [
+    "while",
+    "цикл с предусловием"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 5,

@@ -3,21 +3,24 @@
   "id": "выбрать-нужные-элементы-на-странице-и-об-mvt1kbzp",
   "file": "выбрать-нужные-элементы-на-странице-и-об-mvt1kbzp.js",
   "lang": "js",
-  "title": "Выбрать нужные элементы на странице и обработать событие нажатия: На нажатие кла",
+  "title": "Отследить нажатие клавиши",
   "group": "Страница и браузер / События",
-  "desc": "",
+  "desc": "Подписывается на событие keydown документа и получает объект event с информацией о нажатой клавише. В примере в консоль выводится event.key.",
   "output": "",
   "component": {
     "provides": [],
     "requires": []
   },
   "tags": [],
-  "aliases": [],
+  "aliases": [
+    "keydown",
+    "клавиатурное событие"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": []
 }

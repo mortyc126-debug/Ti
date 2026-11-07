@@ -3,9 +3,9 @@
   "id": "подождать-перед-действием-и-повторять-де-mvt1k5kz",
   "file": "подождать-перед-действием-и-повторять-де-mvt1k5kz.js",
   "lang": "js",
-  "title": "Подождать перед действием и повторять действие по таймеру: Из секунд, чтобы было",
+  "title": "Перевести секунды в миллисекунды",
   "group": "Асинхронность / Ожидание и время",
-  "desc": "",
+  "desc": "Преобразует длительность из секунд в миллисекунды, умножая на 1000. Результат подходит для setTimeout и setInterval.",
   "output": "",
   "component": {
     "provides": [
@@ -15,12 +15,15 @@
     "requires": []
   },
   "tags": [],
-  "aliases": [],
+  "aliases": [
+    "секунды в миллисекунды",
+    "setTimeout"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": []
 }

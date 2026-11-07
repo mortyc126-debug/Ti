@@ -3,9 +3,9 @@
   "id": "подождать-перед-действием-и-повторять-де-mvt1k6gw",
   "file": "подождать-перед-действием-и-повторять-де-mvt1k6gw.js",
   "lang": "js",
-  "title": "Подождать перед действием и повторять действие по таймеру: да",
+  "title": "Ожидание через Promise и setTimeout",
   "group": "Асинхронность / Ожидание и время",
-  "desc": "",
+  "desc": "Функция sleep(ms) возвращает Promise, который выполняется после задержки ms миллисекунд. await sleep(1000) приостанавливает текущую async-функцию примерно на одну секунду.",
   "output": "",
   "component": {
     "provides": [
@@ -14,12 +14,16 @@
     "requires": []
   },
   "tags": [],
-  "aliases": [],
+  "aliases": [
+    "sleep",
+    "Promise",
+    "setTimeout"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": []
 }

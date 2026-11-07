@@ -3,9 +3,9 @@
   "id": "оператор-switch-mvquxxhf",
   "file": "оператор-switch-mvquxxhf.js",
   "lang": "js",
-  "title": "Оператор switch",
+  "title": "Выбрать ветку по значению через switch",
   "group": "Основы языка / Условия и логика",
-  "desc": "",
+  "desc": "Сравнивает значение день с вариантами case и выполняет совпавшую ветку. break завершает ветку, а default выполняется, если совпадений нет.",
   "output": "",
   "descAt": 1793115954627,
   "component": {
@@ -15,13 +15,17 @@
     "requires": []
   },
   "tags": [],
-  "aliases": [],
+  "aliases": [
+    "switch",
+    "case",
+    "default"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 5,

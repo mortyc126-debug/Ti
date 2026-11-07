@@ -3,9 +3,9 @@
   "id": "выбрать-нужные-элементы-на-странице-и-об-mvt1k9t9",
   "file": "выбрать-нужные-элементы-на-странице-и-об-mvt1k9t9.js",
   "lang": "js",
-  "title": "Выбрать нужные элементы на странице и обработать событие нажатия: По id",
+  "title": "Получить элемент по id",
   "group": "Страница и браузер / События",
-  "desc": "",
+  "desc": "document.getElementById('save') ищет элемент с атрибутом id=\"save\" и возвращает ссылку на него. Если такого элемента нет, результатом будет null.",
   "output": "",
   "component": {
     "provides": [
@@ -16,12 +16,15 @@
     ]
   },
   "tags": [],
-  "aliases": [],
+  "aliases": [
+    "getElementById",
+    "найти элемент по id"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": []
 }

@@ -3,9 +3,9 @@
   "id": "подождать-перед-действием-и-повторять-де-mvt1k60d",
   "file": "подождать-перед-действием-и-повторять-де-mvt1k60d.js",
   "lang": "js",
-  "title": "Подождать перед действием и повторять действие по таймеру: Да, по кнопке",
+  "title": "Остановить таймер и интервал по кнопке",
   "group": "Асинхронность / Ожидание и время",
-  "desc": "",
+  "desc": "По нажатию на #stop вызывает clearInterval и clearTimeout для ранее сохранённых идентификаторов. Остановка сработает, если intervalId и timerId содержат идентификаторы созданных таймеров.",
   "output": "",
   "component": {
     "provides": [],
@@ -16,12 +16,16 @@
     ]
   },
   "tags": [],
-  "aliases": [],
+  "aliases": [
+    "clearInterval",
+    "clearTimeout",
+    "остановить таймер"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": []
 }

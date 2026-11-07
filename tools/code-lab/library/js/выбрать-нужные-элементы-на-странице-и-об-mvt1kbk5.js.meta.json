@@ -3,9 +3,9 @@
   "id": "выбрать-нужные-элементы-на-странице-и-об-mvt1kbk5",
   "file": "выбрать-нужные-элементы-на-странице-и-об-mvt1kbk5.js",
   "lang": "js",
-  "title": "Выбрать нужные элементы на странице и обработать событие нажатия: На клик",
+  "title": "Назначить кнопке обработчик click",
   "group": "Страница и браузер / События",
-  "desc": "",
+  "desc": "Добавляет кнопке обработчик события click. При нажатии браузер вызывает функцию onClick.",
   "output": "",
   "component": {
     "provides": [],
@@ -15,12 +15,15 @@
     ]
   },
   "tags": [],
-  "aliases": [],
+  "aliases": [
+    "addEventListener",
+    "обработчик нажатия кнопки"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": []
 }
