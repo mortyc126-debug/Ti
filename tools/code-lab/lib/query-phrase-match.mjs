@@ -1,0 +1,54 @@
+import { terms } from './search.mjs';
+
+const normalize = value => String(value == null ? '' : value)
+  .trim().toLocaleLowerCase('ru').replace(/ё/g, 'е').replace(/\\s+/g, ' ');
+
+// Убираем только грамматический шум. Отрицание, условия и смысловые предлоги сохраняем.
+const STOP = new Set('и а но или что который которая которые которое это этот эта эти мне мне надо нужно хочу сделать сделай сделайте добавить добавь добавьте создать создай создайте чтобы который которая которое которые когда как'.split(' '));
+const NEGATION = new Set(['не', 'без', 'нельзя', 'запрещено', 'кроме']);
+const UNIQUE = values => [...new Set(values)];
+
+export function queryTokens(value) {
+  return UNIQUE(terms(normalize(value)).filter(token => token.length > 1 && !STOP.has(token)));
+}
+
+export function matchQueryPhrase(query, phrase) {
+  const q = normalize(query), p = normalize(phrase);
+  if (!q || !p) return null;
+  if (q === p) return { score: 100, kind: 'exact', matchedTokens: queryTokens(p), phraseCoverage: 1, queryCoverage: 1 };
+  if (p.startsWith(q + ' ')) return { score: 90, kind: 'query-prefix', matchedTokens: queryTokens(q), phraseCoverage: 1, queryCoverage: 1 };
+  if (q.includes(' ' + p + ' ' ) || q.startsWith(p + ' ') || q.endsWith(' ' + p))
+    return { score: 88, kind: 'phrase-contained', matchedTokens: queryTokens(p), phraseCoverage: 1, queryCoverage: 1 };
+
+  const qt = queryTokens(q), pt = queryTokens(p);
+  if (!qt.length || !pt.length) return null;
+  const qSet = new Set(qt);
+  const matched = UNIQUE(pt.filter(token => qSet.has(token)));
+  if (!matched.length) return null;
+
+  const qNeg = qt.filter(token => NEGATION.has(token));
+  const pNeg = pt.filter(token => NEGATION.has(token));
+  if (qNeg.length !== pNeg.length || qNeg.some(token => !pNeg.includes(token))) return null;
+
+  const phraseCoverage = matched.length / pt.length;
+  const queryCoverage = matched.length / qt.length;
+  // Одиночный общий короткий токен слишком часто даёт ложные связи.
+  if (matched.length === 1 && pt.length > 1 && matched[0].length < 5) return null;
+
+  let ordered = 0;
+  let cursor = 0;
+  for (const token of qt) {
+    const index = pt.indexOf(token, cursor);
+    if (index >= 0) { ordered++; cursor = index + 1; }
+  }
+  const orderCoverage = ordered / Math.max(1, matched.length);
+  const score = Math.round(35 * phraseCoverage + 25 * queryCoverage + 20 * orderCoverage);
+  if (phraseCoverage < 0.5 || score < 35) return null;
+  return {
+    score: Math.min(84, score),
+    kind: 'partial',
+    matchedTokens: matched,
+    phraseCoverage: Math.round(phraseCoverage * 100) / 100,
+    queryCoverage: Math.round(queryCoverage * 100) / 100
+  };
+}
