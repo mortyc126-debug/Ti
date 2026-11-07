@@ -48,6 +48,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     if (webTask && !asksFile && (text.includes('document.write') || /записать файл/.test(text))) return false;
     if (multiSourceTask && /источник узла|идентификатор источника узла|заголовок источника узла|описание источника узла/.test(text) && !/dom|узел|node/.test(q)) return false;
     if (multiSourceTask && /узл|node|indexeddb|localstorage|sessionstorage|ковариац|корреляц|статист/.test(text) && !/dom|узел|node|indexeddb|localstorage|хранилищ|корреляц|статист|ряд/.test(q)) return false;
+    if (multiSourceTask && !asksServiceWorker && /service worker|web worker|push-сообщение/.test(text)) return false;
     return true;
   };
   const targetCompatible = target => {
