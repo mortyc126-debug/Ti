@@ -100,7 +100,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     }
   }
   const rawRankedPieces = Array.isArray(directed?.rankedPieces) ? directed.rankedPieces : [];
-  const makeCandidateMap = source => {
+  const makeCandidateMap = (source, ranked) => {
     const map = new Map();
     for (const piece of source) {
       if (!piece?.id) continue;
@@ -108,7 +108,10 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
         ...(piece.matchedTargets || []),
         ...(targetMemberships.get(piece.id) || [])
       ]);
-      const candidate = { ...piece, matchedTargets: [...targets] };
+      const candidate = {
+        ...piece, matchedTargets: [...targets],
+        _rankPosition: ranked ? (Number(piece.position) || null) : null
+      };
       const previous = map.get(piece.id);
       if (!previous || Number(candidate.combinedScore ?? candidate.score ?? 0) > Number(previous.combinedScore ?? previous.score ?? 0)) {
         map.set(piece.id, {
@@ -121,7 +124,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     }
     return map;
   };
-  let directedById = makeCandidateMap(rawRankedPieces);
+  let directedById = makeCandidateMap(rawRankedPieces, true);
   if (!directedById.size || ![...directedById.values()].some(inTaskScope)) {
     // Резервный путь только при пустом/непригодном rankedPieces.
     // Сохраняем порядок целей и релевантность фрагмента внутри каждой цели.
@@ -137,15 +140,15 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
         });
       }
     }
-    directedById = makeCandidateMap(fallback);
+    directedById = makeCandidateMap(fallback, false);
   }
   const directedPieces = [...directedById.values()].sort((a, b) => {
-    const rank = item => item.position ?? (-(item.combinedScore || 0));
+    const rank = item => item._rankPosition ?? (-(item.combinedScore || 0));
     return rank(a) - rank(b) ||
       (a.targetPosition || Infinity) - (b.targetPosition || Infinity) ||
       (a.piecePositionWithinTarget || Infinity) - (b.piecePositionWithinTarget || Infinity) ||
       String(a.title || a.id).localeCompare(String(b.title || b.id), 'ru');
-  }).slice(0, max);
+  }).slice(0, max).map(({ _rankPosition, ...piece }) => piece);
 
   directedPieces.filter(inTaskScope).forEach((piece, index) => {
     const item = ensure(piece.id);
