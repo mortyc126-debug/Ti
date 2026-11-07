@@ -136,6 +136,7 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
       if (htmlTag) lookupKeys.push(htmlTag[1]);
       const locations = [...new Map(
         lookupKeys.flatMap(key => termLocations.get(key) || [])
+          .filter(location => !htmlTag || location.section === 'html')
           .map(location => [location.section + '|' + location.key, location])
       ).values()];
       for (const location of locations) {
