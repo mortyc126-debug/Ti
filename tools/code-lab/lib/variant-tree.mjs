@@ -106,9 +106,14 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
   // точное совпадение → общее слово (js) → термин, у которого есть только конструкции с ним
   const resolve = (term, D, L) => {
     const t = String(term).toLowerCase().trim().replace(/^\.(?=[a-z])/, '').replace(/^<([a-z][\w-]*)>$/, (L === 'html' || L === 'svg') ? '$1' : '<$1>');   // синоним «<img>» ↔ запись словаря «img»
-    // Псевдоклассы, псевдоэлементы и at-rules принадлежат CSS, даже если
-    // одноимённая запись случайно присутствует в базовом JS-словаре.
-    if (/^[:@]/.test(t) && L !== 'css') return null;
+    // Псевдоклассы, псевдоэлементы и at-rules принадлежат CSS.
+    // Часть таких терминов лежит только в общем словаре W, а не в langs.css.
+    if (/^[:@]/.test(t)) {
+      if (L !== 'css') return null;
+      if (D[t]) return { key: t, rank: 1 };
+      if (W[t]) return { key: t, rank: 1.5 };
+      return null;
+    }
     if(D[t]) return { key: t, rank: 1 };
     if((L === 'html' || L === 'svg') && D['<' + t + '>']) return { key: '<' + t + '>', rank: 1 };
     if((L === 'js' || L === 'ts') && W[t]) return { key: t, rank: 1.5 };   // for, while — базовые слова языка
