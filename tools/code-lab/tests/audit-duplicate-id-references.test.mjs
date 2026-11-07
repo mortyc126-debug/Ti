@@ -35,3 +35,21 @@ try {
 } finally {
   await fs.rm(tmp, { recursive: true, force: true });
 }
+
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+const legacyAsyncId = 'асинхронная-функция-mvr80aci';
+const canonicalAsyncId = 'асинхронная_функция';
+const affectedTasks = [
+  'загрузить-данные-с-сервера-и-показать-на-mvsik8vv.json',
+  'отправить-форму-без-перезагрузки-страниц-mvsik8vv.json',
+  'подождать-перед-действием-и-повторять-де-mvt1k3c2.json'
+];
+for (const name of affectedTasks) {
+  const task = JSON.parse(await fs.readFile(path.join(projectRoot, 'tools', 'code-lab', 'tasks', name), 'utf8'));
+  const serialized = JSON.stringify(task);
+  assert.ok(serialized.includes(canonicalAsyncId), name + ': должна использоваться стабильная ссылка');
+  assert.ok(!serialized.includes(legacyAsyncId), name + ': старая ссылка должна быть заменена');
+}
+const canonicalPassport = JSON.parse(await fs.readFile(path.join(projectRoot, 'tools', 'code-lab', 'library', 'js', canonicalAsyncId + '.js.meta.json'), 'utf8'));
+assert.equal(canonicalPassport.id, canonicalAsyncId);
+console.log('canonical task references: 4 checks passed');
