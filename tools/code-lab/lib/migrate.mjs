@@ -84,7 +84,7 @@ export async function migrateTemplates({ src, out, dictPath, dict: suppliedDict 
     let langFiles = []; try { langFiles = (await fs.readdir(langDir)).filter(n => n.endsWith('.json')); } catch(_){}
     for(const file of langFiles){
       try {
-        const lang = file.replace(/\\.json$/i, '').toLowerCase();
+        const lang = file.replace(/\.json$/i, '').toLowerCase();
         const source = JSON.parse(await fs.readFile(path.join(langDir, file), 'utf8'));
         if(source && typeof source === 'object' && !Array.isArray(source)) dict.langs[lang] = Object.assign({}, dict.langs[lang] || {}, source);
       } catch(_){}
