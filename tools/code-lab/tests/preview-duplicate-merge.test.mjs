@@ -38,6 +38,14 @@ try {
   assert.equal(pair.candidatePassport.wordNotes.filter(note => note.kind === 'concept').length, 1);
   assert.equal(pair.review.sourcePassports.length, 2);
   assert.equal(pair.review.sourcePassports.find(x => x.id === 'canonical-piece').passport.extraField.keep, true);
+  assert.deepEqual(pair.review.provenanceMergeProposal.fields, [{
+    key: 'desc',
+    values: [
+      { file: 'js/canonical-piece.js', value: 'manual' },
+      { file: 'js/legacy-piece-mvr123abc.js', value: 'imported' }
+    ]
+  }]);
+  assert.equal(pair.review.componentSources.find(x => x.component)?.file, 'js/legacy-piece-mvr123abc.js');
   assert.equal(pair.review.importable, false);
   assert.ok(pair.review.fieldConflicts.some(field => field.field === 'extraField'));
   assert.ok(pair.review.fieldConflicts.some(field => field.field === 'wordNotes'));
