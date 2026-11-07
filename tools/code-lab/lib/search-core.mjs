@@ -108,7 +108,16 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
         ...(piece.matchedTargets || []),
         ...(targetMemberships.get(piece.id) || [])
       ]);
-      map.set(piece.id, { ...piece, matchedTargets: [...targets] });
+      const candidate = { ...piece, matchedTargets: [...targets] };
+      const previous = map.get(piece.id);
+      if (!previous || Number(candidate.combinedScore ?? candidate.score ?? 0) > Number(previous.combinedScore ?? previous.score ?? 0)) {
+        map.set(piece.id, {
+          ...candidate,
+          matchedTargets: [...new Set([...(previous?.matchedTargets || []), ...candidate.matchedTargets])]
+        });
+      } else {
+        previous.matchedTargets = [...new Set([...(previous.matchedTargets || []), ...candidate.matchedTargets])];
+      }
     }
     return map;
   };
@@ -132,7 +141,10 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
   }
   const directedPieces = [...directedById.values()].sort((a, b) => {
     const rank = item => item.position ?? (-(item.combinedScore || 0));
-    return rank(a) - rank(b) || String(a.title || a.id).localeCompare(String(b.title || b.id), 'ru');
+    return rank(a) - rank(b) ||
+      (a.targetPosition || Infinity) - (b.targetPosition || Infinity) ||
+      (a.piecePositionWithinTarget || Infinity) - (b.piecePositionWithinTarget || Infinity) ||
+      String(a.title || a.id).localeCompare(String(b.title || b.id), 'ru');
   }).slice(0, max);
 
   directedPieces.filter(inTaskScope).forEach((piece, index) => {
