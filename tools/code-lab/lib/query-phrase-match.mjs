@@ -7,15 +7,23 @@ const normalize = value => String(value == null ? '' : value)
 const STOP = new Set('и а но или что который которая которые которое это этот эта эти мне мне надо нужно хочу сделать сделай сделайте добавить добавь добавьте создать создай создайте чтобы который которая которое которые когда как'.split(' '));
 const NEGATION = new Set(['не', 'без', 'нельзя', 'запрещено', 'кроме']);
 const UNIQUE = values => [...new Set(values)];
-
+const TOKEN_CACHE = new Map();
+function cachedTokens(value) {
+  const key = normalize(value);
+  if (TOKEN_CACHE.has(key)) return TOKEN_CACHE.get(key);
+  const result = UNIQUE(terms(key).filter(token => token.length > 1 && !STOP.has(token)));
+  if (TOKEN_CACHE.size >= 30000) TOKEN_CACHE.delete(TOKEN_CACHE.keys().next().value);
+  TOKEN_CACHE.set(key, result);
+  return result;
+}
 export function queryTokens(value) {
-  return UNIQUE(terms(normalize(value)).filter(token => token.length > 1 && !STOP.has(token)));
+  return cachedTokens(value).slice();
 }
 
 export function matchQueryPhrase(query, phrase) {
   const q = normalize(query), p = normalize(phrase);
   if (!q || !p) return null;
-  const qt = queryTokens(q), pt = queryTokens(p);
+  const qt = cachedTokens(q), pt = cachedTokens(p);
   if (!qt.length || !pt.length) return null;
   const qNeg = qt.filter(token => NEGATION.has(token));
   const pNeg = pt.filter(token => NEGATION.has(token));
