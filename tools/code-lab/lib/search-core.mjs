@@ -34,7 +34,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
   const asksSpacing = /межбуквен|межстроч|интервал|перенос|пробел|высота строки/.test(q);
   const asksSorting = /сортир|упорядоч|sort/.test(q);
   const asksFile = /файл|путь|каталог|запис|write/.test(q);
-  const asksWriteData = /отправ|запис|созда|обнов|измен|сохран|post|put|patch/.test(q);
+  const asksWriteData = /отправ|запис|сохран|post|put|patch|передать на сервер|изменить данные|обновить данные/.test(q);
   const asksAuth = /авторизац|токен|учётн|учетн|credential|auth|доступ/.test(q);
   const asksImage = /изображен|картин|image|blob|bitmap|canvas/.test(q);
   const asksMarkup = /html|разметк|innerhtml|insertadjacenthtml/.test(q);
