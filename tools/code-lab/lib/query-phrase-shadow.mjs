@@ -26,6 +26,15 @@ function pieceMatchesTarget(targetKey, phrase, piece, usage) {
   const code = typeof usage?.pieceText === 'function' ? String(usage.pieceText(piece.id) || '') : '';
   if (!code) return true; // совместимость с изолированными тестовыми адаптерами
 
+  // Одного токена «a» недостаточно: в HTML он встречается в значениях атрибутов
+  // (например, label="A"). Теговая цель должна присутствовать именно как разметка.
+  const htmlTag = target.match(/^<([a-z][a-z0-9-]*)>$/);
+  if (htmlTag) {
+    const tag = htmlTag[1];
+    const tagPattern = new RegExp('<\\\\s*' + tag + '(?=[\\\\s/>])|<\\\\/\\\\s*' + tag + '\\\\s*>', 'i');
+    return normalize(piece.lang) === 'html' && tagPattern.test(code);
+  }
+
   // Ключи вроде display/open/join встречаются в посторонних конструкциях.
   // Здесь оставляем только тот синтаксический смысл, который описывает фраза.
   if (target === 'display' && (q === 'скрыть элемент' || q === 'скрыть элемент из потока')) return /\bdisplay\s*:\s*none\b/i.test(code);
