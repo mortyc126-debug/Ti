@@ -107,7 +107,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     item.desc = hit.desc || item.desc;
     item._lexicalRank = index + 1;
     item._rrf += 1 / (60 + index + 1);
-    if ((hit.why || []).some(reason => reason.in === 'название/описание' && reason.kind === 'exact')) item._rrf += 0.006;
+    if ((hit.why || []).some(reason => reason.in === 'название' && reason.kind === 'exact')) item._rrf += 0.006;
     else if ((hit.why || []).some(reason => reason.in === 'название/описание' && reason.kind === 'substring')) item._rrf += 0.003;
     if (!item.sources.includes('полнотекстовый поиск')) item.sources.push('полнотекстовый поиск');
     item.why.push({
