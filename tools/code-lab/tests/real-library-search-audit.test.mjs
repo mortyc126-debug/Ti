@@ -190,6 +190,7 @@ async function main() {
   assert.ok(taskTerms(linkQuery).some(x => x === 'a' || x === '<a>'), 'ссылка должна находиться как HTML-элемент a');
   assert.ok(taskTerms(linkQuery).some(x => x === 'href'), 'для ссылки должен находиться href');
   assert.ok(!taskTerms(linkQuery).some(x => /button/.test(x)), 'ссылка не должна подменяться кнопкой');
+  assert.equal(taskResultMap.get(linkQuery).pieces[0]?.title, 'Ссылка на другую страницу', 'точный библиотечный фрагмент ссылки должен быть выше общих совпадений');
   const details = taskResultMap.get(collapseQuery).roots.find(x => x.term === 'details');
   assert.ok(details, 'для раскрываемого блока должен находиться нативный details');
   assert.match(JSON.stringify(details.children), /summary/, 'внутри details должен показываться summary');
