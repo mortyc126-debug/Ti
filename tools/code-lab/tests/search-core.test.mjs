@@ -151,6 +151,34 @@ test('цель, отсутствующая среди ограниченных �
 });
 
 
+test('направленные цели добавляются в дерево перед общей группой и сохраняют порядок и фрагменты', () => {
+  const result = combineTaskSearch({
+    query: 'получить данные из двух источников и вывести их по блокам',
+    directed: {
+      hits: [
+        {
+          targetKey: 'fetch', score: 56,
+          phrases: [{ phrase: 'получить данные из нескольких источников', language: 'js', note: 'Выполнить запрос к источнику' }],
+          pieces: [{ id: 'fetch-piece', title: 'Запрос к источнику', lang: 'js', desc: 'Получить данные с сервера' }]
+        },
+        {
+          targetKey: 'Promise.all', score: 47,
+          phrases: [{ phrase: 'дождаться всех источников данных', language: 'js' }],
+          pieces: [{ id: 'promise-piece', title: 'Дождаться всех запросов', lang: 'js' }]
+        }
+      ],
+      rankedPieces: []
+    },
+    library: { hits: [] },
+    variants: { roots: [{ term: '', lang: 'js', group: true, label: 'куски из библиотеки', children: [] }] }
+  });
+  assert.deepEqual(result.roots.map(root => root.term), ['fetch', 'Promise.all', '']);
+  assert.equal(result.roots[0].children[0].piece, 'fetch-piece');
+  assert.equal(result.roots[0].note, 'Выполнить запрос к источнику');
+  assert.equal(result.roots[1].children[0].piece, 'promise-piece');
+  assert.deepEqual(result.targets.map(target => target.targetKey), ['fetch', 'Promise.all']);
+});
+
 test('фрагменты и связи восстанавливаются из целей, если агрегированный список пуст', () => {
   const result = combineTaskSearch({
     query: 'получить данные из двух источников',
