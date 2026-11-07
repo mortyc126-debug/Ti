@@ -89,31 +89,49 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     return byId.get(id);
   };
 
-  // Основной индекс обычно отдаёт уже объединённый rankedPieces. Но hit.pieces —
-  // первичный источник связей; подстраховываемся ими, если агрегированный список
-  // неполон или отсутствует, и сохраняем все цели, к которым относится фрагмент.
-  const directedById = new Map();
-  for (const piece of directed?.rankedPieces || []) {
-    if (!piece?.id) continue;
-    directedById.set(piece.id, { ...piece, matchedTargets: [...(piece.matchedTargets || [])] });
+  // Связи собираем из hit.pieces, но сам список кандидатов берём из rankedPieces:
+  // иначе широкий набор фрагментов одной цели вытеснит ранжирование теневого индекса.
+  const targetMemberships = new Map();
+  for (const hit of directed?.hits || []) {
+    for (const piece of hit.pieces || []) {
+      if (!piece?.id || !hit.targetKey) continue;
+      if (!targetMemberships.has(piece.id)) targetMemberships.set(piece.id, new Set());
+      targetMemberships.get(piece.id).add(hit.targetKey);
+    }
   }
-  for (const [targetIndex, hit] of (directed?.hits || []).entries()) {
-    for (const [pieceIndex, piece] of (hit.pieces || []).entries()) {
+  const rawRankedPieces = Array.isArray(directed?.rankedPieces) ? directed.rankedPieces : [];
+  const makeCandidateMap = source => {
+    const map = new Map();
+    for (const piece of source) {
       if (!piece?.id) continue;
-      const previous = directedById.get(piece.id);
-      if (previous) {
-        if (hit.targetKey && !previous.matchedTargets.includes(hit.targetKey)) previous.matchedTargets.push(hit.targetKey);
-      } else {
-        directedById.set(piece.id, {
+      const targets = new Set([
+        ...(piece.matchedTargets || []),
+        ...(targetMemberships.get(piece.id) || [])
+      ]);
+      map.set(piece.id, { ...piece, matchedTargets: [...targets] });
+    }
+    return map;
+  };
+  let directedById = makeCandidateMap(rawRankedPieces);
+  if (!directedById.size || ![...directedById.values()].some(inTaskScope)) {
+    // Резервный путь только при пустом/непригодном rankedPieces.
+    // Сохраняем порядок целей и релевантность фрагмента внутри каждой цели.
+    const fallback = [];
+    for (const [targetIndex, hit] of (directed?.hits || []).entries()) {
+      for (const [pieceIndex, piece] of (hit.pieces || []).entries()) {
+        if (!piece?.id) continue;
+        fallback.push({
           ...piece, targetKey: hit.targetKey, targetScore: hit.score,
           targetPosition: targetIndex + 1, piecePositionWithinTarget: pieceIndex + 1,
+          combinedScore: (Number(hit.score) || 0) * 1000 + (Number(piece.relevanceScore) || 0),
           matchedTargets: hit.targetKey ? [hit.targetKey] : []
         });
       }
     }
+    directedById = makeCandidateMap(fallback);
   }
   const directedPieces = [...directedById.values()].sort((a, b) => {
-    const rank = item => item.position ?? ((item.targetPosition || 999) * 1000 + (item.piecePositionWithinTarget || 999));
+    const rank = item => item.position ?? (-(item.combinedScore || 0));
     return rank(a) - rank(b) || String(a.title || a.id).localeCompare(String(b.title || b.id), 'ru');
   }).slice(0, max);
 
