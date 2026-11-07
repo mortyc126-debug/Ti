@@ -41,6 +41,18 @@ try {
   assert.match(pair.review.conceptNoteHandling, /not moved into candidate wordNotes/);
   assert.match(pair.review.noteConflictHandling, /no winner is selected/);
   assert.deepEqual(pair.review.componentMergeProposal.values.map(item => item.value), [null, { provides: ['a'] }]);
+  assert.deepEqual(pair.review.componentMergeProposal.nonConflicting, { provides: ['a'] });
+  assert.deepEqual(pair.review.componentMergeProposal.conflicts, []);
+  assert.equal(pair.review.componentMergeProposal.complete, true);
+  assert.deepEqual(pair.review.provenanceMergeProposal.nonConflicting, {});
+  assert.deepEqual(pair.review.provenanceMergeProposal.conflicts, [{
+    key: 'desc',
+    values: [
+      { file: 'js/canonical-piece.js', value: 'manual' },
+      { file: 'js/legacy-piece-mvr123abc.js', value: 'imported' }
+    ]
+  }]);
+  assert.equal(pair.review.provenanceMergeProposal.complete, false);
   assert.equal(preview.summary.conceptNotesMovedIntoCandidatePassport, 0);
   assert.equal(preview.summary.componentDataPreservedInSourcePassports, 1);
   assert.equal(preview.summary.provenanceSourcePassportsPreserved, 2);
