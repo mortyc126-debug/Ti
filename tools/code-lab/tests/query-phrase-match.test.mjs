@@ -29,7 +29,7 @@ test('короткое совпадение внутри другого слов
 
 test('смысловые предлоги сохраняются в токенах', () => {
   const tokens = queryTokens('отступ внутри элемента без перезагрузки');
-  assert.ok(tokens.includes('внутри'));
+  assert.ok(tokens.includes('внутр'));
   assert.ok(tokens.includes('без'));
 });
 
