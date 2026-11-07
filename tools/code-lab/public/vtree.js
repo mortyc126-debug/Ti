@@ -69,7 +69,7 @@
 
   function rowHtml(n, depth){
     const has = n.children && n.children.length;
-    const desc = n.piece ? '<span class="vt-d">кусок из библиотеки</span>'
+    const desc = n.piece ? '<span class="vt-d">' + (n.label ? esc(n.label) + ' · ' : '') + 'кусок из библиотеки</span>'
       : '<span class="vt-d">' + (n.label ? '<b>' + esc(n.label) + '</b>' + (n.note ? ' — ' : '') : '') + esc(n.note || '') + '</span>';
     return '<div class="vt-n"><div class="vt-r' + (n.piece ? ' vt-p' : '') + '" data-code="' + esc(n.code || '') + '" data-piece="' + esc(n.piece || '') + '">'
       + '<span class="vt-t">' + (has ? (depth === 0 ? '▸' : '▸') : '') + '</span>'
@@ -94,7 +94,7 @@
       if(!group){ group = { group: true, lang: l, label: 'Фрагменты библиотеки', note: 'Результаты по смысловым фразам и содержимому библиотеки', children: [] }; byLang.get(l).push(group); }
       group.children.push({
         term: piece.title, lang: l, code: '', note: piece.title,
-        label: piece.group || '', piece: piece.id, children: []
+        label: [piece.group, ...(piece.sources || [])].filter(Boolean).join(' · '), piece: piece.id, children: []
       });
     }
     if(!byLang.size){ body.innerHTML = '<div class="vt-none">подходящих конструкций и фрагментов не нашлось — попробуй уточнить действие или объект</div>'; return; }
