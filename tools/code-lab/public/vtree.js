@@ -73,7 +73,7 @@
       : '<span class="vt-d">' + (n.label ? '<b>' + esc(n.label) + '</b>' + (n.note ? ' — ' : '') : '') + esc(n.note || '') + '</span>';
     return '<div class="vt-n"><div class="vt-r' + (n.piece ? ' vt-p' : '') + '" data-code="' + esc(n.code || '') + '" data-piece="' + esc(n.piece || '') + '">'
       + '<span class="vt-t">' + (has ? (depth === 0 ? '▸' : '▸') : '') + '</span>'
-      + '<span class="vt-m' + (order === 'note' ? ' note-first' : '') + '"><span class="vt-c">' + (n.piece ? esc(n.note) : paint(n.code || n.show || n.term, n.lang)) + '</span>' + desc + '</span></div>'
+      + '<span class="vt-m' + (order === 'note' ? ' note-first' : '') + '"><span class="vt-c">' + (n.piece ? esc(n.note) : n.show ? esc(n.show) : paint(n.code || n.term, n.lang)) + '</span>' + desc + '</span></div>'
       + (has ? '<div class="vt-kids" hidden>' + n.children.map(c => rowHtml(c, depth + 1)).join('') + '</div>' : '') + '</div>';
   }
 
