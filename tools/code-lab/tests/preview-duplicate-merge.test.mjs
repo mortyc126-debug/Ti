@@ -18,17 +18,32 @@ try {
   await fs.writeFile(path.join(library, 'js', 'legacy-piece-mvr123abc.js.meta.json'), JSON.stringify(first));
   await fs.writeFile(path.join(library, 'js', 'canonical-piece.js'), code);
   await fs.writeFile(path.join(library, 'js', 'canonical-piece.js.meta.json'), JSON.stringify(second));
+
+  const conflictCode = 'function run() { return 2; }\\n';
+  const conflictHash = crypto.createHash('sha256').update(conflictCode.trim()).digest('hex');
+  const conflictLegacy = { id: 'legacy-conflict-mvr123xyz', component: { provides: ['first'] } };
+  const conflictCanonical = { id: 'canonical-conflict', component: { provides: ['second'] } };
+  await fs.writeFile(path.join(library, 'js', 'legacy-conflict-mvr123xyz.js'), conflictCode);
+  await fs.writeFile(path.join(library, 'js', 'legacy-conflict-mvr123xyz.js.meta.json'), JSON.stringify(conflictLegacy));
+  await fs.writeFile(path.join(library, 'js', 'canonical-conflict.js'), conflictCode);
+  await fs.writeFile(path.join(library, 'js', 'canonical-conflict.js.meta.json'), JSON.stringify(conflictCanonical));
+
   const manifestPath = path.join(tmp, 'manifest.json'), outputPath = path.join(tmp, 'preview.json');
-  const manifest = { pairs: [{ pair: 1, codeIdentical: true, codeHash: hash, canonical: { file: 'js/canonical-piece.js', id: 'canonical-piece' }, legacyIds: [{ id: 'legacy-piece-mvr123abc', redirectTo: 'canonical-piece' }], files: [
-    { file: 'js/legacy-piece-mvr123abc.js', id: first.id }, { file: 'js/canonical-piece.js', id: second.id }
-  ], notes: { anchorConflicts: [] }, urls: { union: [] } }] };
+  const manifest = { pairs: [
+    { pair: 1, codeIdentical: true, codeHash: hash, canonical: { file: 'js/canonical-piece.js', id: 'canonical-piece' }, legacyIds: [{ id: 'legacy-piece-mvr123abc', redirectTo: 'canonical-piece' }], files: [
+      { file: 'js/legacy-piece-mvr123abc.js', id: first.id }, { file: 'js/canonical-piece.js', id: second.id }
+    ], notes: { anchorConflicts: [] }, urls: { union: [] } },
+    { pair: 2, codeIdentical: true, codeHash: conflictHash, canonical: { file: 'js/canonical-conflict.js', id: 'canonical-conflict' }, legacyIds: [{ id: conflictLegacy.id, redirectTo: conflictCanonical.id }], files: [
+      { file: 'js/legacy-conflict-mvr123xyz.js', id: conflictLegacy.id }, { file: 'js/canonical-conflict.js', id: conflictCanonical.id }
+    ], notes: { anchorConflicts: [] }, urls: { union: [] } }
+  ] };
   await fs.writeFile(manifestPath, JSON.stringify(manifest));
   const scriptPath = fileURLToPath(new URL('../scripts/preview-duplicate-merge.mjs', import.meta.url));
   const run = spawnSync(process.execPath, [scriptPath, library, manifestPath, outputPath], { encoding: 'utf8' });
   assert.equal(run.status, 0, run.stderr || run.stdout);
   const preview = JSON.parse(await fs.readFile(outputPath, 'utf8'));
   const pair = preview.pairs[0];
-  assert.equal(preview.summary.verifiedCodePairs, 1);
+  assert.equal(preview.summary.verifiedCodePairs, 2);
   assert.equal(pair.candidatePassport.id, 'canonical-piece');
   assert.equal(pair.candidatePassport.desc, 'Подробное описание конструкции.');
   assert.equal(Object.hasOwn(pair.candidatePassport, 'component'), false);
@@ -60,6 +75,18 @@ try {
   assert.equal(preview.summary.provenanceFieldConflicts, 1);
   assert.equal(preview.summary.componentMergeCompletePairs, 1);
   assert.equal(preview.summary.provenanceMergeCompletePairs, 0);
+  const componentConflict = preview.pairs[1].review.componentMergeProposal;
+  assert.equal(componentConflict.complete, false);
+  assert.deepEqual(componentConflict.nonConflicting, {});
+  assert.deepEqual(componentConflict.conflicts, [{
+    key: 'provides',
+    values: [
+      { file: 'js/canonical-conflict.js', value: ['second'] },
+      { file: 'js/legacy-conflict-mvr123xyz.js', value: ['first'] }
+    ]
+  }]);
+  assert.equal(preview.summary.componentFieldConflicts, 1);
+  assert.equal(preview.summary.componentMergeCompletePairs, 1);
   assert.equal(pair.review.sourcePassports.length, 2);
   assert.equal(pair.review.sourcePassports.find(x => x.id === 'canonical-piece').passport.extraField.keep, true);
   assert.deepEqual(pair.review.provenanceMergeProposal.fields, [{
