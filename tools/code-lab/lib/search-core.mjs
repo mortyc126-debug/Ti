@@ -47,9 +47,14 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
   const asksAttributes = /атрибут/.test(q);
   const asksFirstSuccess = /любой один|первый успешн|хотя бы один|promise\.any/.test(q);
   const asksTesting = /тест|mock|msw|playwright|jest|vitest|мок/.test(q);
+  const asksForm = /форм|submit|отправк|поле/.test(q);
+  const asksResourceLink = /css|stylesheet|шрифт|подключ.*файл|ресурс/.test(q);
+  const asksImageMap = /карт|изображ|image map|карта изображ/.test(q);
+  const asksMessageGroup = /сообщен|чат|message|chat/.test(q);
   const pieceCompatible = item => {
     const text = normalize([item?.title, item?.group, item?.desc, ...(item?.tags || []), ...(item?.aliases || [])].filter(Boolean).join(' '));
     if (buttonTask && !asksGamepad && /геймпад|gamepad/.test(text)) return false;
+    if (buttonTask && !asksForm && /форма|formdata|submit|отправк формы/.test(text)) return false;
     if (webTask && !asksServiceWorker && /service worker|web worker/.test(text)) return false;
     if (linkTask && !/файл|каталог|путь|символическ|symlink|filesystem|linux|unix/.test(q) && /символическ.*ссылк|symbolic link|symlink|удаление файла/.test(text)) return false;
     if (collapseTask && !hasCollectionObject && /свёртк|свертк|свернуть в одно значение|reduce|массив|список элементов/.test(text)) return false;
@@ -59,6 +64,8 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     if (buttonTask && !/отлад|devtools|inspect|диагност/.test(q) && /geteventlisteners|devtools/.test(text)) return false;
     if (buttonTask && !/всплыти|распростран|bubbling|propagation/.test(q) && /stoppropagation|остановить распространение/.test(text)) return false;
     if (linkTask && !asksServiceWorker && /service worker|кэш сразу|кеш сразу/.test(text)) return false;
+    if (linkTask && !asksResourceLink && /style\.css|stylesheet|google fonts|подключить css/.test(text)) return false;
+    if (linkTask && !asksImageMap && /карта областей изображения|image map|image-map/.test(text)) return false;
     if (linkTask && !/worker|данн|json|api|fetch|запрос|сохран|сериализ/.test(q) && /web worker|service worker|сериализуем|передача больших данных|обработка данных/.test(text)) return false;
     if (linkTask && !/динамич|вставить|заменить|создать элемент/.test(q) && /insertadjacenthtml|replacechildren/.test(text)) return false;
     if (headingTask && !buttonTask && /кнопк/.test(text)) return false;
@@ -66,6 +73,8 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     if (hoverTask && !asksSorting && /sort(?:ed|ing)?|сортир/.test(text)) return false;
     if (hoverTask && headingTask && !/список|маркер|list/.test(q) && /маркер списка|list marker/.test(text)) return false;
     if (collapseTask && !/свер|раскры|toggle|переключ|панел|sidebar|aside|details|summary|hidden|aria-expanded|display|visibility|overflow|classlist|скрыть|закрыть/.test(text)) return false;
+    if (collapseTask && !asksMessageGroup && /групп.*сообщен|сообщен.*групп|message group|chat group/.test(text)) return false;
+    if (collapseTask && !asksFile && /канонический путь|symbolic link|symlink|файловый путь/.test(text)) return false;
     if (webTask && !asksFile && (text.includes('document.write') || /записать файл/.test(text))) return false;
     if (multiSourceTask && /источник узла|идентификатор источника узла|заголовок источника узла|описание источника узла/.test(text) && !/dom|узел|node/.test(q)) return false;
     if (multiSourceTask && /узл|node|indexeddb|localstorage|sessionstorage|ковариац|корреляц|статист/.test(text) && !/dom|узел|node|indexeddb|localstorage|хранилищ|корреляц|статист|ряд/.test(q)) return false;
@@ -84,6 +93,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     if (webTask && key === 'get' && !/форма|method|http|метод get|способ отправки/.test(q)) return false;
     if (webTask && key === 'list' && !/input|datalist|поле ввода|список вариантов|подсказк/.test(q)) return false;
     if (buttonTask && !asksMouse && key.includes('event.button')) return false;
+    if (buttonTask && !asksForm && key === 'form') return false;
     if (key === 'disabled' && !/отключ|заблок|неактив|запрет|disable/.test(q)) return false;
     if (key === 'event.target' && !/делегир|всплыти|распростран|event.target|нажатый элемент|определить элемент/.test(q)) return false;
     if (hoverTask && key === 'textcontent' && !/изменить текст|обновить текст|заменить текст|текст при наведении/.test(q)) return false;
