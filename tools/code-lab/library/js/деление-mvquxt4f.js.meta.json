@@ -5,7 +5,7 @@
   "lang": "js",
   "title": "Деление",
   "group": "Числа и математика / Арифметика и округление",
-  "desc": "",
+  "desc": "Делит одно число на другое оператором /. Результат может быть дробным; при делении на ноль JavaScript возвращает Infinity или NaN в зависимости от числителя.",
   "output": "",
   "descAt": 1793115948975,
   "component": {
@@ -23,7 +23,7 @@
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 7,

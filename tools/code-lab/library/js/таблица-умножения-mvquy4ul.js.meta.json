@@ -5,7 +5,7 @@
   "lang": "js",
   "title": "Таблица умножения",
   "group": "Основы языка / Циклы и итераторы",
-  "desc": "",
+  "desc": "Выводит первые пять строк таблицы умножения для заданного числа с помощью цикла for.",
   "output": "",
   "descAt": 1793115964173,
   "component": {
@@ -22,7 +22,7 @@
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 5,

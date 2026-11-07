@@ -5,7 +5,7 @@
   "lang": "js",
   "title": "Фильтрация массива",
   "group": "Данные / Массивы и коллекции",
-  "desc": "",
+  "desc": "Создаёт новый массив из элементов, для которых функция-предикат возвращает true; в примере остаются чётные числа.",
   "output": "",
   "descAt": 1793115965978,
   "component": {
@@ -22,7 +22,7 @@
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 5,

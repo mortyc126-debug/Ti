@@ -5,7 +5,7 @@
   "lang": "js",
   "title": "Округление чисел",
   "group": "Числа и математика / Арифметика и округление",
-  "desc": "",
+  "desc": "Показывает разные способы округления: Math.round до ближайшего целого, Math.floor вниз, Math.ceil вверх и toFixed для получения строки с заданным числом знаков после точки.",
   "output": "",
   "descAt": 1793115954391,
   "component": {
@@ -21,7 +21,7 @@
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 8,

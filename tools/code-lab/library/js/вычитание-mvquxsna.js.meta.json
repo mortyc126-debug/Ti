@@ -5,7 +5,7 @@
   "lang": "js",
   "title": "Вычитание",
   "group": "Числа и математика / Арифметика и округление",
-  "desc": "",
+  "desc": "Вычитает второе число из первого оператором -.",
   "output": "",
   "descAt": 1793115948358,
   "component": {
@@ -23,7 +23,7 @@
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 5,

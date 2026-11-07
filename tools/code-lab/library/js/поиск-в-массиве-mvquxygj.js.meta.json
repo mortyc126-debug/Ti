@@ -5,7 +5,7 @@
   "lang": "js",
   "title": "Поиск в массиве",
   "group": "Данные / Массивы и коллекции",
-  "desc": "",
+  "desc": "Показывает поиск первого подходящего элемента через find, получение его индекса через findIndex и проверку наличия значения через includes.",
   "output": "",
   "descAt": 1793115955892,
   "component": {
@@ -21,7 +21,7 @@
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 5,

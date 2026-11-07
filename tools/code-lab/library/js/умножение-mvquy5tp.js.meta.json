@@ -5,7 +5,7 @@
   "lang": "js",
   "title": "Умножение",
   "group": "Числа и математика / Арифметика и округление",
-  "desc": "",
+  "desc": "Умножает два числа оператором *.",
   "output": "",
   "descAt": 1793115965437,
   "component": {
@@ -23,7 +23,7 @@
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 5,

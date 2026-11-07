@@ -5,7 +5,7 @@
   "lang": "js",
   "title": "Преобразование массива",
   "group": "Данные / Массивы и коллекции",
-  "desc": "",
+  "desc": "Создаёт новый массив, применяя функцию к каждому элементу через map. Исходный массив при этом не изменяется.",
   "output": "",
   "descAt": 1793115956882,
   "component": {
@@ -22,7 +22,7 @@
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 7,

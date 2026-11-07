@@ -5,7 +5,7 @@
   "lang": "js",
   "title": "Свёртка массива",
   "group": "Данные / Массивы и коллекции",
-  "desc": "",
+  "desc": "Сводит массив к одному значению через reduce; в примере перемножает все элементы, начиная с начального значения 1.",
   "output": "",
   "descAt": 1793115960385,
   "component": {
@@ -24,7 +24,7 @@
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 7,

@@ -5,7 +5,7 @@
   "lang": "js",
   "title": "Цикл for",
   "group": "Основы языка / Синтаксис",
-  "desc": "",
+  "desc": "Повторяет блок с помощью счётчика от 1 до 5. Инициализация, условие продолжения и шаг цикла задаются в заголовке for.",
   "output": "",
   "descAt": 1793115966509,
   "component": {
@@ -21,7 +21,7 @@
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 5,

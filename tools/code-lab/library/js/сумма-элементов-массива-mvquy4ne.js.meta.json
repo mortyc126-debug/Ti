@@ -5,7 +5,7 @@
   "lang": "js",
   "title": "Сумма элементов массива",
   "group": "Числа и математика / Статистика",
-  "desc": "",
+  "desc": "Складывает все элементы массива в одно значение с помощью reduce, начиная с нуля.",
   "output": "",
   "descAt": 1793115963914,
   "component": {
@@ -24,7 +24,7 @@
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 8,

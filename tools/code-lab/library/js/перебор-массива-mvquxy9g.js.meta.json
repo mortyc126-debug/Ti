@@ -5,7 +5,7 @@
   "lang": "js",
   "title": "Перебор массива",
   "group": "Данные / Перебор, фильтр, сортировка",
-  "desc": "",
+  "desc": "Показывает два способа перебрать массив: forEach передаёт обработчику элемент и индекс, а for...of последовательно выдаёт сами значения.",
   "output": "",
   "descAt": 1793115955636,
   "component": {
@@ -22,7 +22,7 @@
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 5,

@@ -5,7 +5,7 @@
   "lang": "js",
   "title": "Сложение",
   "group": "Числа и математика / Арифметика и округление",
-  "desc": "",
+  "desc": "Складывает два числа оператором +. В JavaScript этот же оператор может соединять строки.",
   "output": "",
   "descAt": 1793115961136,
   "component": {
@@ -23,7 +23,7 @@
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 7,

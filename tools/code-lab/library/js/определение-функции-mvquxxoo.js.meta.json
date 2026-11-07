@@ -5,7 +5,7 @@
   "lang": "js",
   "title": "Определение функции",
   "group": "Основы языка / Функции",
-  "desc": "",
+  "desc": "Объявляет обычную функцию через function и стрелочную функцию через =>, затем вызывает обе и выводит результаты.",
   "output": "",
   "descAt": 1793115954888,
   "component": {
@@ -22,7 +22,7 @@
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 7,

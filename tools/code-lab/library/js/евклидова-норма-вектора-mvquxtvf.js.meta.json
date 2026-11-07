@@ -5,7 +5,7 @@
   "lang": "js",
   "title": "Евклидова норма вектора",
   "group": "Числа и математика / Векторы и матрицы",
-  "desc": "",
+  "desc": "Вычисляет евклидову длину вектора как квадратный корень из суммы квадратов его координат.",
   "output": "",
   "descAt": 1793115949947,
   "component": {
@@ -24,7 +24,7 @@
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 7,
