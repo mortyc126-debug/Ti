@@ -44,7 +44,7 @@ test('показывает продолжения конструкции из о
   const result = buildVariants({ q: 'if', lang: 'js', dict, rows: [], synonyms: {} });
   const root = result.roots.find(x => x.term === 'if');
   assert.ok(root, 'корень if должен находиться');
-  const group = root.children.find(x => x.group && x.label === 'Варианты продолжения');
+  const group = root.children.find(x => x.group && x.label === 'Следует после');
   assert.ok(group, 'у if должна быть группа продолжений');
   const terms = group.children.map(x => x.term);
   assert.ok(terms.includes('else'), 'else доступен после if');
@@ -56,7 +56,7 @@ test('показывает продолжения конструкции из о
 test('показывает допустимые части конструкции отдельно от синонимов', () => {
   const result = buildVariants({ q: 'try', lang: 'js', dict, rows: [], synonyms: {} });
   const root = result.roots.find(x => x.term === 'try');
-  const group = root.children.find(x => x.group && x.label === 'Варианты продолжения');
+  const group = root.children.find(x => x.group && x.label === 'Состав конструкции');
   assert.ok(group);
   assert.deepEqual(group.children.map(x => x.term).sort(), ['catch', 'finally']);
 });
@@ -64,7 +64,7 @@ test('показывает допустимые части конструкци�
 test('показывает условия применения конструкции', () => {
   const result = buildVariants({ q: 'await', lang: 'js', dict, rows: [], synonyms: {} });
   const root = result.roots.find(x => x.term === 'await');
-  const group = root.children.find(x => x.group && x.label === 'Условия применения');
+  const group = root.children.find(x => x.group && x.label === 'Расположение внутри');
   assert.ok(group);
   assert.match(group.children[0].show, /внутри: async/);
   assert.match(group.children[0].note, /только внутри async-функции/);
@@ -73,6 +73,6 @@ test('показывает условия применения конструк�
 test('не смешивает правила продолжения разных языков', () => {
   const result = buildVariants({ q: 'if', lang: 'python', dict, rows: [], synonyms: {} });
   const root = result.roots.find(x => x.term === 'if');
-  const group = root.children.find(x => x.group && x.label === 'Варианты продолжения');
+  const group = root.children.find(x => x.group && x.label === 'Следует после');
   assert.deepEqual(group.children.map(x => x.term).sort(), ['elif', 'else']);
 });
