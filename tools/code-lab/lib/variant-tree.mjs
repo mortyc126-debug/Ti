@@ -197,7 +197,7 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
       if(r.verb === 'внутри' && own)
         r.args.forEach(a => add('внутри', term + ' находится внутри ' + a, r, a, L, true));
       if(r.verb === 'внутри' && refs.includes(key) && exists(r.term))
-        add('содержит', r.term + ' может содержать ' + term, r, r.term, L, true);
+        add('содержит', term + ' содержит ' + r.term, r, r.term, L, true);
       if(r.verb === 'не внутри' && own)
         r.args.forEach(a => add('не внутри', term + ' нельзя размещать внутри ' + a, r, a));
       if(r.verb === 'содержит' && own)
