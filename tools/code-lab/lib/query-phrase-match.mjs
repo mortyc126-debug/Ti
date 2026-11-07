@@ -71,6 +71,11 @@ function contextConflict(query, phrase, targetKey) {
   if ((target === 'open' || target.startsWith('open(') || /read_csv|readfile|read_file|writefile|write_file/.test(target)) && qUi && !/файл|путь|каталог|csv|кодиров|прочит|запис|открыть файл/.test(q)) return true;
   if ((target === 'str' || target === 'string' || target === 's*n') && qUi && !/строк|тип str|преобразовать|умножить строку/.test(q)) return true;
   if (target === 'headers' && /шапк|заголов/.test(q) && !/http|запрос|ответ|заголовки http/.test(q)) return true;
+  if ((target === 'pre' || target === '<pre>') && qUi && !/код|пример|предформат/.test(q)) return true;
+  if (target === 'value' && qUi && !/поле|input|значение|выбран|ввод/.test(q)) return true;
+  if (target === 'from' && qUi && !/импорт|модул|from\\s/.test(q)) return true;
+  if (target === 'number' && qUi && !/число|числов|number|количеств/.test(q)) return true;
+  if (target === 'select' && qUi && !/выбрать|выпадающ|список вариантов|select|поле выбора/.test(q)) return true;
   const qCollapse = /свер|раскры|открыть|collapse|expand/.test(q);
   if ((target === 'div' || target === '<div>') && qCollapse && !/раскрывающ|свернуть блок|раскрыть блок|toggle|aria-expanded/.test(p)) return true;
   const qVisual = /цвет|фон|тень|скруг|подсвет|границ|анимац|плавн|прозрачн|шрифт|размер|отступ/.test(q);
