@@ -215,3 +215,25 @@ test('языковой алиас javascript не отбрасывается и�
   assert.equal(result.counts.directedPieces, 1);
   assert.equal(result.pieces[0].lang, 'javascript');
 });
+
+
+test('общий фрагмент сохраняет все цели и лучший ранг при резервном объединении', () => {
+  const result = combineTaskSearch({
+    query: 'получить данные из двух источников',
+    directed: {
+      hits: [
+        { targetKey: 'fetch', score: 40, pieces: [
+          { id: 'shared', title: 'Общий пример', lang: 'js', relevanceScore: 3 }
+        ] },
+        { targetKey: 'Promise.all', score: 60, pieces: [
+          { id: 'shared', title: 'Общий пример', lang: 'js', relevanceScore: 8 }
+        ] }
+      ],
+      rankedPieces: []
+    },
+    library: { hits: [] },
+    variants: { roots: [] }
+  });
+  assert.deepEqual(result.pieces[0].matchedTargets, ['fetch', 'Promise.all']);
+  assert.equal(result.pieces[0].targetScore, 60);
+});
