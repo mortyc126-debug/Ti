@@ -63,3 +63,12 @@ test('смысловые предлоги сохраняются в токена
 });
 
 console.log('query-phrase-match: all tests passed');
+
+
+test('одно общее существительное не связывает несопоставимые конструкции', () => {
+  assert.equal(matchQueryPhrase('свернуть блок', 'таблица блоков', 'grid'), null);
+  assert.equal(matchQueryPhrase('свернуть блок', 'высота блока', 'height'), null);
+  assert.equal(matchQueryPhrase('сделать надпись ссылкой на другую страницу', 'текст как на странице', 'innerText'), null);
+  assert.equal(matchQueryPhrase('подсветить текст заголовка в шапке при наведении', 'получить текст блока', 'textContent'), null);
+  assert.ok(matchQueryPhrase('получить данные из двух источников', 'получить данные из нескольких источников', 'fetch'));
+});
