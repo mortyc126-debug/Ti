@@ -69,7 +69,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     if (multiSourceTask && !asksImage && /декодирован.*изображ|imagebitmap|blob|пиксел.*canvas/.test(text)) return false;
     if (multiSourceTask && !asksMarkup && /insertadjacenthtml|innerhtml|вставить html/.test(text)) return false;
     if (multiSourceTask && !asksAttributes && /атрибут|attributes/.test(text)) return false;
-    if (multiSourceTask && !asksTesting && /\\bmsw\\b|mock|подменить ответ сервера|сервер подмен/.test(text)) return false;
+    if (multiSourceTask && !asksTesting && /msw|mock|подменить ответ сервера|сервер подмен/.test(text)) return false;
     if (multiSourceTask && !asksFirstSuccess && /promise\.any|первый успешный промис/.test(text)) return false;
     return true;
   };
