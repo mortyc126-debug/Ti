@@ -219,6 +219,7 @@ async function main() {
   assert.ok(!taskResultMap.get(linkQuery).pieces.some(x => /символическ.*ссылк|удаление файла/i.test(x.title)), 'не подмешивать файловые ссылки к HTML-ссылке');
   assert.ok(!taskResultMap.get(collapseQuery).pieces.some(x => /Свёртка массива|свернуть в одно значение|gl\.useProgram|экранной клавиатур/i.test(x.title)), 'не подмешивать свёртку массива и посторонние UI-фрагменты к раскрываемому блоку');
   assert.ok(taskTerms(buttonQuery).some(x => /button/.test(x)), 'кнопка должна находиться в HTML');
+  assert.ok(taskTerms(buttonQuery).some(x => x === '<button>' || x === 'button'), 'HTML-цель кнопки должна связываться с фрагментами библиотеки');
   assert.ok(taskTerms(buttonQuery).some(x => /addeventlistener|click/.test(x)), 'для кнопки должен находиться обработчик события');
   assert.ok(taskTerms(buttonQuery).some(x => /alert|textcontent|innertext/.test(x)), 'должен находиться способ показать сообщение');
   assert.ok(!taskResultMap.get(buttonQuery).pieces.some(x => /геймпад|gamepad|keydown|keyup|клавиатур/.test(x.title)), 'не подмешивать игровые и клавиатурные кнопки');
@@ -230,6 +231,7 @@ async function main() {
   assert.ok(!taskResultMap.get(linkQuery).pieces.some(x => /Web Worker|Service Worker|сериализуем|replaceChildren|insertAdjacentHTML/i.test(x.title)), 'не подмешивать worker и динамическую вставку к обычной ссылке');
   const details = taskResultMap.get(collapseQuery).roots.find(x => x.term === 'details');
   assert.ok(details, 'для раскрываемого блока должен находиться нативный details');
+  assert.ok(taskTerms(collapseQuery).some(x => x === '<details>' || x === 'details'), 'HTML-цель details должна связываться с фрагментами библиотеки');
   assert.match(JSON.stringify(details.children), /summary/, 'внутри details должен показываться summary');
   assert.ok(taskTerms(hoverQuery).some(x => x === ':hover'), 'для наведения должен находиться :hover');
   assert.ok(taskTerms(hoverQuery).some(x => x === 'color'), 'для подсветки должен находиться цвет текста');
