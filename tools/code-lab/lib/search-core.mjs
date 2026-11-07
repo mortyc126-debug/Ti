@@ -271,7 +271,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
       sections: hit.sections || [],
       pieceCount: matchedPieces.length,
       rootTerm: root?.term || hit.targetKey,
-      rootLang: canonicalLanguage(root?.lang || matchedPieces[0]?.lang || '') || null
+      rootLang: (/^[:@]/.test(canonicalTerm(hit.targetKey)) ? 'css' : '') || canonicalLanguage(root?.lang || matchedPieces[0]?.lang || '') || null
     };
   });
 
