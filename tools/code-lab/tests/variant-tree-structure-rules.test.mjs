@@ -111,7 +111,9 @@ test('связи между языками сохраняются как отд�
   const result = buildVariants({ q: 'id', lang: 'html', dict, rows: [], synonyms: {} });
   const group = groupFor(result, 'id', 'Связи с другими языками');
   assert.ok(group.children.some(x => x.lang === 'css' && /#\\*/.test(x.show)));
+  assert.ok(group.children.some(x => x.lang === 'css' && x.term === '#*'), 'CSS-цель должна быть узлом, а не только текстом');
   assert.ok(group.children.some(x => x.lang === 'js' && /getElementById/.test(x.show)));
+  assert.ok(group.children.some(x => x.lang === 'js' && x.term === 'getelementbyid'), 'JS-вызов должен вести к словарному узлу метода');
 });
 
 test('запрет контекста, зависимости, чтение данных и заметка имеют свои типы', () => {
@@ -123,6 +125,7 @@ test('запрет контекста, зависимости, чтение да
   const reader = buildVariants({ q: 'reader', lang: 'js', dict, rows: [], synonyms: {} });
   const reads = groupFor(reader, 'reader', 'Читаемые данные');
   assert.ok(reads.children.some(x => /fetch/.test(x.show)));
+  assert.ok(reads.children.some(x => x.term === 'fetch' && x.lang === 'js'), 'источник чтения должен вести к узлу fetch');
   const header = buildVariants({ q: 'header', lang: 'html', dict, rows: [], synonyms: {} });
   const notes = groupFor(header, 'header', 'Пояснения');
   assert.ok(notes.children.some(x => /семантическая шапка/.test(x.show)));
