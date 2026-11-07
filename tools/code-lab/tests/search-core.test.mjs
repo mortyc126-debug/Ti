@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { combineTaskSearch } from '../lib/search-core.mjs';
+import { combineTaskSearch, inferTaskScope } from '../lib/search-core.mjs';
 
 test('объединяет направленные фразы и полнотекстовые фрагменты без потери источников', () => {
   const result = combineTaskSearch({
@@ -255,4 +255,11 @@ test('языковая область фильтруется до лимита, 
   });
   assert.equal(result.pieces.length, 1);
   assert.equal(result.pieces[0].id, 'js-second');
+});
+
+
+test('область задачи распознаёт веб-сборку и не путает её с задачей по массивам', () => {
+  assert.equal(inferTaskScope('Добавить кнопку, которая показывает сообщение при нажатии'), 'web');
+  assert.equal(inferTaskScope('Свернуть массив в одно значение'), '');
+  assert.equal(inferTaskScope('Python: получить элемент списка'), '');
 });
