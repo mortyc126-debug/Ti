@@ -38,11 +38,13 @@ function contextConflict(query, phrase, targetKey) {
   const qLetters = /межбуквен|букв/.test(q), qLines = /межстроч|межстрочн|строк/.test(q);
   const pLetters = /межбуквен|букв/.test(p), pLines = /межстроч|межстрочн|строк/.test(p);
   if ((qLetters && !qLines && pLines && !pLetters) || (qLines && !qLetters && pLetters && !pLines)) return true;
-  const qPreserve = /сохрани|оставить место|не терять место/.test(q);
+  const qPreserve = /сохрани|оставить место|не терять место|без удаления места/.test(q);
   const qFlow = /из потока|убрать из потока/.test(q);
-  const pPreserve = /сохрани|оставить место|не терять место/.test(p);
+  const pPreserve = /сохрани|оставить место|не терять место|без удаления места/.test(p);
   const pFlow = /из потока|убрать из потока/.test(p);
   if ((qPreserve && !qFlow && pFlow && !pPreserve) || (qFlow && !qPreserve && pPreserve && !pFlow)) return true;
+  if (target.startsWith('display') && qPreserve && !pPreserve) return true;
+  if (target.startsWith('visibility') && qFlow && !pFlow) return true;
   const qHover = /наведен|hover/.test(q), qClick = /нажат|клик|click/.test(q);
   const pHover = /наведен|hover/.test(p), pClick = /нажат|клик|click/.test(p);
   if ((qHover && !qClick && pClick && !pHover) || (qClick && !qHover && pHover && !pClick)) return true;
