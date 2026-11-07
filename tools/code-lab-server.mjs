@@ -18,7 +18,7 @@ import { createConceptStore } from './code-lab/lib/concept-store.mjs';
 import { buildLegacyQueryPhraseImport } from './code-lab/lib/query-phrase-import.mjs';
 import { createLegacyQueryPhraseShadow } from './code-lab/lib/query-phrase-shadow.mjs';
 import { CONCEPT_RELATIONS } from './code-lab/lib/concept-model.mjs';
-import { rollbackRestore, prepareRestoreTransaction, markRestoreTransaction, recoverRestoreTransactions } from './code-lab/lib/restore-transaction.mjs';
+import { rollbackRestore, prepareRestoreTransaction, markRestoreTransaction, recoverRestoreTransactions, syncRestoreFile, syncRestoreDirectory } from './code-lab/lib/restore-transaction.mjs';
 import { createSearchService } from './code-lab/lib/search.mjs';
 import { combineTaskSearch, inferTaskScope } from './code-lab/lib/search-core.mjs';
 import { tokenize } from './code-lab/lib/tokenizer.mjs';   // токенайзер отдельно — его удобнее тестировать
@@ -1388,6 +1388,9 @@ const server = http.createServer(async (req, res) => {
           const backupPath = path.join(backupRoot, op.rel);
           await fs.mkdir(path.dirname(backupPath), { recursive: true });
           await fs.copyFile(op.abs, backupPath);
+          // Резервная копия должна стать устойчивой ДО публикации журнала.
+          await syncRestoreFile(fs, backupPath);
+          await syncRestoreDirectory(fs, path.dirname(backupPath));
           backups.set(op.abs, backupPath);
         }
         await prepareRestoreTransaction({ fs, backupRoot, root: LIBRARY, rootName: 'library', writes, deletions, backups });
@@ -1399,8 +1402,10 @@ const server = http.createServer(async (req, res) => {
           written.push(op);
           await fs.mkdir(path.dirname(op.abs), { recursive: true });
           await fs.writeFile(op.abs, op.text, 'utf8');
+          await syncRestoreFile(fs, op.abs);
+          await syncRestoreDirectory(fs, path.dirname(op.abs));
         }
-        for(const op of deletions){ deleted.push(op); await fs.unlink(op.abs); }
+        for(const op of deletions){ deleted.push(op); await fs.unlink(op.abs); await syncRestoreDirectory(fs, path.dirname(op.abs)); }
         await markRestoreTransaction({ fs, backupRoot, state: 'COMMITTED' });
       } catch(e){
         const rollbackErrors = await rollbackRestore({ fs, written, deleted, backups });
