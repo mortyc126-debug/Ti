@@ -184,29 +184,32 @@ async function getUsage(){
 
 // Отдельный теневой индекс направленных фраз. Источник читается в памяти;
 // ни manifest, ни legacy-словарь не переписываются.
-let _queryPhraseShadow = null, _queryPhraseShadowUsage = null, _queryPhraseShadowStamp = '';
-async function getQueryPhraseShadow(){
-  const [synStamp, conceptStamp] = await Promise.all([
-    fs.stat(SYN_FILE).then(s => s.mtimeMs + ':' + s.size, () => 'missing'),
-    fs.stat(concepts.filePath).then(s => s.mtimeMs + ':' + s.size, () => 'missing')
-  ]);
+const _queryPhraseShadowCache = new Map();
+async function getQueryPhraseShadow({ includeCurated = true } = {}){
+  const synStamp = await fs.stat(SYN_FILE).then(s => s.mtimeMs + ':' + s.size, () => 'missing');
+  const conceptStamp = includeCurated
+    ? await fs.stat(concepts.filePath).then(s => s.mtimeMs + ':' + s.size, () => 'missing')
+    : 'legacy-only';
   const stamp = synStamp + '|' + conceptStamp;
   const usage = await getUsage();
-  if(_queryPhraseShadow && _queryPhraseShadowStamp === stamp && _queryPhraseShadowUsage === usage) return _queryPhraseShadow;
-  const [imported, conceptData] = await Promise.all([
-    loadSynonyms().then(value => buildLegacyQueryPhraseImport(value, { sourceFile: 'tools/code-lab/public/dict/synonyms.json' })),
-    concepts.get()
-  ]);
-  // Пользовательские и курируемые фразы хранятся отдельно от legacy-синонимов.
-  // В shadow попадают только направленные записи с targetKey; обычные алиасы не смешиваются.
-  const curated = (conceptData.queryPhrases || []).filter(item => item && item.targetKey);
-  _queryPhraseShadow = createLegacyQueryPhraseShadow({
+  const cached = _queryPhraseShadowCache.get(includeCurated);
+  if(cached && cached.stamp === stamp && cached.usage === usage) return cached.index;
+  const imported = await loadSynonyms().then(value => buildLegacyQueryPhraseImport(value, {
+    sourceFile: 'tools/code-lab/public/dict/synonyms.json'
+  }));
+  let curated = [];
+  if(includeCurated){
+    const conceptData = await concepts.get();
+    // Эти фразы остаются в экспериментальном shadow-поиске, но не подменяют
+    // обычный поиск по языковым разделам и каноническим синонимам.
+    curated = (conceptData.queryPhrases || []).filter(item => item && item.targetKey);
+  }
+  const index = createLegacyQueryPhraseShadow({
     queryPhrases: [...imported.manifest.queryPhrases, ...curated],
     usage
   });
-  _queryPhraseShadowUsage = usage;
-  _queryPhraseShadowStamp = stamp;
-  return _queryPhraseShadow;
+  _queryPhraseShadowCache.set(includeCurated, { stamp, usage, index });
+  return index;
 }
 // записать словарь языка в свой файл dict/langs/<lang>.json (мёрдж с существующим)
 async function saveLangDict(lang, pairs){
@@ -1079,7 +1082,7 @@ const server = http.createServer(async (req, res) => {
       const boost = await searchBoost();
       const [library, directed, variants] = await Promise.all([
         search.search(q, { limit, lang, boost }),
-        getQueryPhraseShadow().then(index => index.search(q, { limit, scope })),
+        getQueryPhraseShadow({ includeCurated: false }).then(index => index.search(q, { limit, scope })),
         variantsFor(q, '')
       ]);
       return json(res, 200, combineTaskSearch({
