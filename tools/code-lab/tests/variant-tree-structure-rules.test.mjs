@@ -30,14 +30,14 @@ const dict = {
       li: 'элемент списка', ul: 'маркированный список', ol: 'нумерованный список',
       p: 'абзац', div: 'контейнер', summary: 'заголовок раскрывающегося блока',
       details: 'раскрывающийся блок', img: 'изображение', 'button[type]': 'тип кнопки',
-      id: 'идентификатор', header: 'шапка страницы', script: 'скрипт'
+      id: 'идентификатор', header: 'шапка страницы', script: 'скрипт', button: 'кнопка'
     },
     css: { gap: 'расстояние между элементами', '#*': 'селектор по id' },
     js: {
       if: 'условная конструкция', elif: 'дополнительное условие',
       try: 'обработка ошибок', catch: 'перехват ошибки', finally: 'завершение',
       await: 'ожидание операции', unsafe: 'условная конструкция',
-      reader: 'чтение данных', fetch: 'сетевой запрос', getelementbyid: 'поиск элемента'
+      reader: 'чтение данных', fetch: 'сетевой запрос', getelementbyid: 'поиск элемента', alert: 'показать сообщение', addeventlistener: 'подписка на событие'
     }
   },
   structure: { html: rules.slice(0, 3).concat(rules.slice(8, 12), rules.slice(13, 14)), css: [rules[7]], js: rules.slice(3, 8).concat(rules.slice(12, 13), rules.slice(14)) }
@@ -117,6 +117,18 @@ test('правило «содержит» не превращается в пр�
   const result = buildVariants({ q: 'try', lang: 'js', dict, rows: [], synonyms: {} });
   groupFor(result, 'try', 'Состав конструкции');
   assert.equal(result.roots.find(x => x.term === 'try').children.some(x => x.label === 'Следует после'), false);
+});
+
+test('длинное описание задачи находит конструкции по разным смысловым фразам', () => {
+  const result = buildVariants({
+    q: 'добавить кнопку которая показывает сообщение при нажатии',
+    dict, rows: [],
+    synonyms: { button: ['кнопка'], alert: ['сообщение'], addEventListener: ['нажатие'] }
+  });
+  const terms = new Set(result.roots.map(x => x.term));
+  assert.ok(terms.has('button'));
+  assert.ok(terms.has('alert'));
+  assert.ok(terms.has('addeventlistener'));
 });
 
 test('шаблон синтаксиса берётся из общего парсера', () => {
