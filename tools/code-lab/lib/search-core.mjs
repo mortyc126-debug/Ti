@@ -2,6 +2,7 @@ import { queryTokens } from './query-phrase-match.mjs';
 
 const normalize = value => String(value == null ? '' : value).trim().toLocaleLowerCase('ru').replace(/ё/g, 'е');
 const round = value => Math.round(value * 1e6) / 1e6;
+const canonicalTerm = value => normalize(value).replace(/^<([a-z][\\w-]*)>$/, '$1');
 
 // Reciprocal-rank fusion: независимые поиски имеют разные шкалы score,
 // поэтому объединяем позиции в выдаче, а не сравниваем несопоставимые числа.
@@ -67,14 +68,14 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
   }));
 
   const roots = variants?.roots || [];
-  const rootByKey = new Map(roots.map(root => [normalize(root.term), root]));
+  const rootByKey = new Map(roots.map(root => [canonicalTerm(root.term), root]));
   const targets = (directed?.hits || []).map(hit => ({
     targetKey: hit.targetKey,
     score: hit.score,
     phrases: hit.phrases || [],
     sections: hit.sections || [],
     pieceCount: (hit.pieces || []).length,
-    root: rootByKey.get(normalize(hit.targetKey)) || null
+    root: rootByKey.get(canonicalTerm(hit.targetKey)) || null
   }));
 
   const matchedTokens = new Set();
