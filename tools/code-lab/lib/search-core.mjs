@@ -278,11 +278,6 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
       targets: targets.length,
       roots: roots.length,
       pieces: pieces.length,
-      directedRawPieces: (directed?.rankedPieces || []).length,
-      directedRawLanguages: [...new Set((directed?.rankedPieces || []).map(piece => String(piece.lang || '')))].slice(0, 8),
-      directedScope: directed?.scope || '',
-      directedAllowedLanguages: directed?.allowedLanguages || [],
-      directedCandidateLanguages: directed?.candidateLanguages || {},
       directedPieces: directedPieces.length,
       lexicalPieces: (library?.hits || []).filter(inTaskScope).length
     }
