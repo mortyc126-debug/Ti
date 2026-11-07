@@ -34,6 +34,8 @@ test('объект запроса снимает ложную неоднозна
 test('ссылка и кнопка не подменяют друг друга при совпадении действия', () => {
   assert.equal(matchQueryPhrase('ссылка по клику', 'действие по клику', '<button>'), null);
   assert.equal(matchQueryPhrase('кнопка', 'ссылка', 'href'), null);
+  assert.equal(matchQueryPhrase('ссылка по клику', 'кнопка по клику'), null);
+  assert.equal(matchQueryPhrase('кнопка', 'ссылка на страницу'), null);
 });
 
 test('короткое совпадение внутри другого слова не считается совпадением', () => {
