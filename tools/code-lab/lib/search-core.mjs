@@ -116,15 +116,19 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
 
   const roots = (variants?.roots || []).filter(root => inScope(root) && targetCompatible(root.term));
   const rootByKey = new Map(roots.map(root => [canonicalTerm(root.term), root]));
-  const targetHits = (directed?.hits || []).filter(hit => targetCompatible(hit.targetKey) && (!webOnly || (hit.pieces || []).some(inScope)));
-  const targets = targetHits.map(hit => ({
-    targetKey: hit.targetKey,
-    score: hit.score,
-    phrases: hit.phrases || [],
-    sections: hit.sections || [],
-    pieceCount: (hit.pieces || []).filter(inTaskScope).length,
-    root: rootByKey.get(canonicalTerm(hit.targetKey)) || null
-  }));
+  const targetHits = (directed?.hits || []).filter(hit => targetCompatible(hit.targetKey) && (hit.pieces || []).some(inTaskScope));
+  const targets = targetHits.map(hit => {
+    const root = rootByKey.get(canonicalTerm(hit.targetKey)) || null;
+    return {
+      targetKey: hit.targetKey,
+      score: hit.score,
+      phrases: hit.phrases || [],
+      sections: hit.sections || [],
+      pieceCount: (hit.pieces || []).filter(inTaskScope).length,
+      rootTerm: root?.term || null,
+      rootLang: root?.lang || null
+    };
+  });
 
   const matchedTokens = new Set();
   for (const target of targets) for (const phrase of target.phrases) {
