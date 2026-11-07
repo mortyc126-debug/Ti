@@ -97,8 +97,8 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     if (!piece?.id) continue;
     directedById.set(piece.id, { ...piece, matchedTargets: [...(piece.matchedTargets || [])] });
   }
-  for (const hit of directed?.hits || []) {
-    for (const piece of hit.pieces || []) {
+  for (const [targetIndex, hit] of (directed?.hits || []).entries()) {
+    for (const [pieceIndex, piece] of (hit.pieces || []).entries()) {
       if (!piece?.id) continue;
       const previous = directedById.get(piece.id);
       if (previous) {
@@ -106,15 +106,16 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
       } else {
         directedById.set(piece.id, {
           ...piece, targetKey: hit.targetKey, targetScore: hit.score,
+          targetPosition: targetIndex + 1, piecePositionWithinTarget: pieceIndex + 1,
           matchedTargets: hit.targetKey ? [hit.targetKey] : []
         });
       }
     }
   }
-  const directedPieces = [...directedById.values()].sort((a, b) =>
-    (a.position || a.targetPosition || Infinity) - (b.position || b.targetPosition || Infinity) ||
-    String(a.title || a.id).localeCompare(String(b.title || b.id), 'ru')
-  );
+  const directedPieces = [...directedById.values()].sort((a, b) => {
+    const rank = item => item.position ?? ((item.targetPosition || 999) * 1000 + (item.piecePositionWithinTarget || 999));
+    return rank(a) - rank(b) || String(a.title || a.id).localeCompare(String(b.title || b.id), 'ru');
+  });
 
   directedPieces.filter(inTaskScope).forEach((piece, index) => {
     const item = ensure(piece.id);
