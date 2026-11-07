@@ -191,3 +191,30 @@ const webScoped = scopedIndex.search('получить данные', { scope: '
 assert.deepEqual(webScoped.rankedPieces.map(piece => piece.id), ['js-fetch']);
 assert.deepEqual(webScoped.rankedPieces.map(piece => piece.lang), ['javascript']);
 assert.deepEqual(scopedIndex.search('получить данные').rankedPieces.map(piece => piece.id), ['js-fetch', 'py-fetch']);
+
+const htmlTagUsage = {
+  terms: { html: { button: {}, details: {} } },
+  piecesOf(section, key) {
+    if (section !== 'html') return [];
+    return key === 'button' ? ['button-example'] : key === 'details' ? ['details-example'] : [];
+  },
+  pieceInfo(id) {
+    return id === 'button-example'
+      ? { id, title: 'Кнопка страницы', lang: 'html' }
+      : id === 'details-example' ? { id, title: 'Раскрывающийся блок', lang: 'html' } : null;
+  },
+  pieceText(id) {
+    return id === 'button-example'
+      ? '<button type="button">Показать</button>'
+      : '<details><summary>Подробнее</summary>Содержимое</details>';
+  }
+};
+const htmlTagIndex = createLegacyQueryPhraseShadow({
+  queryPhrases: [
+    { id: 'html-button', phrase: 'кнопка', targetKey: '<button>', language: 'html' },
+    { id: 'html-details', phrase: 'раскрывающийся блок', targetKey: '<details>', language: 'html' }
+  ],
+  usage: htmlTagUsage
+});
+assert.deepEqual(htmlTagIndex.search('кнопка', { language: 'html' }).hits[0].pieces.map(piece => piece.id), ['button-example']);
+assert.deepEqual(htmlTagIndex.search('раскрывающийся блок', { language: 'html' }).hits[0].pieces.map(piece => piece.id), ['details-example']);
