@@ -120,7 +120,7 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
     if(t.length < 2 || /\s/.test(t)) return null;
     const re = tokRe(t), ix = indexes[L];
     const candidates = ix ? (ix.idiomsByToken.get(t) || (/[.@#]/.test(t) ? ix.idioms : [])) : [];
-    for(const k of candidates) if(re.test(k)) return { key: t, rank: 0.5 };
+    for(const k of candidates) if(re.test(k)) return { key: k, rank: 0.5 };
     return null;
   };
   for(const L of want){
