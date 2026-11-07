@@ -275,6 +275,48 @@ test('не подменяет вывод итога арифметической
   assert.equal(arithmetic.targets.some(x => x.targetKey === 'sum'), true);
 });
 
+test('связанные фрагменты выше несвязанных лексических совпадений, но запасные результаты сохраняются', () => {
+  const result = combineTaskSearch({
+    query: 'сделать надпись ссылкой на другую страницу',
+    directed: {
+      hits: [{ targetKey: 'href', score: 48, pieces: [{ id: 'href-piece', title: 'Ссылка на другую страницу', lang: 'html' }] }],
+      rankedPieces: [{ id: 'href-piece', title: 'Ссылка на другую страницу', lang: 'html', targetKey: 'href', position: 1, matchedTargets: ['href'] }]
+    },
+    library: { hits: [
+      { id: 'unrelated-1', title: 'Контактные сведения', lang: 'html' },
+      { id: 'unrelated-2', title: 'Содержимое каталога с типами элементов', lang: 'js' }
+    ] },
+    variants: { roots: [{ term: 'a', lang: 'html' }] }
+  });
+  assert.equal(result.pieces[0].id, 'href-piece');
+  assert.ok(result.pieces.some(piece => piece.id === 'unrelated-1'));
+  assert.ok(result.pieces.findIndex(piece => piece.id === 'unrelated-1') > 0);
+});
+
+
+test('для вывода данных не подменяет textContent читающим innerText', () => {
+  const result = combineTaskSearch({
+    query: 'получить данные из двух источников и вывести имя в шапку',
+    directed: {
+      hits: [
+        { targetKey: 'innerText', score: 60, pieces: [{ id: 'read-text', title: 'Прочитать отображаемый текст', lang: 'js' }] },
+        { targetKey: 'textContent', score: 52, pieces: [{ id: 'write-text', title: 'Вывести текст в элемент', lang: 'js' }] }
+      ],
+      rankedPieces: [
+        { id: 'read-text', title: 'Прочитать отображаемый текст', lang: 'js', targetKey: 'innerText', position: 1 },
+        { id: 'write-text', title: 'Вывести текст в элемент', lang: 'js', targetKey: 'textContent', position: 2 }
+      ]
+    },
+    library: { hits: [] },
+    variants: { roots: [{ term: 'innerText', lang: 'js' }, { term: 'textContent', lang: 'js' }] }
+  });
+  assert.deepEqual(result.targets.map(target => target.targetKey), ['textContent']);
+  assert.ok(!result.roots.some(root => String(root.term).toLowerCase() === 'innertext'));
+  assert.ok(result.pieces.some(piece => piece.id === 'write-text'));
+  assert.ok(!result.pieces.some(piece => piece.id === 'read-text'));
+});
+
+
 test('область задачи распознаёт веб-сборку и не путает её с задачей по массивам', () => {
   assert.equal(inferTaskScope('Добавить кнопку, которая показывает сообщение при нажатии'), 'web');
   assert.equal(inferTaskScope('Свернуть массив в одно значение'), '');
