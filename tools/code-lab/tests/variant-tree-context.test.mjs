@@ -44,7 +44,7 @@ test('показывает продолжения конструкции из о
   const result = buildVariants({ q: 'if', lang: 'js', dict, rows: [], synonyms: {} });
   const root = result.roots.find(x => x.term === 'if');
   assert.ok(root, 'корень if должен находиться');
-  const group = root.children.find(x => x.group && x.label === 'Следует после');
+  const group = root.children.find(x => x.group && x.label === 'Следующие конструкции');
   assert.ok(group, 'у if должна быть группа продолжений');
   const terms = group.children.map(x => x.term);
   assert.ok(terms.includes('else'), 'else доступен после if');
@@ -73,7 +73,7 @@ test('показывает условия применения конструк�
 test('не смешивает правила продолжения разных языков', () => {
   const result = buildVariants({ q: 'if', lang: 'python', dict, rows: [], synonyms: {} });
   const root = result.roots.find(x => x.term === 'if');
-  const group = root.children.find(x => x.group && x.label === 'Следует после');
+  const group = root.children.find(x => x.group && x.label === 'Предшествующие конструкции');
   assert.deepEqual(group.children.map(x => x.term).sort(), ['elif', 'else']);
 });
 
@@ -82,7 +82,7 @@ test('показывает предшествующую конструкцию �
   const result = buildVariants({ q: 'catch', lang: 'js', dict, rows: [], synonyms: {} });
   const root = result.roots.find(x => x.term === 'catch');
   assert.ok(root);
-  const group = root.children.find(x => x.group && x.label === 'Следует после');
+  const group = root.children.find(x => x.group && x.label === 'Предшествующие конструкции');
   assert.ok(group, 'у catch должна быть видна конструкция, после которой он следует');
   assert.ok(group.children.some(x => x.term === 'try' && x.relation === 'после'));
 });
@@ -90,7 +90,7 @@ test('показывает предшествующую конструкцию �
 test('порядок показывает обе стороны без подмены типа отношения', () => {
   const after = buildVariants({ q: 'if', lang: 'js', dict, rows: [], synonyms: {} });
   const ifRoot = after.roots.find(x => x.term === 'if');
-  const continuations = ifRoot.children.find(x => x.group && x.label === 'Следует после');
+  const continuations = ifRoot.children.find(x => x.group && x.label === 'Предшествующие конструкции');
   assert.ok(continuations.children.some(x => x.term === 'else'));
   const before = buildVariants({ q: 'finally', lang: 'js', dict, rows: [], synonyms: {} });
   const finallyRoot = before.roots.find(x => x.term === 'finally');
