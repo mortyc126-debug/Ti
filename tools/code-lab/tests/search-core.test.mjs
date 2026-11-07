@@ -162,3 +162,20 @@ test('фрагменты и связи восстанавливаются из �
   assert.equal(result.pieces[0].id, 'fetch-piece');
   assert.deepEqual(result.pieces[0].matchedTargets, ['fetch']);
 });
+
+
+test('язык цели определяется по связанному фрагменту, а не по одноимённому корню другого языка', () => {
+  const result = combineTaskSearch({
+    query: 'показать сообщение по нажатию кнопки',
+    directed: {
+      hits: [{
+        targetKey: 'alert', score: 43, phrases: [{ phrase: 'всплывающее сообщение' }],
+        pieces: [{ id: 'alert-js', title: 'alert()', lang: 'js' }]
+      }],
+      rankedPieces: []
+    },
+    library: { hits: [] },
+    variants: { roots: [{ term: 'alert', lang: 'html', label: 'одноимённый HTML-корень' }] }
+  });
+  assert.equal(result.targets[0].rootLang, 'js');
+});
