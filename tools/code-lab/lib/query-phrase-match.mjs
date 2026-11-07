@@ -76,10 +76,17 @@ function contextConflict(query, phrase, targetKey) {
   if (target === 'from' && qUi && !(/импорт|модул/.test(q) || q.includes('from '))) return true;
   if (target === 'number' && qUi && !/число|числов|number|количеств/.test(q)) return true;
   if (target === 'select' && qUi && !/выбрать|выпадающ|список вариантов|select|поле выбора/.test(q)) return true;
+  if ((target.includes('!r') || target.includes('repr') || target.includes('f"')) && qUi && !/формат|представлен|repr|f-string|отладк/.test(q)) return true;
+  if ((target === 'canvas' || target === '<canvas>') && qUi && !/рисован|canvas|график|изображен/.test(q)) return true;
+  if (target === 'text-align' && !/выровнять|по центру|text-align|align/.test(q)) return true;
   const qCollapse = /свер|раскры|открыть|collapse|expand/.test(q);
   if ((target === 'div' || target === '<div>') && qCollapse && !/раскрывающ|свернуть блок|раскрыть блок|toggle|aria-expanded/.test(p)) return true;
-  const qVisual = /цвет|фон|тень|скруг|подсвет|границ|анимац|плавн|прозрачн|шрифт|размер|отступ/.test(q);
-  if (/^(?:box-shadow|border-radius|background-color|opacity|animation|text-transform)$/.test(target) && !qVisual) return true;
+  const qColor = /цвет|фон|тень|скруг|подсвет|границ|прозрачн/.test(q);
+  const qTypography = /шрифт|размер|жирн|наклон|подчерк/.test(q);
+  const qAnimation = /анимац|плавн/.test(q);
+  if (/^(?:box-shadow|border-radius|background-color|opacity)$/.test(target) && !qColor) return true;
+  if (target === 'animation' && !qAnimation) return true;
+  if (/^(?:font-size|font-weight|font-style|text-decoration|text-shadow|text-transform)$/.test(target) && !qTypography) return true;
   return false;
 }
 
