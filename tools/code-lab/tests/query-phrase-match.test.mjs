@@ -18,6 +18,7 @@ test('точное совпадение выше частичного', () => {
 
 test('отрицание не теряется при сопоставлении', () => {
   assert.equal(matchQueryPhrase('не скрывать элемент', 'скрыть элемент'), null);
+  assert.equal(matchQueryPhrase('не скрыть элемент', 'скрыть элемент'), null);
   assert.equal(matchQueryPhrase('скрыть элемент', 'не скрывать элемент'), null);
   assert.ok(matchQueryPhrase('не скрывать элемент', 'не скрывать место'));
 });
