@@ -87,7 +87,7 @@
     const desc = n.piece ? (inGroup ? '' : 'кусок из библиотеки') : (n.label ? '<b>' + esc(n.label) + '</b>' + (n.note ? ' — ' : '') : '') + esc(n.note || '');
     return '<div class="ac-n"><div class="ac-r' + (n.piece ? ' ac-p' : '') + '" data-code="' + esc(n.code || '') + '" data-piece="' + esc(n.piece || '') + '">'
       + '<span class="ac-t">' + (has ? '▸' : '') + '</span>'
-      + '<span class="ac-m' + (order === 'note' ? ' nf' : '') + '"><span class="ac-c">' + (n.piece ? esc(n.note) : paint(n.show || n.code, n.lang)) + '</span>'
+      + '<span class="ac-m' + (order === 'note' ? ' nf' : '') + '"><span class="ac-c">' + (n.piece ? esc(n.note) : (n.show ? esc(n.show) : paint(n.code, n.lang))) + '</span>'
       + (desc ? '<span class="ac-d">' + desc + '</span>' : '') + '</span></div>'
       + (has ? '<div class="ac-kids" hidden>' + n.children.map(k => rowHtml(k)).join('') + '</div>' : '') + '</div>';
   }
