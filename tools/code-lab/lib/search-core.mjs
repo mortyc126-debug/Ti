@@ -215,7 +215,13 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
   }));
 
   const roots = (variants?.roots || []).filter(root => inScope(root) && targetCompatible(root.term));
-  const rootByKey = new Map(roots.map(root => [canonicalTerm(root.term), root]));
+  const rootByKey = new Map();
+  // Корни уже отсортированы по релевантности; для одноимённых конструкций
+  // сохраняем первый (лучший) языковой вариант, а не последний.
+  for (const root of roots) {
+    const key = canonicalTerm(root.term);
+    if (!rootByKey.has(key)) rootByKey.set(key, root);
+  }
   const targetHits = (directed?.hits || []).filter(hit => targetCompatible(hit.targetKey) && (hit.pieces || []).some(inTaskScope));
   const targets = targetHits.map(hit => {
     const root = rootByKey.get(canonicalTerm(hit.targetKey)) || null;
@@ -227,7 +233,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
       sections: hit.sections || [],
       pieceCount: matchedPieces.length,
       rootTerm: root?.term || hit.targetKey,
-      rootLang: canonicalLanguage(matchedPieces[0]?.lang || root?.lang || '') || null
+      rootLang: canonicalLanguage(root?.lang || matchedPieces[0]?.lang || '') || null
     };
   });
 
