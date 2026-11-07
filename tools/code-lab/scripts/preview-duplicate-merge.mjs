@@ -194,7 +194,7 @@ for (const pair of manifest.pairs) {
   if (!Object.keys(candidatePassport.labels || {}).length) delete candidatePassport.labels;
   if (!candidatePassport.orphanNotes.length) delete candidatePassport.orphanNotes;
   const mergeableFields = new Set([
-    'desc', 'descAt', 'tags', 'aliases', 'component', 'source', 'wordNotes', 'orphanNotes',
+    'desc', 'descAt', 'title', 'tags', 'aliases', 'component', 'source', 'wordNotes', 'orphanNotes',
     'legacy', 'enriched', 'externalLinks', 'labels'
   ]);
   const unresolvedFieldConflicts = fieldConflicts.filter(conflict => {
