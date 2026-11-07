@@ -62,6 +62,23 @@ test('в задачах интерфейса приоритет у веб-язы
   assert.equal(backend.pieces[0].lang, 'python');
 });
 
+test('обычная навигационная ссылка не получает ложный CSS-корень href', () => {
+  const result = combineTaskSearch({
+    query: 'сделать ссылку на другую страницу',
+    directed: { hits: [], rankedPieces: [] },
+    library: { hits: [] },
+    variants: { roots: [
+      { term: 'a', lang: 'html' },
+      { term: 'href', lang: 'html' },
+      { term: 'href', lang: 'css' }
+    ] }
+  });
+  assert.deepEqual(result.roots.map(root => [root.term, root.lang]), [
+    ['a', 'html'],
+    ['href', 'html']
+  ]);
+});
+
 test('точное совпадение с названием фрагмента выше слабого совпадения по фразе', () => {
   const result = combineTaskSearch({
     query: 'сделать надпись ссылкой на другую страницу',
