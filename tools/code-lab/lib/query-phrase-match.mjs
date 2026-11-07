@@ -61,6 +61,10 @@ function contextConflict(query, phrase, targetKey) {
   if ((target === 'a' || target.includes('href')) && qButton && !qLink) return true;
   if (qUi && pCollection && !pUi && !qCollection) return true;
   if (qCollection && pUi && !pCollection && !qUi) return true;
+  if (target.includes('assert') && !/провер|утверж|услов|assert|допущен/.test(q)) return true;
+  if (/(?:raise|throw|exception|valueerror|error)/.test(target) && !/ошиб|исключ|error|exception|raise|throw/.test(q)) return true;
+  if ((target.includes('console.log') || target.includes('console.error') || target === 'print') && !/консол|вывод|напечат|print/.test(q)) return true;
+  if (target.includes('insert into') && !/баз|таблиц|sql|запис|insert/.test(q)) return true;
   return false;
 }
 
@@ -96,7 +100,9 @@ export function matchQueryPhrase(query, phrase, targetKey = '') {
     if (index >= 0) { ordered++; cursor = index + 1; }
   }
   const orderCoverage = ordered / Math.max(1, matched.length);
-  const score = Math.round(35 * phraseCoverage + 25 * queryCoverage + 20 * orderCoverage);
+  const score = pt.length === 1 && qt.length > 1
+    ? Math.round(40 + 40 * queryCoverage)
+    : Math.round(35 * phraseCoverage + 25 * queryCoverage + 20 * orderCoverage);
   if (phraseCoverage < 0.5 || score < 35) return null;
   return {
     score: Math.min(84, score),
