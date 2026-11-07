@@ -6,7 +6,7 @@
 // опечатка метода — после точки стоит то, чего нет ни в словаре, ни в файле, но похоже на известное (addEventListner).
 
 const KW = new Set(('break case catch class const continue debugger default delete do else export extends finally for function if import in instanceof let new return super switch this throw try typeof var void while with yield async await of static get set from as true false null undefined '
-  + 'def elif except lambda pass raise with global nonlocal assert is not and or None True False print self cls').split(' '));
+  + 'def elif except lambda pass raise with global nonlocal assert is not and or None True False print self cls type interface implements private protected public readonly keyof infer unknown never any satisfies declare abstract override asserts string number boolean void').split(' '));
 
 // строки и комментарии заменяем пробелами той же длины: так они не мешают, а позиции не съезжают
 function blank(code, lang){
@@ -67,7 +67,7 @@ export function analyzeNames(code, lang, { dict = {}, explain = null, globals = 
   // словарь: известные имена и методы (последнее звено ключей вида «obj.method»)
   const known = new Set(), methods = new Set();
   const take = o => { if(o) for(const k of Object.keys(o)){ for(const m of k.matchAll(/[A-Za-z_$][\w$]*/g)) known.add(m[0].toLowerCase()); for(const m of k.matchAll(/\.([A-Za-z_$][\w$]*)/g)) methods.add(m[1].toLowerCase()); } };
-  take(dict.words); take(dict.langs && dict.langs[L]);
+  take(dict.words); take(dict.langs && dict.langs[lang]); if(L !== lang) take(dict.langs && dict.langs[L]);
   // методы — с исходным регистром, если он есть в коде файла; иначе как в словаре
   const methodList = [...methods];
 
