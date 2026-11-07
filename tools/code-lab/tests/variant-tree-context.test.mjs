@@ -76,3 +76,24 @@ test('не смешивает правила продолжения разных
   const group = root.children.find(x => x.group && x.label === 'Следует после');
   assert.deepEqual(group.children.map(x => x.term).sort(), ['elif', 'else']);
 });
+
+
+test('показывает предшествующую конструкцию для элемента с правилом «после»', () => {
+  const result = buildVariants({ q: 'catch', lang: 'js', dict, rows: [], synonyms: {} });
+  const root = result.roots.find(x => x.term === 'catch');
+  assert.ok(root);
+  const group = root.children.find(x => x.group && x.label === 'Следует после');
+  assert.ok(group, 'у catch должна быть видна конструкция, после которой он следует');
+  assert.ok(group.children.some(x => x.term === 'try' && x.relation === 'после'));
+});
+
+test('порядок показывает обе стороны без подмены типа отношения', () => {
+  const after = buildVariants({ q: 'if', lang: 'js', dict, rows: [], synonyms: {} });
+  const ifRoot = after.roots.find(x => x.term === 'if');
+  const continuations = ifRoot.children.find(x => x.group && x.label === 'Следует после');
+  assert.ok(continuations.children.some(x => x.term === 'else'));
+  const before = buildVariants({ q: 'finally', lang: 'js', dict, rows: [], synonyms: {} });
+  const finallyRoot = before.roots.find(x => x.term === 'finally');
+  const predecessors = finallyRoot.children.find(x => x.group && x.label === 'Следует после');
+  assert.ok(predecessors.children.some(x => x.term === 'try'));
+});
