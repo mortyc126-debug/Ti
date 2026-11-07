@@ -208,6 +208,7 @@ async function main() {
   assert.ok(taskTerms(dataQuery).some(x => x === '<header>') && taskTerms(dataQuery).some(x => x === '<footer>'), 'должны находиться разные места вывода');
   assert.ok(!taskTerms(dataQuery).some(x => /math.floor|event.target/.test(x)), 'не подмешивать незаказанные операции');
   assert.ok(!taskResultMap.get(dataQuery).pieces.some(x => /узла|IndexedDB|Ковариация|Корреляция/.test(x.title)), 'не подмешивать метаданные DOM-узлов и статистические фрагменты');
+  assert.ok(!taskResultMap.get(dataQuery).pieces.some(x => /Service Worker|Web Worker|push-сообщение/i.test(x.title)), 'не подмешивать фоновые worker-сообщения к обычной загрузке данных');
   assert.ok(taskTerms(sidebarQuery).some(x => x === '<aside>'), 'боковая панель должна находиться как aside');
   assert.ok(!taskTerms(sidebarQuery).some(x => /reduce/.test(x)), 'сворачивание панели не должно превращаться в свёртку массива');
 
