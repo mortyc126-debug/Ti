@@ -39,7 +39,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
   const asksImage = /изображен|картин|image|blob|bitmap|canvas/.test(q);
   const asksMarkup = /html|разметк|innerhtml|insertadjacenthtml/.test(q);
   const asksAttributes = /атрибут/.test(q);
-  const asksFirstSuccess = /любой один|первый успешн|хотя бы один|promise.any/.test(q);
+  const asksFirstSuccess = /любой один|первый успешн|хотя бы один|promise\\.any/.test(q);
   const pieceCompatible = item => {
     const text = normalize([item?.title, item?.group, item?.desc, ...(item?.tags || []), ...(item?.aliases || [])].filter(Boolean).join(' '));
     if (buttonTask && !asksGamepad && /геймпад|gamepad/.test(text)) return false;
