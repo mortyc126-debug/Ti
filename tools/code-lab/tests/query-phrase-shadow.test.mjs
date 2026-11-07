@@ -193,20 +193,21 @@ assert.deepEqual(webScoped.rankedPieces.map(piece => piece.lang), ['javascript']
 assert.deepEqual(scopedIndex.search('получить данные').rankedPieces.map(piece => piece.id), ['js-fetch', 'py-fetch']);
 
 const htmlTagUsage = {
-  terms: { html: { button: {}, details: {} } },
+  terms: { html: { button: {}, details: {} }, js: { button: {} } },
   piecesOf(section, key) {
-    if (section !== 'html') return [];
-    return key === 'button' ? ['button-example'] : key === 'details' ? ['details-example'] : [];
+    if (section === 'html') return key === 'button' ? ['button-example'] : key === 'details' ? ['details-example'] : [];
+    if (section === 'lang:js' && key === 'button') return ['js-button-variable'];
+    return [];
   },
   pieceInfo(id) {
-    return id === 'button-example'
-      ? { id, title: 'Кнопка страницы', lang: 'html' }
-      : id === 'details-example' ? { id, title: 'Раскрывающийся блок', lang: 'html' } : null;
+    if (id === 'button-example') return { id, title: 'Кнопка страницы', lang: 'html' };
+    if (id === 'details-example') return { id, title: 'Раскрывающийся блок', lang: 'html' };
+    return id === 'js-button-variable' ? { id, title: 'Переменная button', lang: 'js' } : null;
   },
   pieceText(id) {
-    return id === 'button-example'
-      ? '<button type="button">Показать</button>'
-      : '<details><summary>Подробнее</summary>Содержимое</details>';
+    if (id === 'button-example') return '<button type="button">Показать</button>';
+    if (id === 'details-example') return '<details><summary>Подробнее</summary>Содержимое</details>';
+    return 'const button = document.querySelector("#action")';
   }
 };
 const htmlTagIndex = createLegacyQueryPhraseShadow({
@@ -216,5 +217,5 @@ const htmlTagIndex = createLegacyQueryPhraseShadow({
   ],
   usage: htmlTagUsage
 });
-assert.deepEqual(htmlTagIndex.search('кнопка', { language: 'html' }).hits[0].pieces.map(piece => piece.id), ['button-example']);
+assert.deepEqual(htmlTagIndex.search('кнопка').hits[0].pieces.map(piece => piece.id), ['button-example']);
 assert.deepEqual(htmlTagIndex.search('раскрывающийся блок', { language: 'html' }).hits[0].pieces.map(piece => piece.id), ['details-example']);
