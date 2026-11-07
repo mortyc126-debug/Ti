@@ -215,7 +215,7 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
       if(!groups.has(verb)) groups.set(verb, []);
       const note = [rule.note, relationDescriptions[verb]].filter(Boolean).join(' · ');
       let item;
-      if(actionable && target && targetLang === L && exists(target)){
+      if(actionable && target && exists(target, targetLang)){
         item = node(target, targetLang, verb);
         item.note = [item.note, rule.note, relationDescriptions[verb]].filter(Boolean).join(' · ');
       } else {
