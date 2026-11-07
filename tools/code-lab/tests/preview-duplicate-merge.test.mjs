@@ -31,11 +31,19 @@ try {
   assert.equal(preview.summary.verifiedCodePairs, 1);
   assert.equal(pair.candidatePassport.id, 'canonical-piece');
   assert.equal(pair.candidatePassport.desc, 'Подробное описание конструкции.');
-  assert.deepEqual(pair.candidatePassport.component, { provides: ['a'] });
+  assert.equal(Object.hasOwn(pair.candidatePassport, 'component'), false);
+  assert.equal(Object.hasOwn(pair.candidatePassport, 'source'), false);
   assert.deepEqual(pair.candidatePassport.tags, ['канонический-тег', 'старый-тег']);
   assert.deepEqual(pair.candidatePassport.aliases, ['пример', 'старый-вариант']);
   assert.equal(pair.review.conceptNotes.length, 1);
-  assert.equal(pair.candidatePassport.wordNotes.filter(note => note.kind === 'concept').length, 1);
+  assert.equal(pair.candidatePassport.wordNotes.filter(note => note.kind === 'concept').length, 0);
+  assert.equal(pair.candidatePassport.wordNotes.length, 2);
+  assert.match(pair.review.conceptNoteHandling, /not moved into candidate wordNotes/);
+  assert.match(pair.review.noteConflictHandling, /no winner is selected/);
+  assert.deepEqual(pair.review.componentMergeProposal.values.map(item => item.value), [null, { provides: ['a'] }]);
+  assert.equal(preview.summary.conceptNotesMovedIntoCandidatePassport, 0);
+  assert.equal(preview.summary.componentDataPreservedInSourcePassports, 1);
+  assert.equal(preview.summary.provenanceSourcePassportsPreserved, 2);
   assert.equal(pair.review.sourcePassports.length, 2);
   assert.equal(pair.review.sourcePassports.find(x => x.id === 'canonical-piece').passport.extraField.keep, true);
   assert.deepEqual(pair.review.provenanceMergeProposal.fields, [{
