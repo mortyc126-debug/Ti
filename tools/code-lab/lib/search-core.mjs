@@ -34,6 +34,12 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
   const asksSpacing = /межбуквен|межстроч|интервал|перенос|пробел|высота строки/.test(q);
   const asksSorting = /сортир|упорядоч|sort/.test(q);
   const asksFile = /файл|путь|каталог|запис|write/.test(q);
+  const asksWriteData = /отправ|запис|созда|обнов|измен|сохран|post|put|patch/.test(q);
+  const asksAuth = /авторизац|токен|учётн|учетн|credential|auth|доступ/.test(q);
+  const asksImage = /изображен|картин|image|blob|bitmap|canvas/.test(q);
+  const asksMarkup = /html|разметк|innerhtml|insertadjacenthtml/.test(q);
+  const asksAttributes = /атрибут/.test(q);
+  const asksFirstSuccess = /любой один|первый успешн|хотя бы один|promise.any/.test(q);
   const pieceCompatible = item => {
     const text = normalize([item?.title, item?.group, item?.desc, ...(item?.tags || []), ...(item?.aliases || [])].filter(Boolean).join(' '));
     if (buttonTask && !asksGamepad && /геймпад|gamepad/.test(text)) return false;
@@ -57,6 +63,12 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     if (multiSourceTask && /источник узла|идентификатор источника узла|заголовок источника узла|описание источника узла/.test(text) && !/dom|узел|node/.test(q)) return false;
     if (multiSourceTask && /узл|node|indexeddb|localstorage|sessionstorage|ковариац|корреляц|статист/.test(text) && !/dom|узел|node|indexeddb|localstorage|хранилищ|корреляц|статист|ряд/.test(q)) return false;
     if (multiSourceTask && !asksServiceWorker && /service worker|web worker|push-сообщение/.test(text)) return false;
+    if (multiSourceTask && !asksWriteData && /fetch post|метод post|post запрос|отправить данные на сервер/.test(text)) return false;
+    if (multiSourceTask && !asksAuth && /учётные данные|учетные данные|credentials|authorization|авторизац/.test(text)) return false;
+    if (multiSourceTask && !asksImage && /декодирован.*изображ|imagebitmap|blob|пиксел.*canvas/.test(text)) return false;
+    if (multiSourceTask && !asksMarkup && /insertadjacenthtml|innerhtml|вставить html/.test(text)) return false;
+    if (multiSourceTask && !asksAttributes && /атрибут|attributes/.test(text)) return false;
+    if (multiSourceTask && !asksFirstSuccess && /promise\\.any|первый успешный промис/.test(text)) return false;
     return true;
   };
   const targetCompatible = target => {
