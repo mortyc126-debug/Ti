@@ -109,16 +109,36 @@ for (const pair of manifest.pairs) {
     Object.keys(source.passport.source && typeof source.passport.source === 'object' ? source.passport.source : {})
   ))].sort();
   const provenanceSources = orderedSources.map(source => ({ file: source.file, value: source.passport.source ?? null }));
+  const selectedDescProvenance = descSource.passport.source?.desc ?? null;
+  // source.desc describes the provenance of passport.desc, not an independent
+  // source choice. Keep every original value below, but align the merge proposal
+  // with the exact passport from which the selected description was taken.
+  const resolvedProvenanceSources = orderedSources.map(source => ({
+    file: source.file,
+    value: { ...(source.passport.source && typeof source.passport.source === 'object' ? source.passport.source : {}), desc: selectedDescProvenance }
+  }));
+  const originalProvenanceProposal = objectMergeProposal(provenanceSources);
   const provenanceMergeProposal = {
-    mode: 'merge only identical or one-sided provenance fields; retain conflicts without choosing a winner',
-    ...objectMergeProposal(provenanceSources),
+    mode: 'source.desc follows descSourceFile; all original values remain listed for review',
+    ...objectMergeProposal(resolvedProvenanceSources),
     fields: provenanceKeys.map(key => ({
       key,
       values: orderedSources
         .filter(source => source.passport.source && typeof source.passport.source === 'object' &&
           Object.prototype.hasOwnProperty.call(source.passport.source, key))
         .map(source => ({ file: source.file, value: source.passport.source[key] }))
-    }))
+    })),
+    resolvedFields: [{
+      key: 'desc',
+      selectedFile: descSource.file,
+      selectedValue: selectedDescProvenance,
+      rule: 'the provenance of desc follows the passport selected for desc',
+      originalValues: orderedSources.map(source => ({
+        file: source.file,
+        value: source.passport.source?.desc ?? null
+      })),
+      hadConflict: originalProvenanceProposal.conflicts.some(conflict => conflict.key === 'desc')
+    }]
   };
   const componentSources = orderedSources.map(source => ({ file: source.file, value: source.passport.component ?? null }));
   const componentMergeProposal = {
@@ -189,6 +209,8 @@ const summary = {
   provenanceSourcePassportsPreserved: previews.reduce((n, item) => n + item.review.provenanceSources.filter(x => x.source != null).length, 0),
   componentFieldConflicts: previews.reduce((n, item) => n + item.review.componentMergeProposal.conflicts.length, 0),
   provenanceFieldConflicts: previews.reduce((n, item) => n + item.review.provenanceMergeProposal.conflicts.length, 0),
+  provenanceOriginalFieldConflicts: previews.reduce((n, item) => n + item.review.provenanceMergeProposal.resolvedFields.filter(field => field.hadConflict).length, 0),
+  descSourceProvenanceResolvedPairs: previews.filter(item => item.review.provenanceMergeProposal.resolvedFields.some(field => field.key === 'desc')).length,
   componentMergeCompletePairs: previews.filter(item => item.review.componentMergeProposal.complete).length,
   provenanceMergeCompletePairs: previews.filter(item => item.review.provenanceMergeProposal.complete).length,
   importablePairs: 0
