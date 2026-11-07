@@ -97,6 +97,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     if (key === 'disabled' && !/отключ|заблок|неактив|запрет|disable/.test(q)) return false;
     if (key === 'event.target' && !/делегир|всплыти|распростран|event.target|нажатый элемент|определить элемент/.test(q)) return false;
     if (hoverTask && key === 'textcontent' && !/изменить текст|обновить текст|заменить текст|текст при наведении/.test(q)) return false;
+    if (linkTask && !asksResourceLink && key === 'link') return false;
     if (linkTask && !asksServiceWorker && /serviceworker|service worker/.test(key)) return false;
     if (linkTask && /^(?:self|none)$/.test(key) && !/новом окне|вкладк|target|blank|self/.test(q)) return false;
     if (hoverTask && !asksSpacing && /letter-spacing|line-height|white-space/.test(key)) return false;
