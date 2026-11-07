@@ -18,11 +18,12 @@ await fs.writeFile(path.join(L, 'public', 'index.html'), '<!doctype html><title>
 await fs.copyFile(path.join(TOOLS, 'code-lab', 'public', 'tasks-format.js'), path.join(L, 'public', 'tasks-format.js'));   // общий формат задач (сервер и браузер)
 for(const f of ['code-links.js', 'structure-rules.js']) await fs.copyFile(path.join(TOOLS, 'code-lab', 'public', f), path.join(L, 'public', f));   // связи и правила структуры — общие для сервера и страницы
 for(const f of ['concepts.html', 'concepts.js', 'style.css', 'shell.js']) await fs.copyFile(path.join(TOOLS, 'code-lab', 'public', f), path.join(L, 'public', f));   // страница пользовательских конструкций и её оболочка
-await fs.writeFile(path.join(L, 'public', 'keyword-dict.json'), JSON.stringify({ words: { print: 'print — вывод' }, cssProps: { 'font-weight': 'font-weight — жирность шрифта', 'font-size': 'font-size — размер шрифта' } }));
+await fs.writeFile(path.join(L, 'public', 'keyword-dict.json'), JSON.stringify({ words: { print: 'print — вывод', fetch: 'fetch — получить данные с сервера' }, cssProps: { 'font-weight': 'font-weight — жирность шрифта', 'font-size': 'font-size — размер шрифта' } }));
 await fs.mkdir(path.join(L, 'public', 'dict'), { recursive: true });
 await fs.writeFile(path.join(L, 'public', 'dict', 'synonyms.json'), JSON.stringify({
   'font-weight': ['толщина шрифта'],
-  'font-size': ['толщина шрифта']
+  'font-size': ['толщина шрифта'],
+  'fetch': ['получить данные из нескольких источников']
 }));
 // две старые карточки: автомиграция должна перенести их в library/
 const card = (id, title, lang, code, desc, group) => ({ id, lang, group, title, desc, output: '', lines: code.split('\n').map(l => [{ k: 'name', v: l, r: l }]) });
@@ -118,6 +119,24 @@ try {
     assert.ok(weight.pieces.some(piece => piece.id === 'css-bold'));
     assert.ok(comparison.shadow.hits.some(hit => hit.targetKey === 'font-size'), 'неоднозначная фраза должна сохранить вторую цель');
     assert.equal(comparison.shadow.ambiguous, true);
+  });
+
+  await test('направленная цель становится корнем дерева и сохраняет связь с фрагментом по HTTP', async () => {
+    const code = "const response = await fetch('/api/data');";
+    await fs.writeFile(path.join(L, 'library', 'js', 'fetch-task-example.js'), code);
+    await fs.writeFile(path.join(L, 'library', 'js', 'fetch-task-example.js.meta.json'), JSON.stringify({
+      id: 'fetch-task-example', lang: 'js', title: 'Запрос данных из источника',
+      group: 'JavaScript: сеть', desc: 'Получить данные с сервера', tags: [], aliases: []
+    }));
+    await new Promise(resolve => setTimeout(resolve, 1100));
+    await get('/api/list');
+    const query = 'получить данные из нескольких источников и вывести по блокам';
+    const result = await get('/api/search/task?q=' + encodeURIComponent(query));
+    const root = result.roots.find(item => item.term === 'fetch' && item.lang === 'js');
+    assert.ok(root, 'направленная цель должна стать корнем дерева');
+    assert.match(root.note, /Направленная поисковая формулировка/);
+    assert.ok(root.children.some(item => item.piece === 'fetch-task-example'), 'корень должен вести к найденному фрагменту');
+    assert.ok(result.targets.some(item => item.targetKey === 'fetch'));
   });
 
   await test('правка файла синонимов подхватывается без перезапуска', async () => {
