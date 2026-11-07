@@ -114,3 +114,26 @@ test('migrateTemplates reports a same-ID code conflict without overwriting the l
     await fs.rm(f.root, { recursive: true, force: true });
   }
 });
+
+test('migrateTemplates classifies language-specific and TypeScript fallback notes as dictionary notes', async () => {
+  const f = await fixture();
+  try {
+    const file = path.join(f.src, 'dom-example.json');
+    const card = JSON.parse(await fs.readFile(file, 'utf8'));
+    card.lang = 'sql';
+    card.lines = [[
+      { k: 'kw', v: 'FROM', e: 'FROM — источник таблиц SQL' },
+      { k: 'sp' },
+      { k: 'name', v: 'таблица', e: 'имя таблицы' }
+    ]];
+    await fs.writeFile(file, JSON.stringify(card), 'utf8');
+    const dict = { words: {}, langs: { sql: { from: 'FROM — источник таблиц SQL' } } };
+    const report = await migrateTemplates({ src: f.src, out: f.out, dict });
+    const meta = JSON.parse(await fs.readFile(path.join(f.out, 'sql', 'dom-example.sql.meta.json'), 'utf8'));
+    assert.equal(report.created, 1);
+    assert.equal(meta.wordNotes[0].source, 'dict');
+    assert.equal(meta.wordNotes[1].source, 'custom');
+  } finally {
+    await fs.rm(f.root, { recursive: true, force: true });
+  }
+});
