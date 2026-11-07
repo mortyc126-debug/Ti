@@ -179,3 +179,25 @@ test('язык цели определяется по связанному фр�
   });
   assert.equal(result.targets[0].rootLang, 'js');
 });
+
+
+test('резервная сборка сохраняет порядок целей и фрагментов внутри цели', () => {
+  const result = combineTaskSearch({
+    query: 'получить данные из двух источников',
+    directed: {
+      hits: [
+        { targetKey: 'fetch', score: 56, pieces: [
+          { id: 'fetch-a', title: 'fetch A', lang: 'js' },
+          { id: 'fetch-b', title: 'fetch B', lang: 'js' }
+        ] },
+        { targetKey: 'Promise.all', score: 47, pieces: [
+          { id: 'promise-all', title: 'Promise.all', lang: 'js' }
+        ] }
+      ],
+      rankedPieces: []
+    },
+    library: { hits: [] },
+    variants: { roots: [] }
+  });
+  assert.deepEqual(result.pieces.map(piece => piece.id), ['fetch-a', 'fetch-b', 'promise-all']);
+});
