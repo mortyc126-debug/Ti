@@ -157,4 +157,17 @@ const task = taskIndex.search('Добавить кнопку, которая п�
 assert.deepEqual(new Set(task.hits.map(hit => hit.targetKey)), new Set(['button', 'alert', 'addeventlistener']));
 assert.ok(task.hits.every(hit => hit.phrases[0].match.kind === 'partial'));
 
+const reduceUsage = {
+  terms: { js: { '.reduce': {} } },
+  piecesOf() { return ['reduce-code']; },
+  pieceInfo() { return { id: 'reduce-code', title: 'Свёртка массива', lang: 'js' }; },
+  pieceText() { return 'const total = items.reduce((sum, item) => sum + item, 0)'; }
+};
+const reduceIndex = createLegacyQueryPhraseShadow({
+  queryPhrases: [{ id: 'reduce', phrase: 'свернуть массив', targetKey: '.reduce' }],
+  usage: reduceUsage
+});
+assert.equal(reduceIndex.search('свернуть боковую панель').total, 0);
+assert.equal(reduceIndex.search('свернуть массив').hits[0].targetKey, '.reduce');
+
 console.log('query-phrase-shadow: isolated index and content-filter tests passed');
