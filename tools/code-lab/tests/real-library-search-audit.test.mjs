@@ -200,7 +200,7 @@ async function main() {
   assert.ok(!hoverTerms.some(x => x === 'textcontent'), 'подсветка при наведении не должна подменяться изменением текста');
   assert.ok(!taskResultMap.get(buttonQuery).pieces.some(x => /Service Worker|Web Worker/i.test(x.title)), 'не подмешивать worker-фрагменты к обычной кнопке');
   assert.ok(!taskResultMap.get(linkQuery).pieces.some(x => /символическ.*ссылк|удаление файла/i.test(x.title)), 'не подмешивать файловые ссылки к HTML-ссылке');
-  assert.ok(!taskResultMap.get(collapseQuery).pieces.some(x => /Свёртка массива|свернуть в одно значение|gl\\.useProgram|экранной клавиатур/i.test(x.title)), 'не подмешивать свёртку массива и посторонние UI-фрагменты к раскрываемому блоку');
+  assert.ok(!taskResultMap.get(collapseQuery).pieces.some(x => /Свёртка массива|свернуть в одно значение|gl\.useProgram|экранной клавиатур/i.test(x.title)), 'не подмешивать свёртку массива и посторонние UI-фрагменты к раскрываемому блоку');
   assert.ok(taskTerms(buttonQuery).some(x => /button/.test(x)), 'кнопка должна находиться в HTML');
   assert.ok(taskTerms(buttonQuery).some(x => /addeventlistener|click/.test(x)), 'для кнопки должен находиться обработчик события');
   assert.ok(taskTerms(buttonQuery).some(x => /alert|textcontent|innertext/.test(x)), 'должен находиться способ показать сообщение');
