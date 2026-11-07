@@ -179,11 +179,12 @@ async function main() {
     branch: 'audit/fixes-2026-11-06',
     commit: process.env.GITHUB_SHA || null,
     libraryMode: 'real repository checkout; no synthetic fixture',
-    shadowRanking: 'fragment-level; phrase match score plus title/description/tags/aliases relevance; deterministic heuristic, not semantic model ranking',
+    shadowRanking: 'fragment-level; exact and token-overlap phrase matches with Russian stemming, plus title/description/tags/aliases relevance; deterministic heuristic, not semantic model ranking',
     comparisonNote: 'shadow and legacy now expose fragment positions; their scoring systems differ, so compare rank movement and content relevance rather than raw score values',
     queryCount: queries.length,
     phraseCount: (await get('/api/search/shadow?q=' + encodeURIComponent(queries[0]) + '&limit=1')).shadowPhraseCount,
     templateCount: templateCache.size,
+    taskResults,
     results
   };
   await fs.writeFile(OUT, JSON.stringify(report, null, 2) + '\n');
