@@ -52,10 +52,9 @@ function pieceMatchesTarget(targetKey, phrase, piece, usage) {
 }
 
 const conceptIdentity = targetKey => normalize(targetKey).replace(/\([^()]*\)$/, '');
-const words = value => new Set(normalize(value).match(/[\p{L}\p{N}_-]+/gu) || []);
 function overlap(text, phraseWords) {
   if (!phraseWords.size) return 0;
-  const haystack = words(text);
+  const haystack = new Set(queryTokens(text));
   let common = 0;
   for (const word of phraseWords) if (haystack.has(word)) common++;
   return common / phraseWords.size;
