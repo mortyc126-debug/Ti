@@ -9,14 +9,14 @@ const canonicalLanguage = value => {
   return ({ javascript: 'js', node: 'js', typescript: 'ts', python3: 'python', html5: 'html', css3: 'css' })[lang] || lang;
 };
 const QUERY_LANGUAGE_HINTS = [
-  ['ts', /\\b(?:typescript|ts)\\b|тайпскрипт/],
-  ['js', /\\b(?:javascript|js|node(?:\\.js)?)\\b|яваскрипт/],
-  ['python', /\\bpython(?:3)?\\b|питон/],
-  ['sql', /\\bsql\\b/],
-  ['css', /\\bcss\\b/],
-  ['html', /\\bhtml\\b/],
-  ['svg', /\\bsvg\\b/],
-  ['sh', /\\b(?:bash|shell)\\b|оболочк/]
+  ['ts', /\b(?:typescript|ts)\b|тайпскрипт/],
+  ['js', /\b(?:javascript|js|node(?:\.js)?)\b|яваскрипт/],
+  ['python', /\bpython(?:3)?\b|питон/],
+  ['sql', /\bsql\b/],
+  ['css', /\bcss\b/],
+  ['html', /\bhtml\b/],
+  ['svg', /\bsvg\b/],
+  ['sh', /\b(?:bash|shell)\b|оболочк/]
 ];
 function inferQueryLanguage(query) {
   const matches = new Set(QUERY_LANGUAGE_HINTS.filter(([, pattern]) => pattern.test(query)).map(([lang]) => lang));
