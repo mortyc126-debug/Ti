@@ -236,6 +236,8 @@ async function main() {
   assert.ok(taskTerms(hoverQuery).some(x => x === '<header>'), 'должна учитываться шапка страницы');
   assert.ok(!taskTerms(hoverQuery).some(x => /letter-spacing|line-height|sort|write/.test(x)), 'не подмешивать несвязанные свойства и команды');
   assert.ok(!taskTerms(dataQuery).some(term => term === 'get' || term === 'list'), 'слова «получить» и «список» не должны превращаться в HTML-метод GET и атрибут list');
+  assert.ok(!taskTerms(dataQuery).some(term => term === 'innertext'), 'вывод полученных данных не должен подменяться чтением уже отображённого текста');
+  assert.ok(!taskResultMap.get(linkQuery).pieces.slice(0, 5).some(piece => !(piece.matchedTargets || []).length), 'несвязанные лексические совпадения не должны занимать первые пять позиций, если найдены направленные фрагменты');
   const dataTargets = taskResultMap.get(dataQuery).targets.map(x => x.targetKey);
   assert.ok(!taskResultMap.get(dataQuery).roots.some(root => /^<(?:form|input|datalist)\b/i.test(String(root.term || ''))), 'обычный вывод данных на страницу не должен превращаться в форму поиска или поле ввода');
   assert.ok(dataTargets.indexOf('fetch') >= 0 && dataTargets.indexOf('response.json()') > dataTargets.indexOf('fetch'), 'получение данных должно стоять выше разбора JSON-ответа: ' + dataTargets.join(', ') + '; counts=' + JSON.stringify(taskResultMap.get(dataQuery).counts));
