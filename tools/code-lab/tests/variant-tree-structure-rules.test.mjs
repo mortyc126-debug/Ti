@@ -150,6 +150,26 @@ test('длинное описание задачи находит констру
   assert.ok(terms.has('addeventlistener'));
 });
 
+
+test('совпадение слова внутри HTML-конструкции не создаёт несуществующий отдельный элемент', () => {
+  const html = {
+    ...dict,
+    langs: {
+      ...dict.langs,
+      html: { ...dict.langs.html, '<div role="alert">': 'область для сообщения об ошибке' }
+    }
+  };
+  const result = buildVariants({
+    q: 'показать сообщение',
+    lang: 'html',
+    dict: html,
+    rows: [],
+    synonyms: { alert: ['показать сообщение'] }
+  });
+  assert.ok(result.roots.some(x => x.term === '<div role="alert">'));
+  assert.equal(result.roots.some(x => x.term === 'alert'), false);
+});
+
 test('синонимы HTML-тега находят словарную запись с угловыми скобками', () => {
   const tagged = {
     ...dict,
