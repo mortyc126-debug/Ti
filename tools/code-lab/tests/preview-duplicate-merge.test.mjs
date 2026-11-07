@@ -73,7 +73,7 @@ try {
   assert.equal(preview.summary.provenanceSourcePassportsPreserved, 4);
   assert.equal(preview.summary.componentFieldConflicts, 1);
   assert.equal(preview.summary.provenanceFieldConflicts, 0);
-  assert.equal(preview.summary.provenanceOriginalFieldConflicts, 2);
+  assert.equal(preview.summary.provenanceOriginalDescConflicts, 2);
   assert.equal(preview.summary.descSourceProvenanceResolvedPairs, 2);
   assert.equal(preview.summary.componentMergeCompletePairs, 1);
   assert.equal(preview.summary.provenanceMergeCompletePairs, 2);
