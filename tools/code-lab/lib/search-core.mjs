@@ -37,6 +37,9 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
   const pieceCompatible = item => {
     const text = normalize([item?.title, item?.group, item?.desc, ...(item?.tags || []), ...(item?.aliases || [])].filter(Boolean).join(' '));
     if (buttonTask && !asksGamepad && /геймпад|gamepad/.test(text)) return false;
+    if (webTask && !asksServiceWorker && /service worker|web worker/.test(text)) return false;
+    if (linkTask && !/файл|каталог|путь|символическ|symlink|filesystem|linux|unix/.test(q) && /символическ ссылк|symlink|удаление файла/.test(text)) return false;
+    if (collapseTask && !hasCollectionObject && /свёртк|свертк|reduce|массив|список элементов/.test(text)) return false;
     if (buttonTask && !asksKeyboard && /keydown|keyup|клавиатур|keyboard/.test(text)) return false;
     if (buttonTask && !asksMouse && (text.includes('event.button') || /кнопку мыши|кнопка мыши/.test(text))) return false;
     if (buttonTask && !/ошиб|исключ|error|exception/.test(q) && /ошибка|исключение|error|exception|assertion/.test(text)) return false;
@@ -59,6 +62,9 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
   const targetCompatible = target => {
     const key = normalize(target);
     if (buttonTask && !asksMouse && key.includes('event.button')) return false;
+    if (key === 'disabled' && !/отключ|заблок|неактив|запрет|disable/.test(q)) return false;
+    if (key === 'event.target' && !/делегир|всплыти|распростран|event.target|нажатый элемент|определить элемент/.test(q)) return false;
+    if (hoverTask && key === 'textcontent' && !/изменить текст|обновить текст|заменить текст|текст при наведении/.test(q)) return false;
     if (linkTask && !asksServiceWorker && /serviceworker|service worker/.test(key)) return false;
     if (linkTask && /^(?:self|none)$/.test(key) && !/новом окне|вкладк|target|blank|self/.test(q)) return false;
     if (hoverTask && !asksSpacing && /letter-spacing|line-height|white-space/.test(key)) return false;
