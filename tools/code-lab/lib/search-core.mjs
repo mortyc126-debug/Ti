@@ -115,7 +115,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
   const directedPieces = [...directedById.values()].sort((a, b) => {
     const rank = item => item.position ?? ((item.targetPosition || 999) * 1000 + (item.piecePositionWithinTarget || 999));
     return rank(a) - rank(b) || String(a.title || a.id).localeCompare(String(b.title || b.id), 'ru');
-  });
+  }).slice(0, max);
 
   directedPieces.filter(inTaskScope).forEach((piece, index) => {
     const item = ensure(piece.id);
@@ -217,6 +217,8 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
       targets: targets.length,
       roots: roots.length,
       pieces: pieces.length,
+      directedRawPieces: (directed?.rankedPieces || []).length,
+      directedRawLanguages: [...new Set((directed?.rankedPieces || []).map(piece => String(piece.lang || '')))].slice(0, 8),
       directedPieces: directedPieces.filter(inTaskScope).length,
       lexicalPieces: (library?.hits || []).filter(inTaskScope).length
     }
