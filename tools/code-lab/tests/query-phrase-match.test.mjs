@@ -33,6 +33,7 @@ test('объект запроса снимает ложную неоднозна
 
 test('контрастные уточнения не смешиваются при частичном совпадении', () => {
   assert.equal(matchQueryPhrase('отступ внутри элемента', 'отступ снаружи элемента'), null);
+  assert.equal(matchQueryPhrase('отступ внутри элемента', 'отступ'), null);
   assert.equal(matchQueryPhrase('толщина шрифта', 'размер шрифта'), null);
   assert.equal(matchQueryPhrase('межбуквенный интервал', 'межстрочный интервал'), null);
   assert.equal(matchQueryPhrase('спрятать элемент сохранив место', 'скрыть элемент из потока'), null);
