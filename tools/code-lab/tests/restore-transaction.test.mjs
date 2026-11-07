@@ -89,6 +89,24 @@ try {
     assert.equal(await fs.readFile(target, 'utf8'), 'damaged');
   })();
   await (async () => {
+    const target = path.join(tmp, 'fsync-target.txt');
+    const source = path.join(tmp, 'fsync-source.txt');
+    await fs.writeFile(target, 'preserve original');
+    await fs.writeFile(source, 'replacement');
+    const failingFs = {
+      ...fs,
+      mkdir: fs.mkdir.bind(fs),
+      copyFile: fs.copyFile.bind(fs),
+      open: async () => { throw new Error('simulated fsync failure'); },
+      rename: fs.rename.bind(fs),
+      unlink: fs.unlink.bind(fs)
+    };
+    await assert.rejects(copyFileAtomic(source, target, failingFs), /simulated fsync failure/);
+    assert.equal(await fs.readFile(target, 'utf8'), 'preserve original');
+    assert.deepEqual((await fs.readdir(tmp)).filter(name => name.startsWith('.restore-fsync-target')), []);
+  })();
+
+  await (async () => {
     const root = path.join(tmp, 'journal-root');
     const backupRoot = path.join(tmp, 'journal-backup');
     await fs.mkdir(root, { recursive: true });
@@ -110,4 +128,4 @@ try {
 } finally {
   await fs.rm(tmp, { recursive: true, force: true });
 }
-console.log('restore-transaction: 5 сценариев пройдены');
+console.log('restore-transaction: 6 сценариев пройдены');
