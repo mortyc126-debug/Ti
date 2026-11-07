@@ -1068,6 +1068,25 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, await search.search(q, { limit, lang, boost: await searchBoost() }));
     }
 
+    // Единый поиск по описанию задачи: направленные фразы + полнотекстовая библиотека + дерево конструкций.
+    // Контекст активного файла влияет на ранжирование фрагментов, но не отрезает остальные языки:
+    // задача сборки страницы обычно затрагивает HTML, CSS и JavaScript одновременно.
+    if(u.pathname === '/api/search/task' && req.method === 'GET'){
+      const q = String(u.searchParams.get('q') || '').slice(0, 500);
+      const limit = Math.min(200, Number(u.searchParams.get('limit')) || 60);
+      const lang = String(u.searchParams.get('lang') || '').toLowerCase();
+      const scope = String(u.searchParams.get('scope') || '');
+      const boost = await searchBoost();
+      const [library, directed, variants] = await Promise.all([
+        search.search(q, { limit, lang, boost }),
+        getQueryPhraseShadow().then(index => index.search(q, { limit, scope })),
+        variantsFor(q, '')
+      ]);
+      return json(res, 200, combineTaskSearch({
+        query: q, language: lang, limit, library, directed, variants
+      }));
+    }
+
     // «на что похоже»: сравнить присланный код с кусками библиотеки по общим токенам (Жаккар).
     // {code, lang?, exclude?} → { hits:[{id,title,lang,score, shared:[токены]}] } — похожие фрагменты.
     if(u.pathname === '/api/similar' && req.method === 'POST'){
