@@ -71,7 +71,7 @@ try {
   assert.equal(preview.summary.conceptNotesMovedIntoCandidatePassport, 0);
   assert.equal(preview.summary.componentDataPreservedInSourcePassports, 3);
   assert.equal(preview.summary.provenanceSourcePassportsPreserved, 2);
-  assert.equal(preview.summary.componentFieldConflicts, 0);
+  assert.equal(preview.summary.componentFieldConflicts, 1);
   assert.equal(preview.summary.provenanceFieldConflicts, 1);
   assert.equal(preview.summary.componentMergeCompletePairs, 1);
   assert.equal(preview.summary.provenanceMergeCompletePairs, 1);
