@@ -21,8 +21,8 @@ try {
 
   const conflictCode = 'function run() { return 2; }\\n';
   const conflictHash = crypto.createHash('sha256').update(conflictCode.trim()).digest('hex');
-  const conflictLegacy = { id: 'legacy-conflict-mvr123xyz', component: { provides: ['first'] } };
-  const conflictCanonical = { id: 'canonical-conflict', component: { provides: ['second'] } };
+  const conflictLegacy = { id: 'legacy-conflict-mvr123xyz', desc: 'Подробное описание со старой стороны.', source: { desc: 'imported' }, component: { provides: ['first'] } };
+  const conflictCanonical = { id: 'canonical-conflict', desc: 'Коротко.', source: { desc: 'manual' }, component: { provides: ['second'] } };
   await fs.writeFile(path.join(library, 'js', 'legacy-conflict-mvr123xyz.js'), conflictCode);
   await fs.writeFile(path.join(library, 'js', 'legacy-conflict-mvr123xyz.js.meta.json'), JSON.stringify(conflictLegacy));
   await fs.writeFile(path.join(library, 'js', 'canonical-conflict.js'), conflictCode);
@@ -59,22 +59,27 @@ try {
   assert.deepEqual(pair.review.componentMergeProposal.nonConflicting, { provides: ['a'] });
   assert.deepEqual(pair.review.componentMergeProposal.conflicts, []);
   assert.equal(pair.review.componentMergeProposal.complete, true);
-  assert.deepEqual(pair.review.provenanceMergeProposal.nonConflicting, {});
-  assert.deepEqual(pair.review.provenanceMergeProposal.conflicts, [{
-    key: 'desc',
-    values: [
-      { file: 'js/canonical-piece.js', value: 'manual' },
-      { file: 'js/legacy-piece-mvr123abc.js', value: 'imported' }
-    ]
-  }]);
-  assert.equal(pair.review.provenanceMergeProposal.complete, false);
+  assert.deepEqual(pair.review.provenanceMergeProposal.nonConflicting, { desc: 'manual' });
+  assert.deepEqual(pair.review.provenanceMergeProposal.conflicts, []);
+  assert.equal(pair.review.provenanceMergeProposal.complete, true);
+  assert.equal(pair.review.provenanceMergeProposal.resolvedFields[0].selectedFile, 'js/canonical-piece.js');
+  assert.equal(pair.review.provenanceMergeProposal.resolvedFields[0].selectedValue, 'manual');
+  assert.deepEqual(pair.review.provenanceMergeProposal.resolvedFields[0].originalValues, [
+    { file: 'js/canonical-piece.js', value: 'manual' },
+    { file: 'js/legacy-piece-mvr123abc.js', value: 'imported' }
+  ]);
   assert.equal(preview.summary.conceptNotesMovedIntoCandidatePassport, 0);
   assert.equal(preview.summary.componentDataPreservedInSourcePassports, 3);
   assert.equal(preview.summary.provenanceSourcePassportsPreserved, 2);
   assert.equal(preview.summary.componentFieldConflicts, 1);
-  assert.equal(preview.summary.provenanceFieldConflicts, 1);
+  assert.equal(preview.summary.provenanceFieldConflicts, 0);
+  assert.equal(preview.summary.provenanceOriginalFieldConflicts, 2);
+  assert.equal(preview.summary.descSourceProvenanceResolvedPairs, 2);
   assert.equal(preview.summary.componentMergeCompletePairs, 1);
-  assert.equal(preview.summary.provenanceMergeCompletePairs, 1);
+  assert.equal(preview.summary.provenanceMergeCompletePairs, 2);
+  assert.equal(preview.pairs[1].review.descSourceFile, 'js/legacy-conflict-mvr123xyz.js');
+  assert.equal(preview.pairs[1].review.provenanceMergeProposal.nonConflicting.desc, 'imported');
+  assert.equal(preview.pairs[1].review.provenanceMergeProposal.resolvedFields[0].selectedValue, 'imported');
   const componentConflict = preview.pairs[1].review.componentMergeProposal;
   assert.equal(componentConflict.complete, false);
   assert.deepEqual(componentConflict.nonConflicting, {});
