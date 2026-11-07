@@ -258,6 +258,22 @@ test('языковая область фильтруется до лимита, 
 });
 
 
+test('не подменяет вывод итога арифметической операцией без запроса на сумму', () => {
+  const search = query => combineTaskSearch({
+    query,
+    directed: {
+      hits: [{ targetKey: 'sum', score: 40, pieces: [{ id: 'sum-piece', title: 'SUM', lang: 'html' }] }],
+      rankedPieces: [{ id: 'sum-piece', title: 'SUM', lang: 'html', targetKey: 'sum' }]
+    },
+    library: { hits: [] },
+    variants: { roots: [] }
+  });
+  const display = search('Получить данные из двух источников и вывести итог внизу страницы');
+  assert.equal(display.targets.some(x => x.targetKey === 'sum'), false);
+  const arithmetic = search('Получить данные из двух источников, сложить значения и вывести сумму на страницу');
+  assert.equal(arithmetic.targets.some(x => x.targetKey === 'sum'), true);
+});
+
 test('область задачи распознаёт веб-сборку и не путает её с задачей по массивам', () => {
   assert.equal(inferTaskScope('Добавить кнопку, которая показывает сообщение при нажатии'), 'web');
   assert.equal(inferTaskScope('Свернуть массив в одно значение'), '');
