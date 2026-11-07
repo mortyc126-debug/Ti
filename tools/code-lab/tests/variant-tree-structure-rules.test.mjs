@@ -71,6 +71,9 @@ test('ограничения не смешиваются с допустимым
   const group = groupFor(result, 'p', 'Запрещённое содержимое');
   assert.ok(group.children.some(x => /div/.test(x.show)));
   assert.equal(result.roots.find(x => x.term === 'p').children.some(x => x.label === 'Состав конструкции'), false);
+  const inverse = buildVariants({ q: 'div', lang: 'html', dict, rows: [], synonyms: {} });
+  const inverseGroup = groupFor(inverse, 'div', 'Запрещённое содержимое');
+  assert.ok(inverseGroup.children.some(x => x.term === 'p'));
 });
 
 test('правило первого элемента имеет отдельный тип отношения', () => {
