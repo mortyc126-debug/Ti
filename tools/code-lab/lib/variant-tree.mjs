@@ -200,12 +200,16 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
         add('содержит', term + ' содержит ' + r.term, r, r.term, L, true);
       if(r.verb === 'не внутри' && own)
         r.args.forEach(a => add('не внутри', term + ' нельзя размещать внутри ' + a, r, a));
+      if(r.verb === 'не внутри' && refs.includes(key) && exists(r.term))
+        add('не содержит', term + ' не может содержать ' + r.term, r, r.term, L, true);
       if(r.verb === 'содержит' && own)
         r.args.forEach(a => add('содержит', term + ' содержит ' + a, r, a, L, true));
       if(r.verb === 'содержит' && refs.includes(key) && exists(r.term))
         add('содержит', r.term + ' содержит ' + term, r, r.term, L, true);
       if(r.verb === 'не содержит' && own)
         r.args.forEach(a => add('не содержит', term + ' не может содержать ' + a, r, a));
+      if(r.verb === 'не содержит' && refs.includes(key) && exists(r.term))
+        add('не содержит', r.term + ' не может содержать ' + term, r, r.term, L, true);
       if(r.verb === 'первым в' && own)
         r.args.forEach(a => add('первым в', term + ' должен быть первым в ' + a, r, a, L, true));
       if(r.verb === 'первым в' && refs.includes(key) && exists(r.term))
