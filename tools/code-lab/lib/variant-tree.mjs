@@ -212,6 +212,11 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
       const refs = r.args.map(a => norm(a));
       if(r.verb === 'после' && refs.includes(key) && exists(r.term))
         add('после', r.term + ' — следует после ' + term, r, r.term, L, true);
+      // Показываем и обратную сторону порядка: если текущий термин сам объявлен
+      // следующим после другого, предыдущая конструкция должна быть видна прямо здесь.
+      if(r.verb === 'после' && own)
+        r.args.forEach(a => add('после', term + ' следует после ' + a, r, a, L, true));
+
       if(r.verb === 'внутри' && own)
         r.args.forEach(a => add('внутри', term + ' находится внутри ' + a, r, a, L, true));
       if(r.verb === 'внутри' && refs.includes(key) && exists(r.term))
