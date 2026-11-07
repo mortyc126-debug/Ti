@@ -174,8 +174,8 @@ console.log('query-phrase-shadow: isolated index and content-filter tests passed
 
 
 const scopedUsage = {
-  terms: { JavaScript: { fetch: {} }, python: { fetch: {} } },
-  piecesOf(section) { return section === 'JavaScript' ? ['js-fetch'] : ['py-fetch']; },
+  terms: { common: { fetch: {} } },
+  piecesOf(section) { return section === 'common' ? ['js-fetch', 'py-fetch'] : []; },
   pieceInfo(id) {
     return id === 'js-fetch'
       ? { id, title: 'Получить данные через fetch', lang: 'javascript' }
