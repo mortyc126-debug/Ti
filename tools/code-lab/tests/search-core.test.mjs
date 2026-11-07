@@ -25,7 +25,7 @@ test('объединяет направленные фразы и полноте
   });
 
   assert.equal(result.mode, 'task');
-  assert.equal(result.targets[0].root.term, 'button');
+  assert.equal(result.targets[0].rootTerm, 'button');
   assert.deepEqual(result.pieces.map(piece => piece.id), ['both', 'phrase-only', 'text-only']);
   assert.deepEqual(result.pieces[0].sources, ['направленные фразы', 'полнотекстовый поиск']);
   assert.equal(result.pieces[0].matchedTargets[0], 'button');
