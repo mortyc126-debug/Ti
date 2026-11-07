@@ -131,6 +131,26 @@ test('длинное описание задачи находит констру
   assert.ok(terms.has('addeventlistener'));
 });
 
+test('синонимы HTML-тега находят словарную запись с угловыми скобками', () => {
+  const tagged = {
+    ...dict,
+    langs: {
+      ...dict.langs,
+      html: { ...dict.langs.html, '<aside>': 'обозначает боковую панель страницы' }
+    }
+  };
+  const result = buildVariants({
+    q: 'свернуть боковую панель',
+    lang: 'html',
+    dict: tagged,
+    rows: [],
+    synonyms: { '<aside>': ['боковая панель'] }
+  });
+  const root = result.roots.find(x => x.term === '<aside>');
+  assert.ok(root);
+  assert.equal(root.code, '<aside>');
+});
+
 test('шаблон синтаксиса берётся из общего парсера', () => {
   const result = buildVariants({ q: 'if', lang: 'js', dict, rows: [], synonyms: {} });
   const root = result.roots.find(x => x.term === 'if');
