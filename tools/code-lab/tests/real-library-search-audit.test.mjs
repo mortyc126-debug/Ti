@@ -190,6 +190,13 @@ async function main() {
   };
   const buttonQuery = taskScenarios[0], linkQuery = taskScenarios[1], collapseQuery = taskScenarios[2];
   const hoverQuery = taskScenarios[3], dataQuery = taskScenarios[4], sidebarQuery = taskScenarios[5];
+  const buttonTitles = taskResultMap.get(buttonQuery).pieces.map(piece => piece.title);
+  assert.ok(!buttonTitles.some(title => /форма|formdata|submit|отправк формы/i.test(title)), 'простая кнопка не должна притягивать отправку формы');
+  const linkTitles = taskResultMap.get(linkQuery).pieces.map(piece => piece.title);
+  assert.ok(!linkTitles.some(title => /style\\.css|stylesheet|google fonts|image map|карта областей изображения/i.test(title)), 'ссылка на страницу не должна смешиваться с подключением ресурсов и image map');
+  const collapseTitles = taskResultMap.get(collapseQuery).pieces.map(piece => piece.title);
+  assert.ok(!collapseTitles.some(title => /групп.*сообщен|сообщен.*групп|канонический путь|symbolic link/i.test(title)), 'сворачиваемый блок не должен смешиваться с группами сообщений и файловыми путями');
+
   const buttonTerms = taskTerms(buttonQuery);
   const linkTerms = taskTerms(linkQuery);
   const collapseTerms = taskTerms(collapseQuery);
