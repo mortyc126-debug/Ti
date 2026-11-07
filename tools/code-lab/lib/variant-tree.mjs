@@ -217,6 +217,7 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
       let item;
       if(actionable && target && exists(target, targetLang)){
         item = node(target, targetLang, verb);
+        item.show = show;
         item.note = [item.note, rule.note, relationDescriptions[verb]].filter(Boolean).join(' · ');
       } else {
         item = { term: target || '', lang: targetLang, code: '', show, label: '', note, relation: verb, children: [] };
