@@ -110,7 +110,7 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
     const D = langs[L] || {};
     for(const [term, phrases] of Object.entries(synonyms || {})){
       if(!Array.isArray(phrases)) continue;
-      const matches = phrases.map(phrase => ({ phrase, match: matchQueryPhrase(qn, phrase) }))
+      const matches = phrases.map(phrase => ({ phrase, match: matchQueryPhrase(qn, phrase, term) }))
         .filter(item => item.match).sort((a, b) => b.match.score - a.match.score);
       const hit = matches[0]; if(!hit) continue;
       const res = resolve(term, D, L); if(!res) continue;
