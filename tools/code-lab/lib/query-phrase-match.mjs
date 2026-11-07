@@ -25,9 +25,9 @@ export function queryTokens(value) {
 
 function contextConflict(query, phrase, targetKey) {
   const q = normalize(query), p = normalize(phrase), target = normalize(targetKey);
-  const qUi = /панел|блок|раздел|страниц|sidebar|меню|вкладк|шапк|заголов|кнопк|ссылк|текст|надпис|элемент|карточк|поле|форм/.test(q);
+  const qUi = /панел|блок|раздел|страниц|sidebar|меню|вкладк|шапк|заголов|кнопк|ссылк|надпис|карточк|поле|форм/.test(q);
   const qCollection = /массив|список|коллекц|последовательност/.test(q);
-  const pUi = /панел|блок|раздел|страниц|sidebar|меню|вкладк|шапк|заголов|кнопк|ссылк|текст|надпис|элемент|карточк|поле|форм/.test(p);
+  const pUi = /панел|блок|раздел|страниц|sidebar|меню|вкладк|шапк|заголов|кнопк|ссылк|надпис|карточк|поле|форм/.test(p);
   const pCollection = /массив|список|коллекц|последовательност/.test(p);
   const qInside = /внутр/.test(q), qOutside = /снаруж/.test(q);
   const pInside = /внутр/.test(p), pOutside = /снаруж/.test(p);
