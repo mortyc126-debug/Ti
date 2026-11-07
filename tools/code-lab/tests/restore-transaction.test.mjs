@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { copyFileAtomic, rollbackRestore } from '../lib/restore-transaction.mjs';
+import { copyFileAtomic, rollbackRestore, prepareRestoreTransaction, markRestoreTransaction } from '../lib/restore-transaction.mjs';
 
 const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'restore-transaction-'));
 try {
@@ -88,7 +88,26 @@ try {
     assert.deepEqual(errors, ['simulated rollback failure']);
     assert.equal(await fs.readFile(target, 'utf8'), 'damaged');
   })();
+  await (async () => {
+    const root = path.join(tmp, 'journal-root');
+    const backupRoot = path.join(tmp, 'journal-backup');
+    await fs.mkdir(root, { recursive: true });
+    await fs.mkdir(backupRoot, { recursive: true });
+    const target = path.join(root, 'piece.js');
+    const backup = path.join(backupRoot, 'piece.js');
+    await fs.writeFile(target, 'original');
+    await fs.writeFile(backup, 'original');
+    const manifest = await prepareRestoreTransaction({
+      fs, backupRoot, root, rootName: 'library',
+      writes: [{ abs: target }], backups: new Map([[target, backup]])
+    });
+    assert.equal(manifest.operations[0].target, 'piece.js');
+    const stored = JSON.parse(await fs.readFile(path.join(backupRoot, 'manifest.json'), 'utf8'));
+    assert.equal(stored.format, 'code-lab-restore-transaction');
+    await markRestoreTransaction({ fs, backupRoot, state: 'COMMITTED' });
+    assert.ok((await fs.stat(path.join(backupRoot, 'COMMITTED'))).isFile());
+  })();
 } finally {
   await fs.rm(tmp, { recursive: true, force: true });
 }
-console.log('restore-transaction: 4 сценария пройдены');
+console.log('restore-transaction: 5 сценариев пройдены');
