@@ -198,7 +198,11 @@ async function main() {
   assert.ok(!collapseTitles.some(title => /групп.*сообщен|сообщен.*групп|канонический путь|symbolic link/i.test(title)), 'сворачиваемый блок не должен смешиваться с группами сообщений и файловыми путями');
 
   const buttonTerms = taskTerms(buttonQuery);
+  assert.ok(!buttonTerms.includes('form'), 'обычная кнопка не должна превращаться в форму');
+
   const linkTerms = taskTerms(linkQuery);
+  assert.ok(linkTerms.includes('a') && !linkTerms.includes('link'), 'переход на страницу должен вести к <a>, а не к ресурсному тегу <link>');
+
   const collapseTerms = taskTerms(collapseQuery);
   const hoverTerms = taskTerms(hoverQuery);
   assert.ok(taskResultMap.get(buttonQuery).roots.findIndex(x => /button/.test(String(x.term))) < 3, 'HTML-кнопка должна быть среди первых трёх корней');
