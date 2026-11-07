@@ -65,6 +65,7 @@ function contextConflict(query, phrase, targetKey) {
   if (/(?:raise|throw|exception|valueerror|error)/.test(target) && !/ошиб|исключ|error|exception|raise|throw/.test(q)) return true;
   if ((target.includes('console.log') || target.includes('console.error') || target === 'print') && !/консол|вывод|напечат|print/.test(q)) return true;
   if (target.includes('insert into') && !/баз|таблиц|sql|запис|insert/.test(q)) return true;
+  if ((target === 'import' || target.startsWith('import ')) && !/импорт|модул|библиотек|подключ/.test(q)) return true;
   return false;
 }
 
