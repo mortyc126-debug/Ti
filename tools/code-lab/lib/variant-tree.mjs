@@ -14,11 +14,14 @@ const MAX_ROOTS = 8, MAX_KIDS = 14;
 const HTML_TAGS = new Set('a abbr address article aside audio b blockquote body br button canvas caption code col datalist dd details dialog div dl dt em fieldset figure footer form h1 h2 h3 h4 h5 h6 head header hr html i iframe img input label legend li link main menu meta nav ol optgroup option output p picture pre progress script section select slot small source span strong style sub summary sup svg table tbody td template textarea tfoot th thead time title tr ul video'.split(' '));
 const norm = s => String(s || '').toLowerCase().replace(/ё/g, 'е').trim();
 const preferredSynonymLabel = (synonyms, term, fallback = '') => {
+  const hasRussian = phrase => /[А-Яа-яЁё]/.test(String(phrase || ''));
+  const isRussianOnly = phrase => hasRussian(phrase) && !/[A-Za-z]/.test(String(phrase || ''));
+  if (isRussianOnly(fallback)) return fallback;
   const keys = [String(term || ''), '<' + String(term || '').replace(/^<|>$/g, '') + '>'];
   for (const key of keys) {
     const phrases = synonyms && synonyms[key];
     if (!Array.isArray(phrases) || !phrases.length) continue;
-    return phrases.find(phrase => /[А-Яа-яЁё]/.test(String(phrase))) || fallback || phrases[0];
+    return phrases.find(isRussianOnly) || phrases.find(hasRussian) || fallback || phrases[0];
   }
   return fallback;
 };
