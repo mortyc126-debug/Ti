@@ -39,3 +39,16 @@ test('составные имена с точкой сохраняют гото�
   assert.ok(root);
   assert.equal(root.code, 'object.keys(obj)');
 });
+
+
+test('CSS-псевдокласс не попадает в JavaScript из-за одноимённой записи', () => {
+  const dict = { langs: {
+    js: { ':hover': 'ошибочная запись базового словаря' },
+    css: { ':hover': 'CSS-псевдокласс состояния наведения' }
+  } };
+  const synonyms = { ':hover': ['подсветить при наведении'] };
+  const result = buildVariants({ q: 'подсветить при наведении', dict, rows: [], synonyms });
+  const hoverRoots = result.roots.filter(root => root.term === ':hover');
+  assert.equal(hoverRoots.length, 1);
+  assert.equal(hoverRoots[0].lang, 'css');
+});
