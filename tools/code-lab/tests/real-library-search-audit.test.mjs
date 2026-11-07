@@ -206,7 +206,7 @@ async function main() {
 
   const collapseTerms = taskTerms(collapseQuery);
   const hoverTerms = taskTerms(hoverQuery);
-  assert.equal(taskResultMap.get(hoverQuery).roots.find(root => root.term === ':hover')?.lang, 'css', ':hover должен оставаться CSS-псевдоклассом');
+  assert.equal(taskResultMap.get(hoverQuery).roots.find(root => root.term === ':hover')?.lang, 'css', ':hover должен оставаться CSS-псевдоклассом: ' + JSON.stringify(taskResultMap.get(hoverQuery).roots.map(root => ({ term: root.term, lang: root.lang, label: root.label }))));
   assert.ok(taskResultMap.get(buttonQuery).roots.findIndex(x => /button/.test(String(x.term))) < 3, 'HTML-кнопка должна быть среди первых трёх корней');
   assert.ok(!buttonTerms.some(x => x === 'disabled' || x === 'event.target'), 'простая кнопка не должна подменяться состоянием disabled или event.target');
   assert.ok(!linkTerms.some(x => /innertext/.test(x)), 'обычная ссылка не должна притягивать чтение отображаемого текста');
