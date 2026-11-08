@@ -113,7 +113,17 @@
       .map(row => row.item);
   }
 
-  const api = { normalizeLanguage, register, resolve, rankCandidates };
+  function listProviders() {
+    return Array.from(providers.values())
+      .map(provider => ({
+        id: provider.id,
+        priority: provider.priority,
+        languages: provider.languages ? Array.from(provider.languages) : null
+      }))
+      .sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id));
+  }
+
+  const api = { normalizeLanguage, register, resolve, rankCandidates, listProviders };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.CodeLabContext = api;
 })(typeof window !== 'undefined' ? window : globalThis);
