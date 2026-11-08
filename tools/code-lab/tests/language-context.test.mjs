@@ -88,6 +88,7 @@ test('реальный словарь даёт языковые пояснени
     dict.langs[lang] = JSON.parse(fs.readFileSync(new URL('../public/dict/langs/' + lang + '.json', import.meta.url), 'utf8'));
   }
   const py = makeLook('python', dict), js = makeLook('js', dict), sql = makeLook('sql', dict), html = makeLook('html', dict), ts = makeLook('ts', dict);
+  const css = makeLook('css', dict);
   assert.match(py('await'), /coroutine|awaitable/i);
   assert.doesNotMatch(py('await'), /Promise|промис/i);
   assert.match(js('await'), /промис|Promise|thenable/i);
@@ -103,6 +104,9 @@ test('реальный словарь даёт языковые пояснени
   assert.match(py('with'), /контекстный менеджер/);
   assert.match(sql('with'), /CTE/);
   assert.match(html('for'), /label/);
+  assert.match(html('a'), /ссылка/);
+  assert.match(css('display'), /тип раскладки/);
+  assert.match(css('block'), /блочный/);
   assert.match(ts('as'), /утверждение типа|приводит выражение/);
   assert.match(py('False'), /логическая ложь/);
   assert.match(js('false'), /ложь/);
