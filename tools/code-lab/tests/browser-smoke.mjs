@@ -82,6 +82,20 @@ try {
     assert.ok(contextualValues.some(value => /^end$/i.test(value)),
       'CSS value suggestions did not use the align-items property context');
     await page.keyboard.press('Escape');
+
+    await cm.click();
+    await page.keyboard.press('Control+A');
+    await page.keyboard.type('.card { /* align-items: en');
+    await delay(250);
+    assert.equal(await page.locator('.ac-pop').count(), 0,
+      'CSS autocomplete opened inside a comment');
+
+    await cm.click();
+    await page.keyboard.press('Control+A');
+    await page.keyboard.type('.card { content: "hello');
+    await delay(250);
+    assert.equal(await page.locator('.ac-pop').count(), 0,
+      'CSS autocomplete opened inside a string');
   }
   if (await cm.count() && await cm.isVisible()) {
     await cm.click();
