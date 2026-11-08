@@ -106,23 +106,5 @@
       "note": "Закрывает поток и сохраняет изменения.",
       "source": "custom"
     }
-  ],
-  "orphanNotes": [
-    {
-      "line": 4,
-      "col": 12,
-      "text": "close",
-      "kind": "fn",
-      "note": "Закрывает поток и сохраняет изменения.",
-      "source": "custom"
-    },
-    {
-      "line": 4,
-      "col": 12,
-      "text": "close",
-      "kind": "fn",
-      "note": "Закрывает поток и сохраняет изменения.",
-      "source": "custom"
-    }
   ]
 }

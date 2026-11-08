@@ -139,23 +139,5 @@
       "note": "Выдаёт порцию данных из генератора.",
       "source": "custom"
     }
-  ],
-  "orphanNotes": [
-    {
-      "line": 5,
-      "col": 4,
-      "text": "yield",
-      "kind": "kw",
-      "note": "Выдаёт порцию данных из генератора.",
-      "source": "custom"
-    },
-    {
-      "line": 5,
-      "col": 4,
-      "text": "yield",
-      "kind": "kw",
-      "note": "Выдаёт порцию данных из генератора.",
-      "source": "custom"
-    }
   ]
 }

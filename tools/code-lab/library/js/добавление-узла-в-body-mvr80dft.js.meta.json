@@ -71,23 +71,5 @@
       "note": "Добавляет узел последним потомком родителя.",
       "source": "custom"
     }
-  ],
-  "orphanNotes": [
-    {
-      "line": 3,
-      "col": 14,
-      "text": "appendChild",
-      "kind": "fn",
-      "note": "Добавляет узел последним потомком родителя.",
-      "source": "custom"
-    },
-    {
-      "line": 3,
-      "col": 14,
-      "text": "appendChild",
-      "kind": "fn",
-      "note": "Добавляет узел последним потомком родителя.",
-      "source": "custom"
-    }
   ]
 }

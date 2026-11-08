@@ -129,23 +129,5 @@
       "note": "false — логическая «ложь» (нет).",
       "source": "dict"
     }
-  ],
-  "orphanNotes": [
-    {
-      "line": 6,
-      "col": 4,
-      "text": "finally",
-      "kind": "kw",
-      "note": "Выполняется и при успехе, и при ошибке.",
-      "source": "custom"
-    },
-    {
-      "line": 6,
-      "col": 4,
-      "text": "finally",
-      "kind": "kw",
-      "note": "Выполняется и при успехе, и при ошибке.",
-      "source": "custom"
-    }
   ]
 }

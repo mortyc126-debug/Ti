@@ -72,23 +72,5 @@
       "note": "Добавляет узел в конец списка дочерних элементов.",
       "source": "custom"
     }
-  ],
-  "orphanNotes": [
-    {
-      "line": 3,
-      "col": 6,
-      "text": "appendChild",
-      "kind": "fn",
-      "note": "Добавляет узел в конец списка дочерних элементов.",
-      "source": "custom"
-    },
-    {
-      "line": 3,
-      "col": 6,
-      "text": "appendChild",
-      "kind": "fn",
-      "note": "Добавляет узел в конец списка дочерних элементов.",
-      "source": "custom"
-    }
   ]
 }

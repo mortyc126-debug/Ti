@@ -71,23 +71,5 @@
       "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
       "source": "dict"
     }
-  ],
-  "orphanNotes": [
-    {
-      "line": 0,
-      "col": 0,
-      "text": "async",
-      "kind": "kw",
-      "note": "Объявляет функцию, возвращающую Promise.",
-      "source": "custom"
-    },
-    {
-      "line": 0,
-      "col": 0,
-      "text": "async",
-      "kind": "kw",
-      "note": "Объявляет функцию, возвращающую Promise.",
-      "source": "custom"
-    }
   ]
 }
