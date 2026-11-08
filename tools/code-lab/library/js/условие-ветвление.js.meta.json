@@ -238,7 +238,7 @@
         "title": "Применение",
         "code": {
           "language": "js",
-          "content": "constвозраст=20;\n\nif(возраст>=18){\n  console.log(\"можно\");\n}else{\n  console.log(\"нельзя\");\n}"
+          "content": "const возраст = 20;\n\nif (возраст >= 18) {\n  console.log(\"можно\");\n} else {\n  console.log(\"нельзя\");\n}"
         },
         "steps": [
           "Проверь требования и подготовь входные данные/окружение.",

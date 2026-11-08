@@ -212,7 +212,7 @@
         "title": "Применение",
         "code": {
           "language": "js",
-          "content": "for(leti=0;i<3;i++){\n  console.log(i);\n}"
+          "content": "for (let i = 0; i < 3; i++) {\n  console.log(i);\n}"
         },
         "steps": [
           "Проверь требования и подготовь входные данные/окружение.",
