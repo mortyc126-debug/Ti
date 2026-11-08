@@ -47,7 +47,17 @@ const noteCases=[],conceptNotes=[];
 const dictionaryNoteStats={available:false,total:0,matched:0,stale:0,missing:0};
 const dictionaryNoteCases=[];
 let keywordDict=null;
-try{keywordDict=JSON.parse(await fs.readFile(new URL('../public/keyword-dict.json',import.meta.url),'utf8'));dictionaryNoteStats.available=true;}catch{}
+try{
+  keywordDict=JSON.parse(await fs.readFile(new URL('../public/keyword-dict.json',import.meta.url),'utf8'));
+  keywordDict.langs=keywordDict.langs&&typeof keywordDict.langs==='object'?keywordDict.langs:{};
+  const langDir=new URL('../public/dict/langs/',import.meta.url);
+  for(const file of (await fs.readdir(langDir)).filter(n=>n.endsWith('.json'))){
+    const lang=file.replace(/\.json$/,'').toLowerCase();
+    const entries=JSON.parse(await fs.readFile(new URL(file,langDir),'utf8'));
+    keywordDict.langs[lang]=Object.assign({},keywordDict.langs[lang]||{},entries);
+  }
+  dictionaryNoteStats.available=true;
+}catch{}
 const viewCodeStats={eligible:0,exact:0,formatOnly:0,mismatch:0,missing:0};
 const viewCodeCases=[];
 const extLang={js:'js',mjs:'js',cjs:'js',jsx:'js',ts:'ts',tsx:'ts',py:'python',html:'html',htm:'html',css:'css',svg:'svg',json:'json',sql:'sql',rb:'ruby',php:'php',go:'go',lua:'lua',sh:'sh',bash:'bash',ps1:'powershell',r:'r',pl:'perl',txt:'txt'};

@@ -83,6 +83,10 @@ test('TypeScript-specific method names are known during typo analysis', () => {
 
 test('реальный словарь даёт языковые пояснения для одинаковых ключевых слов', () => {
   const dict = JSON.parse(fs.readFileSync(new URL('../public/keyword-dict.json', import.meta.url), 'utf8'));
+  dict.langs = {};
+  for (const lang of ['python', 'js', 'sql', 'ts', 'html', 'css']) {
+    dict.langs[lang] = JSON.parse(fs.readFileSync(new URL('../public/dict/langs/' + lang + '.json', import.meta.url), 'utf8'));
+  }
   const py = makeLook('python', dict), js = makeLook('js', dict), sql = makeLook('sql', dict), html = makeLook('html', dict), ts = makeLook('ts', dict);
   assert.match(py('await'), /coroutine|awaitable/i);
   assert.doesNotMatch(py('await'), /Promise|промис/i);
