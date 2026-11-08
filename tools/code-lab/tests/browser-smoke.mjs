@@ -111,10 +111,10 @@ try {
     return { lang: result.lang, roots: (result.roots || []).map(root => ({ term: root.term, label: root.label, note: root.note })) };
   });
   const inputEvents = await page.evaluate(() => window.__autocompleteInputs);
+  await delay(300);
   const acTrace = await page.evaluate(() => window.__acTrace);
   console.log('browser debug:', JSON.stringify({ browserDebug, editorDebug, apiDebug, inputEvents, acTrace }));
 
-  await delay(300);
   const autoPopupOpened = await page.locator('.ac-pop').count() > 0;
   if (!autoPopupOpened) await page.keyboard.press('Control+Space');
   await page.waitForSelector('.ac-pop', { timeout: 5_000 });
