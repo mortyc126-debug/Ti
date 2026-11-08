@@ -10,11 +10,19 @@ let CUR_LANG = '', CODE = '';   // язык и текущий код куска 
 
 // пояснение слова из словаря (сначала язык куска, потом общий/HTML/CSS/любой язык)
 function dictExplain(word){
-  const lw = String(word).toLowerCase(), l = (CUR_LANG || '').toLowerCase();
+  const lw = String(word).toLowerCase(), raw = (CUR_LANG || '').toLowerCase();
+  const l = raw === 'htm' ? 'html' : raw;
   if(l && DICT.langs && DICT.langs[l] && DICT.langs[l][lw]) return DICT.langs[l][lw];
+  if(l === 'ts' && DICT.langs && DICT.langs.js && DICT.langs.js[lw]) return DICT.langs.js[lw];
+  if(l === 'css') {
+    if(DICT.cssProps && DICT.cssProps[lw]) return DICT.cssProps[lw];
+    if(DICT.cssVals && DICT.cssVals[lw]) return DICT.cssVals[lw];
+  }
+  if(l === 'html') {
+    if(DICT.htmlTags && DICT.htmlTags[lw]) return DICT.htmlTags[lw];
+    if(DICT.htmlAttrs && DICT.htmlAttrs[lw]) return DICT.htmlAttrs[lw];
+  }
   if(DICT.words && DICT.words[lw]) return DICT.words[lw];
-  for(const s of ['cssProps','cssVals','htmlTags','htmlAttrs']) if(DICT[s] && DICT[s][lw]) return DICT[s][lw];
-  if(DICT.langs) for(const k of Object.keys(DICT.langs)) if(DICT.langs[k][lw]) return DICT.langs[k][lw];
   return '';
 }
 // подчеркнуть слова, у которых в словаре есть похожие (тот же корень) — видно, что можно менять
@@ -27,11 +35,12 @@ function rerenderCode(){ const host = document.querySelector('.code-host'); if(h
 // словарь-пул под язык куска: {ключ: пояснение} — из него выводим похожие слова (кэш, т.к. зовётся на каждый токен)
 let _pool = null, _poolLang = null;
 function poolKeys(){
-  const l = (CUR_LANG || '').toLowerCase();
+  const raw = (CUR_LANG || '').toLowerCase(), l = raw === 'htm' ? 'html' : raw;
   if(_pool && _poolLang === l) return _pool;
   const out = {}; const put = o => { if(o) for(const k of Object.keys(o)) if(typeof o[k] === 'string') out[k.toLowerCase()] = o[k]; };
   if(DICT.langs && DICT.langs[l]) put(DICT.langs[l]);
-  if(l === 'css' || l === 'html' || l === 'htm'){ ['cssProps','cssVals','htmlTags','htmlAttrs'].forEach(s => put(DICT[s])); }
+  if(l === 'ts' && DICT.langs && DICT.langs.js) put(DICT.langs.js);
+  if(l === 'css' || l === 'html'){ ['cssProps','cssVals','htmlTags','htmlAttrs'].forEach(s => put(DICT[s])); }
   put(DICT.words);
   _pool = out; _poolLang = l; return out;
 }
