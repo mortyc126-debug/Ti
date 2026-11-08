@@ -233,7 +233,11 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     item.group = hit.group || item.group;
     item.desc = hit.desc || item.desc;
     item._lexicalRank = index + 1;
-    const exactTitle = (hit.why || []).some(reason => reason.in === 'название' && reason.kind === 'exact');
+    const titleTokens = queryTokens(hit.title || '');
+    const queryTokenSet = new Set(queryTokens(query));
+    const exactTitleMatch = titleTokens.length > 0 && titleTokens.every(token => queryTokenSet.has(token));
+    const exactTitle = exactTitleMatch &&
+      (hit.why || []).some(reason => reason.in === 'название' && reason.kind === 'exact');
     const titleSubstring = (hit.why || []).some(reason => reason.in === 'название/описание' && reason.kind === 'substring');
     // Когда направленные цели уже найдены, несвязанные полнотекстовые совпадения
     // остаются запасными, но не вытесняют фрагменты, привязанные к цели задачи.
