@@ -1,0 +1,160 @@
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { setTimeout as delay } from 'node:timers/promises';
+import { chromium } from 'playwright';
+
+const port = 8878;
+const origin = `http://127.0.0.1:${port}`;
+const server = spawn(process.execPath, ['tools/code-lab-server.mjs', String(port)], {
+  cwd: process.cwd(),
+  stdio: ['ignore', 'pipe', 'pipe']
+});
+let serverLog = '';
+server.stdout.on('data', chunk => { serverLog += chunk.toString(); });
+server.stderr.on('data', chunk => { serverLog += chunk.toString(); });
+
+let browser;
+try {
+  const deadline = Date.now() + 120_000;
+  let ready = false;
+  while (Date.now() < deadline) {
+    if (server.exitCode !== null) throw new Error('Code Lab server exited early:\n' + serverLog);
+    try {
+      const response = await fetch(origin + '/constructor.html');
+      if (response.ok) { ready = true; break; }
+    } catch (_) {}
+    await delay(500);
+  }
+  assert.ok(ready, 'Code Lab server did not start:\n' + serverLog);
+
+  browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+  const context = await browser.newContext();
+  await context.addInitScript(() => {
+    localStorage.removeItem('codelab_sandbox');
+    localStorage.setItem('codelab_mode', 'sandbox');
+    localStorage.setItem('codelab_ac', 'on');
+    localStorage.setItem('codelab_ac_speed', 'instant');
+  });
+  const page = await context.newPage();
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+  await page.goto(origin + '/constructor.html', { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('#sbEds .sb-ed', { timeout: 30_000 });
+  await page.waitForFunction(() => {
+    const box = document.querySelector('#sandbox');
+    return box && getComputedStyle(box).display !== 'none';
+  }, { timeout: 30_000 });
+
+  const cssIndex = await page.locator('#sbEds .sb-ed').evaluateAll(eds =>
+    eds.findIndex(ed => ed.querySelector('.sb-lang')?.value === 'css')
+  );
+  assert.ok(cssIndex >= 0, 'default CSS editor was not created');
+  const cssEditor = page.locator('#sbEds .sb-ed').nth(cssIndex);
+  const cm = cssEditor.locator('.CodeMirror');
+  if (await cm.count()) {
+    await cm.waitFor({ state: 'visible', timeout: 20_000 });
+    await cm.click();
+    await page.keyboard.press('Control+A');
+    await page.keyboard.type('отступ');
+  } else {
+    const textarea = cssEditor.locator('textarea.sb-code');
+    await textarea.fill('отступ');
+    await textarea.evaluate(el => el.setSelectionRange(el.value.length, el.value.length));
+  }
+
+  await page.waitForSelector('.ac-pop', { timeout: 20_000 });
+  const popup = page.locator('.ac-pop');
+  const popupText = await popup.innerText();
+  assert.match(popupText, /margin/i, 'CSS margin variant was not shown');
+  assert.match(popupText, /padding/i, 'CSS padding variant was not shown');
+
+  const expandableIndex = await popup.locator('.ac-r').evaluateAll(rows => {
+    const visible = rows.filter(row => row.offsetParent !== null);
+    return visible.findIndex(row => row.nextElementSibling?.classList.contains('ac-kids'));
+  });
+  assert.ok(expandableIndex >= 0, 'variant tree has no expandable group');
+  for (let i = 0; i < expandableIndex; i++) await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowRight');
+  const expanded = await popup.locator('.ac-r.sel').evaluate(row =>
+    row.nextElementSibling?.classList.contains('ac-kids') && !row.nextElementSibling.hidden
+  );
+  assert.ok(expanded, 'ArrowRight did not expand the selected variant group');
+  await page.keyboard.press('ArrowDown');
+  assert.equal(await popup.locator('.ac-r.sel').count(), 1, 'keyboard navigation lost the selected row');
+
+  const insertIndex = await popup.locator('.ac-r').evaluateAll(rows => {
+    const visible = rows.filter(row => row.offsetParent !== null);
+    return visible.findIndex(row => row.dataset.code && row.dataset.code.trim() && !row.classList.contains('ac-grp'));
+  });
+  assert.ok(insertIndex >= 0, 'variant tree has no insertable code row');
+  const selectedIndex = await popup.locator('.ac-r').evaluateAll(rows => {
+    const visible = rows.filter(row => row.offsetParent !== null);
+    return visible.indexOf(visible.find(row => row.classList.contains('sel')));
+  });
+  const delta = insertIndex - selectedIndex;
+  for (let i = 0; i < Math.abs(delta); i++) await page.keyboard.press(delta > 0 ? 'ArrowDown' : 'ArrowUp');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => !document.querySelector('.ac-pop'));
+  let code = await cssEditor.evaluate(ed => ed.__f.code);
+  assert.match(code, /margin|padding|gap/i, 'Enter did not insert the selected variant');
+
+  // IME: intermediate input must not open the popup; compositionend must resume suggestions.
+  await cssEditor.evaluate(ed => {
+    const original = ed.querySelector('textarea');
+    const cm = original && original.__cm;
+    if (cm) { cm.setValue('отступ'); cm.setCursor({ line: 0, ch: 6 }); }
+    else {
+      original.value = 'отступ';
+      original.setSelectionRange(6, 6);
+    }
+    const input = ed.querySelector('.CodeMirror textarea') || original;
+    input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+    input.dispatchEvent(new InputEvent('input', {
+      bubbles: true, isComposing: true, inputType: 'insertCompositionText', data: 'отступ'
+    }));
+  });
+  await delay(100);
+  assert.equal(await page.locator('.ac-pop').count(), 0, 'autocomplete opened during IME composition');
+  await cssEditor.evaluate(ed => {
+    const original = ed.querySelector('textarea');
+    const input = ed.querySelector('.CodeMirror textarea') || original;
+    input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: 'отступ' }));
+  });
+  await page.waitForSelector('.ac-pop', { timeout: 15_000 });
+
+  // A slow template response must not insert into the editor after the popup is closed.
+  let templateStarted = false;
+  await page.route('**/api/template?id=*', async route => {
+    templateStarted = true;
+    await delay(900);
+    try { await route.continue(); } catch (_) {}
+  });
+  const pieceIndex = await popup.locator('.ac-r').evaluateAll(rows =>
+    rows.findIndex(row => row.offsetParent !== null && row.dataset.piece)
+  );
+  assert.ok(pieceIndex >= 0, 'variant tree did not expose a library example for cancellation test');
+  const requestPromise = page.waitForRequest(request => request.url().includes('/api/template?id='), { timeout: 10_000 });
+  await popup.locator('.ac-r').nth(pieceIndex).click();
+  await requestPromise;
+  await page.keyboard.press('Escape');
+  await delay(1_100);
+  assert.ok(templateStarted, 'template request did not start');
+  code = await cssEditor.evaluate(ed => ed.__f.code);
+  assert.equal(code, 'отступ', 'stale template response inserted code after the tree was closed');
+  assert.equal(await page.locator('.ac-pop').count(), 0, 'Escape did not close the variant tree');
+
+  assert.deepEqual(pageErrors, [], 'browser page raised uncaught errors: ' + pageErrors.join('; '));
+  console.log('Browser smoke passed: variant tree, expansion, keyboard insertion, IME and stale-template cancellation.');
+} finally {
+  if (browser) await browser.close().catch(() => {});
+  if (server.exitCode === null) {
+    server.kill('SIGTERM');
+    await Promise.race([
+      new Promise(resolve => server.once('exit', resolve)),
+      delay(5_000)
+    ]);
+  }
+  if (server.exitCode !== null && server.exitCode !== 0) {
+    console.error('Code Lab server exit code:', server.exitCode, serverLog);
+  }
+}
