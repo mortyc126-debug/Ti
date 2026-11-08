@@ -265,7 +265,16 @@ async function main() {
   assert.ok(!taskResultMap.get(dataQuery).roots.some(root => /^<(?:form|input|datalist)\b/i.test(String(root.term || ''))), 'обычный вывод данных на страницу не должен превращаться в форму поиска или поле ввода');
   assert.ok(dataTargets.indexOf('fetch') >= 0 && dataTargets.indexOf('response.json()') > dataTargets.indexOf('fetch'), 'получение данных должно стоять выше разбора JSON-ответа: ' + dataTargets.join(', ') + '; counts=' + JSON.stringify(taskResultMap.get(dataQuery).counts));
   assert.ok(taskResultMap.get(dataQuery).counts.directedPieces > 0, 'по найденным целям должны подбираться связанные фрагменты');
-  assert.ok(taskResultMap.get(dataQuery).pieces.some(piece => (piece.matchedTargets || []).includes('fetch')), 'фрагмент запроса должен быть связан с целью fetch');
+  const fetchLinkDebug = {
+    targets: dataTargets,
+    pieces: taskResultMap.get(dataQuery).pieces.slice(0, 20).map(piece => ({
+      title: piece.title, lang: piece.lang, matchedTargets: piece.matchedTargets,
+      score: piece.score, sources: piece.sources, why: (piece.why || []).slice(0, 3)
+    })),
+    counts: taskResultMap.get(dataQuery).counts
+  };
+  assert.ok(taskResultMap.get(dataQuery).pieces.some(piece => (piece.matchedTargets || []).includes('fetch')),
+    'фрагмент запроса должен быть связан с целью fetch: ' + JSON.stringify(fetchLinkDebug));
   const dataPieceTitles = taskResultMap.get(dataQuery).pieces.map(piece => piece.title);
   assert.ok(dataPieceTitles.some(title => /fetch \+ await/i.test(title)), 'основной пример должен показывать получение данных через fetch');
   assert.ok(dataPieceTitles.findIndex(title => /fetch \+ await/i.test(title)) < 3, 'основной fetch-фрагмент должен находиться среди первых трёх результатов');
