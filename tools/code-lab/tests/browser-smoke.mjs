@@ -67,6 +67,29 @@ try {
     await textarea.evaluate(el => el.setSelectionRange(el.value.length, el.value.length));
   }
 
+  const browserDebug = await page.evaluate(() => ({
+    sandboxApi: !!window.codelabSandbox,
+    sandboxVisible: getComputedStyle(document.querySelector('#sandbox')).display,
+    editorTabs: [...document.querySelectorAll('#sbTabs .sb-tab')].map(tab => tab.innerText),
+    activeId: localStorage.getItem('codelab_sb_active'),
+    autocompleteStyle: [...document.querySelectorAll('style')].some(style => style.textContent.includes('.ac-pop'))
+  }));
+  const editorDebug = await cssEditor.evaluate(ed => ({
+    className: ed.className,
+    display: getComputedStyle(ed).display,
+    file: ed.__f && { name: ed.__f.name, lang: ed.__f.lang, code: ed.__f.code },
+    textareas: [...ed.querySelectorAll('textarea')].map(ta => ({
+      className: ta.className, display: getComputedStyle(ta).display,
+      visibility: getComputedStyle(ta).visibility, value: ta.value,
+      hasCodeMirror: !!ta.__cm, rect: ta.getBoundingClientRect().toJSON()
+    })),
+    codeMirror: [...ed.querySelectorAll('.CodeMirror')].map(cm => ({
+      display: getComputedStyle(cm).display, visibility: getComputedStyle(cm).visibility,
+      rect: cm.getBoundingClientRect().toJSON()
+    }))
+  }));
+  console.log('browser debug:', JSON.stringify({ browserDebug, editorDebug }));
+
   await page.waitForSelector('.ac-pop', { timeout: 20_000 });
   const popup = page.locator('.ac-pop');
   const popupCodes = await popup.locator('.ac-r').evaluateAll(rows => rows.map(row => row.dataset.code || ''));
