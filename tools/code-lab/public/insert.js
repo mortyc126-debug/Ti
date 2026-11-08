@@ -205,7 +205,6 @@
     });
     window.CodeLabContext.register({
       id: 'call-arguments',
-      languages: ['css', 'js', 'python', 'ts', 'java', 'c', 'cpp', 'csharp', 'go', 'rust', 'php', 'ruby'],
       priority: 50,
       resolve: snapshot => {
         const raw = callCtx(snapshot.editor);
