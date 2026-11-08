@@ -51,13 +51,13 @@ try {
   assert.ok(cssIndex >= 0, 'default CSS editor was not created');
   const cssEditor = page.locator('#sbEds .sb-ed').nth(cssIndex);
   const cm = cssEditor.locator('.CodeMirror');
-  if (await cm.count()) {
-    await cm.waitFor({ state: 'visible', timeout: 20_000 });
+  if (await cm.count() && await cm.isVisible()) {
     await cm.click();
     await page.keyboard.press('Control+A');
     await page.keyboard.type('отступ');
   } else {
     const textarea = cssEditor.locator('textarea.sb-code');
+    await textarea.waitFor({ state: 'visible' });
     await textarea.fill('отступ');
     await textarea.evaluate(el => el.setSelectionRange(el.value.length, el.value.length));
   }
@@ -101,15 +101,17 @@ try {
 
   // IME: intermediate input must not open the popup; compositionend must resume suggestions.
   await cssEditor.evaluate(ed => {
-    const original = ed.querySelector('textarea');
+    const original = ed.querySelector('textarea.sb-code') || ed.querySelector('textarea');
     const cm = original && original.__cm;
-    if (cm) { cm.setValue('отступ'); cm.setCursor({ line: 0, ch: 6 }); }
-    else {
+    if (cm && cm.getWrapperElement().offsetParent !== null) {
+      cm.setValue('отступ'); cm.setCursor({ line: 0, ch: 6 });
+    } else {
       original.value = 'отступ';
       original.setSelectionRange(6, 6);
     }
     ed.__f.code = 'отступ';
-    const input = ed.querySelector('.CodeMirror textarea') || original;
+    const input = cm && cm.getWrapperElement().offsetParent !== null
+      ? ed.querySelector('.CodeMirror textarea') : original;
     input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
     input.dispatchEvent(new InputEvent('input', {
       bubbles: true, isComposing: true, inputType: 'insertCompositionText', data: 'отступ'
@@ -118,8 +120,10 @@ try {
   await delay(100);
   assert.equal(await page.locator('.ac-pop').count(), 0, 'autocomplete opened during IME composition');
   await cssEditor.evaluate(ed => {
-    const original = ed.querySelector('textarea');
-    const input = ed.querySelector('.CodeMirror textarea') || original;
+    const original = ed.querySelector('textarea.sb-code') || ed.querySelector('textarea');
+    const cm = original && original.__cm;
+    const input = cm && cm.getWrapperElement().offsetParent !== null
+      ? ed.querySelector('.CodeMirror textarea') : original;
     input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: 'отступ' }));
   });
   await page.waitForSelector('.ac-pop', { timeout: 15_000 });
