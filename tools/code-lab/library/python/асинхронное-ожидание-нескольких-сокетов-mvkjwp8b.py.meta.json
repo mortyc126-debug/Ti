@@ -161,43 +161,11 @@
       "source": "dict"
     },
     {
-      "line": 28,
+      "line": 23,
       "col": 4,
-      "text": "for",
-      "kind": "kw",
-      "note": "for — цикл: повторять блок заданное число раз.",
-      "source": "dict"
-    },
-    {
-      "line": 28,
-      "col": 17,
-      "text": "in",
-      "kind": "kw",
-      "note": "in — часть for…in (ключи объекта) или проверка наличия свойства.",
-      "source": "dict"
-    },
-    {
-      "line": 29,
-      "col": 8,
       "text": "print",
       "kind": "fn",
       "note": "print — напечатать значение (Python: вывод в консоль).",
-      "source": "dict"
-    },
-    {
-      "line": 32,
-      "col": 4,
-      "text": "for",
-      "kind": "kw",
-      "note": "for — цикл: повторять блок заданное число раз.",
-      "source": "dict"
-    },
-    {
-      "line": 32,
-      "col": 15,
-      "text": "in",
-      "kind": "kw",
-      "note": "in — часть for…in (ключи объекта) или проверка наличия свойства.",
       "source": "dict"
     },
     {

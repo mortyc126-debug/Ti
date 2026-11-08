@@ -61,8 +61,8 @@
       "source": "dict"
     },
     {
-      "line": 13,
-      "col": 34,
+      "line": 16,
+      "col": 25,
       "text": "scroll",
       "kind": "kw",
       "note": "scroll — событие прокрутки.",

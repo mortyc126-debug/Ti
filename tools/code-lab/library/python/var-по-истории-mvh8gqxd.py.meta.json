@@ -35,55 +35,15 @@
   "status": "described",
   "wordNotes": [
     {
-      "line": 0,
-      "col": 0,
-      "text": "returns",
-      "kind": "name",
-      "note": "returns — доходности по периодам",
-      "source": "dict"
-    },
-    {
-      "line": 1,
-      "col": 0,
-      "text": "returns",
-      "kind": "name",
-      "note": "returns — доходности по периодам",
-      "source": "dict"
-    },
-    {
-      "line": 1,
-      "col": 8,
-      "text": "sort",
-      "kind": "fn",
-      "note": "sort — сортирует список на месте, худшие значения идут первыми",
-      "source": "custom"
-    },
-    {
-      "line": 3,
-      "col": 12,
+      "line": 17,
+      "col": 21,
       "text": "len",
       "kind": "fn",
       "note": "len — длина (Python): элементов в списке, символов в строке.",
       "source": "dict"
     },
     {
-      "line": 3,
-      "col": 16,
-      "text": "returns",
-      "kind": "name",
-      "note": "returns — доходности по периодам",
-      "source": "dict"
-    },
-    {
-      "line": 4,
-      "col": 10,
-      "text": "returns",
-      "kind": "name",
-      "note": "returns — доходности по периодам",
-      "source": "dict"
-    },
-    {
-      "line": 5,
+      "line": 19,
       "col": 0,
       "text": "print",
       "kind": "fn",
