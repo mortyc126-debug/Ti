@@ -128,7 +128,10 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
   function search(query, { language = '', scope = '', limit = 60 } = {}) {
     const q = normalize(query);
     if (!q) return { query: q, total: 0, hits: [], rankedPieces: [], ambiguous: false };
-    const effectiveLanguage = language ? canonicalLanguage(language) : inferQueryLanguage(q);
+    // Явная область поиска (например, web) уже задаёт набор допустимых языков.
+    // Не сужаем составную задачу до одного языка только потому, что в тексте
+    // упомянут CSS/HTML/JS; явный параметр language по-прежнему имеет приоритет.
+    const effectiveLanguage = language ? canonicalLanguage(language) : scope ? '' : inferQueryLanguage(q);
     const grouped = new Map();
     const allowedLanguages = scopeLanguages(scope);
 
