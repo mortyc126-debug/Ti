@@ -62,6 +62,6 @@ test('candidate ranking prefers prefix matches and preserves stable order', () =
     { code: 'start', note: 'начало' },
   ];
   const ranked = Context.rankCandidates(items, { prefix: 'en' });
-  assert.deepEqual(ranked.map(x => x.code), ['end', 'center']);
+  assert.deepEqual(ranked.map(x => x.code), ['end', 'center', 'flex-end']);
   assert.deepEqual(Context.rankCandidates(items, { prefix: '' }), items);
 });
