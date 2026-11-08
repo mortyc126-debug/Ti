@@ -110,4 +110,17 @@ test('реальный словарь даёт языковые пояснени
   assert.match(ts('as'), /утверждение типа|приводит выражение/);
   assert.match(py('False'), /логическая ложь/);
   assert.match(js('false'), /ложь/);
+  assert.match(js('require'), /CommonJS/);
+  assert.match(js('process'), /Node\.js/);
+  assert.match(js('setTimeout'), /таймер/);
+  assert.match(js('reduce'), /накапливает/);
+  assert.match(js('localStorage'), /хранилище/);
+  assert.match(js('Object'), /объект/);
+  assert.match(js('JSON'), /JSON/);
+  assert.match(js('URL'), /URL/);
+  assert.match(js('AbortController'), /отмен/);
+  assert.match(js('requestAnimationFrame'), /перерисов/);
+  assert.match(js('getAttribute'), /атрибут/);
+  assert.match(js('slice'), /копию/);
+  assert.match(js('includes'), /содерж/);
 });
