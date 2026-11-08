@@ -62,7 +62,7 @@ try {
   if (await cm.count() && await cm.isVisible()) {
     await cm.click();
     await page.keyboard.press('Control+A');
-    await page.keyboard.type('margin');
+    await page.keyboard.type('m'); // однобуквенный префикс должен сразу открыть CSS-варианты
   } else {
     const textarea = cssEditor.locator('textarea.sb-code');
     await textarea.waitFor({ state: 'visible' });
