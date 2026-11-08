@@ -274,3 +274,21 @@ assert.deepEqual(languageIntentIndex.search('список Python').hits.map(hit 
 assert.deepEqual(languageIntentIndex.search('список Python').rankedPieces.map(piece => piece.id), ['py-list']);
 assert.deepEqual(new Set(languageIntentIndex.search('список Python', { language: 'html' }).hits.map(hit => hit.targetKey)), new Set(['<ol>', '<ul>']));
 assert.deepEqual(new Set(languageIntentIndex.search('список Python и HTML').hits.map(hit => hit.targetKey)), new Set(['list', '<ol>', '<ul>']));
+
+
+// Область web не должна сужаться до CSS только из-за упоминания CSS в составной задаче.
+// При этом явно переданный language продолжает ограничивать результаты.
+const mixedWebUsage = {
+  terms: { common: { fetch: {} } },
+  piecesOf(section, key) { return section === 'common' && key === 'fetch' ? ['js-fetch'] : []; },
+  pieceInfo(id) { return id === 'js-fetch' ? { id, title: 'Получить данные через fetch', lang: 'javascript' } : null; },
+  pieceText() { return "fetch('/api/data')"; }
+};
+const mixedWebIndex = createLegacyQueryPhraseShadow({
+  queryPhrases: [{ id: 'web-fetch', phrase: 'получить данные из нескольких источников', targetKey: 'fetch' }],
+  usage: mixedWebUsage
+});
+const mixedWeb = mixedWebIndex.search('получить данные из нескольких источников через CSS Grid', { scope: 'web' });
+assert.deepEqual(mixedWeb.hits.map(hit => hit.targetKey), ['fetch']);
+assert.deepEqual(mixedWeb.rankedPieces.map(piece => piece.id), ['js-fetch']);
+assert.equal(mixedWebIndex.search('получить данные из нескольких источников через CSS Grid', { language: 'css', scope: 'web' }).total, 0);
