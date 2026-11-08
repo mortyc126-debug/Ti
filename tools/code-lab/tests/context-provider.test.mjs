@@ -65,3 +65,74 @@ test('candidate ranking prefers prefix matches and preserves stable order', () =
   assert.deepEqual(ranked.map(x => x.code), ['end', 'center', 'flex-end']);
   assert.deepEqual(Context.rankCandidates(items, { prefix: '' }), items);
 });
+
+test('context preserves syntax constraints and source information', () => {
+  const unregister = Context.register({
+    id: 'test-metadata',
+    resolve: () => ({
+      language: 'typescript',
+      kind: 'call-argument',
+      expected: 'argument-value',
+      fn: 'fetch',
+      argumentIndex: 1,
+      constraints: { allowed: ['string'], required: true },
+      sourceRange: { from: 10, to: 14 },
+      confidence: 0.8,
+      scope: 'function',
+      container: 'call',
+    }),
+  });
+  try {
+    const result = Context.resolve({ language: 'ts' });
+    assert.equal(result.language, 'ts');
+    assert.equal(result.callable, 'fetch');
+    assert.equal(result.argumentIndex, 1);
+    assert.deepEqual(result.constraints, { allowed: ['string'], required: true });
+    assert.deepEqual(result.sourceRange, { from: 10, to: 14 });
+    assert.equal(result.confidence, 0.8);
+    assert.equal(result.scope, 'function');
+    assert.equal(result.container, 'call');
+  } finally {
+    unregister();
+  }
+});
+
+test('candidate ranking respects applicability, language, expected kind and prefix', () => {
+  const candidates = [
+    { code: 'end', expected: 'property-value', languages: ['css'] },
+    { code: 'center', expected: 'property-value', languages: ['css'] },
+    { code: 'enter', expected: 'argument-value', languages: ['js'] },
+    { code: 'enable', expected: 'property-value', languages: ['css'], applicable: false },
+    { code: 'enclose', expected: 'property-value', languages: ['css'], contexts: ['selector'] },
+    { code: 'end', expected: 'property-value', languages: ['css'] },
+  ];
+  const ranked = Context.rankCandidates(candidates, {
+    prefix: 'en', language: 'css', expected: 'property-value', kind: 'css-value',
+  });
+  assert.deepEqual(ranked.map(x => x.code), ['end', 'center']);
+});
+
+test('stale unregister callback cannot remove a replacement provider', () => {
+  const removeOld = Context.register({ id: 'replace-me', resolve: () => ({ kind: 'old' }) });
+  const removeNew = Context.register({ id: 'replace-me', resolve: () => ({ kind: 'new' }) });
+  removeOld();
+  try {
+    assert.equal(Context.resolve({}).kind, 'new');
+  } finally {
+    removeNew();
+  }
+});
+
+test('a broken provider does not prevent later providers from resolving context', () => {
+  const errors = [];
+  const removeBroken = Context.register({ id: 'broken', priority: 10, resolve: () => { throw new Error('broken adapter'); } });
+  const removeWorking = Context.register({ id: 'working', priority: 1, resolve: () => ({ kind: 'working' }) });
+  try {
+    const result = Context.resolve({ onProviderError: (error, id) => errors.push([error.message, id]) });
+    assert.equal(result.provider, 'working');
+    assert.deepEqual(errors, [['broken adapter', 'broken']]);
+  } finally {
+    removeBroken();
+    removeWorking();
+  }
+});
