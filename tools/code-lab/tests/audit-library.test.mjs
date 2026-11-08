@@ -40,6 +40,29 @@ try {
   assert.equal(report.noteCases[0].swapped, true);
   assert.equal(report.noteCases[0].text, '');
   console.log('audit-library: empty note anchors are reported as invalid without losing swap diagnostics');
+
+  const lexicalLibrary = path.join(temporary, 'lexical-library');
+  await fs.mkdir(lexicalLibrary, { recursive: true });
+  await fs.writeFile(path.join(lexicalLibrary, 'tokens.js'), 'const result = await fetch(url);\\nconst awaitResult = result;\\n');
+  await fs.writeFile(path.join(lexicalLibrary, 'tokens.js.meta.json'), JSON.stringify({
+    id: 'tokens',
+    lang: 'js',
+    wordNotes: [
+      { line: 0, col: 0, text: 'await', kind: 'kw', note: 'Ожидание результата.', source: 'custom' },
+      { line: 0, col: 0, text: 'a', kind: 'name', note: 'Переменная.', source: 'custom' }
+    ]
+  }));
+  const lexicalRun = spawnSync(process.execPath, [SCRIPT, lexicalLibrary], {
+    cwd: temporary,
+    encoding: 'utf8'
+  });
+  assert.equal(lexicalRun.status, 0, lexicalRun.stderr || lexicalRun.stdout);
+  const lexicalReport = JSON.parse(await fs.readFile(path.join(temporary, 'audit-library-report.json'), 'utf8'));
+  assert.equal(lexicalReport.notes.uniqueToken, 1, 'await must match as a complete identifier, not its prefix inside awaitResult');
+  assert.equal(lexicalReport.notes.multipleTokens, 0, 'identifier substrings must not inflate repeated-token counts');
+  assert.equal(lexicalReport.notes.absent, 1, 'single-letter a must not match inside await or fetch');
+  assert.equal(lexicalReport.notes.composite, 0, 'identifier substrings are not composite code expressions');
+  console.log('audit-library: identifier matching respects token boundaries');
 } finally {
   await fs.rm(temporary, { recursive: true, force: true });
 }
