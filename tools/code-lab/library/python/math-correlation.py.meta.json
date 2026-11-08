@@ -63,7 +63,7 @@
       "source": "custom"
     },
     {
-      "line": 12,
+      "line": 15,
       "col": 7,
       "text": "np",
       "kind": "name",
@@ -71,7 +71,7 @@
       "source": "custom"
     },
     {
-      "line": 12,
+      "line": 15,
       "col": 10,
       "text": "corrcoef",
       "kind": "fn",
@@ -79,7 +79,7 @@
       "source": "custom"
     },
     {
-      "line": 13,
+      "line": 16,
       "col": 0,
       "text": "print",
       "kind": "fn",

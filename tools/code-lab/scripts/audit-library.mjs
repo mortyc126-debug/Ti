@@ -93,6 +93,7 @@ for(const file of files){
   const lang=String(meta.lang||extLang[ext]||'').toLowerCase();
   const expected=extLang[ext];
   const notes=Array.isArray(meta.wordNotes)?meta.wordNotes:[];
+  const codeLines=code.split('\n');
   const orphans=Array.isArray(meta.orphanNotes)?meta.orphanNotes:[];
   noteStats.total+=notes.length;noteStats.orphanTotal+=orphans.length;
   const noteKey=n=>JSON.stringify([n?.text,n?.line,n?.col,n?.note,n?.kind,n?.source]);
@@ -129,7 +130,9 @@ for(const file of files){
     if(isOrphan||!anchored||swapped) noteCases.push({
       file:rel,id,text:note.text,explanation,source:note.source||'',
       line:note.line??null,col:note.col??null,classification:cls,
-      occurrences:hits.length,anchored,swapped,isOrphan
+      occurrences:hits.length,anchored,swapped,isOrphan,
+      savedLineText:codeLines[note.line]??null,
+      candidatePositions:!anchored&&hits.length>1?hits.slice(0,30).map(p=>({line:p.line,col:p.col,lineText:(codeLines[p.line]||'').slice(0,240)})):[]
     });
   }
   for(const n of notes) inspect(n,false);
