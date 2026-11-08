@@ -96,6 +96,21 @@ try {
     await delay(250);
     assert.equal(await page.locator('.ac-pop').count(), 0,
       'CSS autocomplete opened inside a string');
+
+    await cm.click();
+    await page.keyboard.press('Control+A');
+    await page.keyboard.type('.card { place-items: center; }');
+    await cssEditor.evaluate(ed => {
+      const ta = ed.querySelector('textarea');
+      const editor = ta && ta.__cm;
+      editor.setSelection({ line: 0, ch: 8 }, { line: 0, ch: 19 });
+    });
+    await page.evaluate(async () => { await window.codelabSelExplain.open(); });
+    await page.waitForSelector('.se', { timeout: 10_000 });
+    const shorthandExplanation = await page.locator('.se').innerText();
+    assert.match(shorthandExplanation, /align-items/);
+    assert.match(shorthandExplanation, /justify-items/);
+    await page.locator('.se .se-h button').click();
   }
   if (await cm.count() && await cm.isVisible()) {
     await cm.click();
