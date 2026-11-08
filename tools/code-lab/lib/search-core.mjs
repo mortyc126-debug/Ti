@@ -211,12 +211,20 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     const lang = canonicalLanguage(piece.lang || '');
     languageCounts.set(lang, (languageCounts.get(lang) || 0) + 1);
   }
+  const targetLanguages = new Set(targetHits.flatMap(hit => (hit.pieces || [])
+    .filter(inTaskScope)
+    .map(piece => canonicalLanguage(piece.lang || ''))
+    .filter(Boolean)
+  ));
+  // Резервируем языковые позиции только для действительно межъязыковой веб-задачи.
+  // Обычные задачи HTML+JS не должны терять верхние JS-примеры ради формального баланса.
+  const needsWebLanguageCoverage = webTask && ['html', 'css', 'js'].every(lang => targetLanguages.has(lang));
   const coverageCandidates = new Map();
-  for (const hit of targetHits) {
+  if (needsWebLanguageCoverage) for (const hit of targetHits) {
     for (const piece of hit.pieces || []) {
       if (!piece?.id || !inTaskScope(piece)) continue;
       const lang = canonicalLanguage(piece.lang || '');
-      if (!lang || languageCounts.has(lang)) continue;
+      if (!['html', 'css', 'js'].includes(lang) || languageCounts.has(lang)) continue;
       const candidate = {
         ...piece,
         matchedTargets: [...new Set([...(targetMemberships.get(piece.id) || []), hit.targetKey].filter(Boolean))],
