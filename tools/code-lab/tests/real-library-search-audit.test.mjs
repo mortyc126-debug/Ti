@@ -250,6 +250,11 @@ async function main() {
   assert.ok(taskResultMap.get(dataQuery).pieces.some(piece => (piece.matchedTargets || []).includes('fetch')), 'фрагмент запроса должен быть связан с целью fetch');
   const dataPieceTitles = taskResultMap.get(dataQuery).pieces.map(piece => piece.title);
   assert.ok(dataPieceTitles.some(title => /fetch \+ await/i.test(title)), 'основной пример должен показывать получение данных через fetch');
+  assert.ok(dataPieceTitles.findIndex(title => /fetch \+ await/i.test(title)) < 3, 'основной fetch-фрагмент должен находиться среди первых трёх результатов');
+  assert.ok(taskResultMap.get(dataQuery).pieces.slice(0, 3).every(piece => (piece.matchedTargets || []).length > 0), 'первые результаты составной задачи не должны занимать несвязанные лексические совпадения');
+  const sidebarPieces = taskResultMap.get(sidebarQuery).pieces;
+  assert.equal(sidebarPieces[0]?.title, 'переключить класс', 'действие сворачивания панели должно предшествовать второстепенным вариантам');
+  assert.ok((sidebarPieces[0]?.matchedTargets || []).includes('classlist.toggle'), 'первый фрагмент боковой панели должен быть связан с переключением класса');
   assert.ok(!dataPieceTitles.some(title => /fetch post|учётные данные|учетные данные|imagebitmap|insertadjacenthtml|element\.attributes|первый успешный промис|msw|подменить ответ сервера/i.test(title)), 'не подмешивать POST, авторизацию, декодирование изображения, HTML-вставку и атрибуты к задаче чтения данных');
 
 
