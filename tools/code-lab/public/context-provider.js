@@ -16,13 +16,16 @@
     if (!provider || !provider.id || typeof provider.resolve !== 'function') {
       throw new TypeError('Контекстный провайдер должен иметь id и resolve()');
     }
-    providers.set(provider.id, {
+    const entry = {
       id: provider.id,
       priority: Number.isFinite(provider.priority) ? provider.priority : 0,
       languages: provider.languages ? new Set(provider.languages.map(normalizeLanguage)) : null,
       resolve: provider.resolve
-    });
-    return function unregister() { providers.delete(provider.id); };
+    };
+    providers.set(provider.id, entry);
+    return function unregister() {
+      if (providers.get(provider.id) === entry) providers.delete(provider.id);
+    };
   }
 
   function normalizeContext(provider, raw, snapshot) {
@@ -44,7 +47,15 @@
       inString: Boolean(raw.inString || raw.inQuote),
       position,
       replace: raw.replace || raw.put || null,
-      legacy: raw.legacy || raw
+      legacy: raw.legacy || raw,
+      constraints: raw.constraints || null,
+      candidates: Array.isArray(raw.candidates) ? raw.candidates : [],
+      sourceRange: raw.sourceRange || null,
+      confidence: Number.isFinite(raw.confidence) ? raw.confidence : 1,
+      scope: raw.scope || null,
+      container: raw.container || null,
+      callable: raw.callable || raw.fn || null,
+      property: raw.property || (language === 'css' ? raw.fn || null : null)
     });
   }
 
@@ -56,7 +67,13 @@
       .sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id));
 
     for (const provider of ordered) {
-      const raw = provider.resolve(input);
+      let raw;
+      try {
+        raw = provider.resolve(input);
+      } catch (error) {
+        if (input.onProviderError) input.onProviderError(error, provider.id);
+        continue;
+      }
       const context = normalizeContext(provider.id, raw, input);
       if (context) return context;
     }
@@ -64,15 +81,35 @@
   }
 
   function rankCandidates(candidates, context) {
-    const prefix = String(context && context.prefix || '').toLowerCase();
+    const ctx = context || {};
+    const prefix = String(ctx.prefix || '').trim().toLowerCase();
+    const expected = String(ctx.expected || '').toLowerCase();
+    const kind = String(ctx.kind || '').toLowerCase();
+    const seen = new Set();
     return (Array.isArray(candidates) ? candidates : []).map((item, index) => {
-      const code = String(item && (item.code || item.show || item.label) || '');
-      const note = String(item && (item.note || item.description) || '');
+      const code = String(item && (item.code || item.insert || item.show || item.label) || '');
       const lower = code.toLowerCase();
-      const score = !prefix ? 0 : lower.startsWith(prefix) ? 100 : lower.includes(prefix) ? 35 : 0;
-      return { item, index, score: score + (item && item.priority || 0) };
-    }).filter(row => !prefix || row.score > 0)
-      .sort((a, b) => b.score - a.score || a.index - b.index)
+      const itemExpected = item && (item.expected || item.expectedKind);
+      const itemKinds = item && (item.contexts || item.kinds);
+      const itemLangs = item && item.languages;
+      const blocked = item && (item.disabled || item.applicable === false);
+      const expectedMismatch = expected && itemExpected && String(itemExpected).toLowerCase() !== expected;
+      const kindMismatch = kind && Array.isArray(itemKinds) && itemKinds.length &&
+        !itemKinds.map(x => String(x).toLowerCase()).includes(kind);
+      const languageMismatch = ctx.language && Array.isArray(itemLangs) && itemLangs.length &&
+        !itemLangs.map(normalizeLanguage).includes(normalizeLanguage(ctx.language));
+      const prefixScore = !prefix ? 0 : lower.startsWith(prefix) ? 1000 : lower.includes(prefix) ? 100 : -1;
+      const contextScore = item && itemExpected && !expectedMismatch ? 80 : 0;
+      const priority = Number.isFinite(item && item.priority) ? item.priority : 0;
+      const key = [code, item && item.label || '', item && item.lang || ''].join('|').toLowerCase();
+      return { item, index, key, score: prefixScore + contextScore + priority,
+        blocked: !!blocked || !!expectedMismatch || !!kindMismatch || !!languageMismatch };
+    }).filter(row => {
+      if (row.blocked || (prefix && row.score < 0) || !row.item) return false;
+      if (row.key === '||' || seen.has(row.key)) return false;
+      seen.add(row.key);
+      return true;
+    }).sort((a, b) => b.score - a.score || a.index - b.index)
       .map(row => row.item);
   }
 
