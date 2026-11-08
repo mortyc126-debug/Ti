@@ -28,6 +28,29 @@
     };
   }
 
+  function createSnapshot(input) {
+    const source = input || {};
+    const language = normalizeLanguage(source.language || source.lang);
+    const code = String(source.code == null ? '' : source.code);
+    const cursor = source.cursor && Number.isInteger(source.cursor.line) && Number.isInteger(source.cursor.ch)
+      ? { line: Math.max(0, source.cursor.line), ch: Math.max(0, source.cursor.ch) }
+      : null;
+    const lines = code.split(/\\r?\\n/);
+    const currentLine = cursor ? String(lines[cursor.line] || '') : String(source.currentLine || '');
+    const beforeCursor = cursor ? currentLine.slice(0, cursor.ch) : String(source.beforeCursor || '');
+    const afterCursor = cursor ? currentLine.slice(cursor.ch) : String(source.afterCursor || '');
+    return Object.assign({}, source, {
+      language,
+      code,
+      cursor,
+      currentLine,
+      beforeCursor,
+      afterCursor,
+      selectedText: String(source.selectedText || ''),
+      prefix: String(source.prefix == null ? (beforeCursor.match(/[\\w$-]*$/) || [''])[0] : source.prefix)
+    });
+  }
+
   function normalizeContext(provider, raw, snapshot) {
     if (!raw) return null;
     const language = normalizeLanguage(raw.language || raw.lang || snapshot.language);
@@ -60,8 +83,7 @@
   }
 
   function resolve(snapshot) {
-    const input = Object.assign({}, snapshot || {});
-    input.language = normalizeLanguage(input.language || input.lang);
+    const input = createSnapshot(snapshot);
     const ordered = Array.from(providers.values())
       .filter(p => !p.languages || p.languages.has(input.language))
       .sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id));
@@ -123,7 +145,7 @@
       .sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id));
   }
 
-  const api = { normalizeLanguage, register, resolve, rankCandidates, listProviders };
+  const api = { normalizeLanguage, createSnapshot, register, resolve, rankCandidates, listProviders };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.CodeLabContext = api;
 })(typeof window !== 'undefined' ? window : globalThis);
