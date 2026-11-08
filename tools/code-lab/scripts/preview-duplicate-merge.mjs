@@ -75,9 +75,21 @@ async function readSafe(relative) {
 }
 
 const previews = [];
+const skippedPairs = [];
 for (const pair of manifest.pairs) {
-  if (!pair.codeIdentical || !pair.canonical || !Array.isArray(pair.files) || pair.files.length !== 2) {
-    throw new Error('Пара ' + pair.pair + ' не прошла предварительные условия манифеста');
+  const reasons = [];
+  if (!pair.codeIdentical) reasons.push('код не подтверждён как идентичный');
+  if (!pair.canonical) reasons.push('канонический фрагмент требует ручного выбора');
+  if (!Array.isArray(pair.files)) reasons.push('в манифесте отсутствует список файлов');
+  else if (pair.files.length !== 2) reasons.push('поддерживается предпросмотр только пары из двух файлов');
+  if (reasons.length) {
+    skippedPairs.push({
+      pair: pair.pair ?? null,
+      status: pair.status || 'manual-review-required',
+      files: Array.isArray(pair.files) ? pair.files.map(item => item.file) : [],
+      reasons
+    });
+    continue;
   }
   const sources = [];
   for (const item of pair.files) {
@@ -232,6 +244,7 @@ for (const pair of manifest.pairs) {
 }
 const summary = {
   pairCount: previews.length,
+  skippedPairCount: skippedPairs.length,
   verifiedCodePairs: previews.filter(item => item.code.identical).length,
   sourcePassportsPreserved: previews.reduce((n, item) => n + item.review.sourcePassports.length, 0),
   pairsWithFieldConflicts: previews.filter(item => item.review.fieldConflicts.length).length,
@@ -260,7 +273,8 @@ const result = {
   sourceManifest: path.basename(manifestPath),
   libraryRoot: path.relative(process.cwd(), root),
   summary,
-  pairs: previews
+  pairs: previews,
+  skippedPairs
 };
 await fs.writeFile(output, JSON.stringify(result, null, 2) + '\n', 'utf8');
-console.log(JSON.stringify({ output, summary }, null, 2));
+console.log(JSON.stringify({ output, summary, skippedPairs }, null, 2));
