@@ -102,10 +102,10 @@
       const contextScore = item && itemExpected && !expectedMismatch ? 80 : 0;
       const priority = Number.isFinite(item && item.priority) ? item.priority : 0;
       const key = [code, item && item.label || '', item && item.lang || ''].join('|').toLowerCase();
-      return { item, index, key, score: prefixScore + contextScore + priority,
+      return { item, index, key, score: prefixScore + contextScore + priority, prefixMismatch: prefixScore < 0,
         blocked: !!blocked || !!expectedMismatch || !!kindMismatch || !!languageMismatch };
     }).filter(row => {
-      if (row.blocked || (prefix && row.score < 0) || !row.item) return false;
+      if (row.blocked || (prefix && row.prefixMismatch) || !row.item) return false;
       if (row.key === '||' || seen.has(row.key)) return false;
       seen.add(row.key);
       return true;
