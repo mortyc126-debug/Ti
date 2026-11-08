@@ -94,7 +94,7 @@ try {
   const popup = page.locator('.ac-pop');
   const popupCodes = await popup.locator('.ac-r').evaluateAll(rows => rows.map(row => row.dataset.code || ''));
   assert.ok(popupCodes.some(code => /margin/i.test(code)), 'CSS margin variant was not shown');
-  assert.ok(popup.locator('.ac-note').count() > 0, 'variant rows do not include explanation fields');
+  assert.ok(await popup.locator('.ac-note').count() > 0, 'variant rows do not include explanation fields');
   const explanations = await popup.locator('.ac-note').allTextContents();
   assert.ok(explanations.some(note => /[А-Яа-яЁё]/.test(note)), 'variant rows have no Russian explanations');
 
