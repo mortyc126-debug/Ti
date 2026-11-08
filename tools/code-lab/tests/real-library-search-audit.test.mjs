@@ -156,7 +156,8 @@ async function main() {
     'Сделать блок, который можно раскрыть и свернуть',
     'Подсветить текст заголовка в шапке при наведении курсора',
     'Получить данные из двух источников и вывести имя в шапку, список в основной блок, итог внизу',
-    'Свернуть боковую панель, чтобы её можно было снова открыть'
+    'Свернуть боковую панель, чтобы её можно было снова открыть',
+    'Сделать страницу с шапкой и боковой панелью, расположить основной блок через CSS Grid, добавить кнопку, которая загружает данные из двух источников и выводит их списком'
   ];
   const taskResults = [];
   const taskResultMap = new Map();
@@ -181,6 +182,22 @@ async function main() {
       counts: result.counts
     });
   }
+  const compositionQuery = taskScenarios[6];
+  const compositionResult = taskResultMap.get(compositionQuery);
+  const compositionTargetKeys = new Set((compositionResult.targets || []).map(target => String(target.targetKey).toLowerCase()));
+  const compositionRootLanguages = new Set((compositionResult.roots || []).map(root => root.lang));
+  const compositionPieceLanguages = new Set((compositionResult.pieces || []).filter(piece =>
+    (piece.matchedTargets || []).length > 0
+  ).map(piece => piece.lang));
+  assert.ok(compositionTargetKeys.has('grid'), 'составная задача должна находить CSS Grid как направленную цель');
+  assert.ok(compositionTargetKeys.has('fetch'), 'составная задача должна находить загрузку данных через fetch');
+  assert.ok(compositionTargetKeys.has('<button>'), 'составная задача должна находить HTML-кнопку');
+  for (const language of ['html', 'css', 'js']) {
+    assert.ok(compositionRootLanguages.has(language), 'дерево одной задачи должно содержать корни языка ' + language);
+    assert.ok(compositionPieceLanguages.has(language), 'связанные фрагменты одной задачи должны содержать язык ' + language);
+  }
+  assert.ok(compositionTargetKeys.has('promise.all'), 'два источника должны связываться с параллельным ожиданием Promise.all');
+
   const taskTerms = query => {
     const result = taskResultMap.get(query);
     return [
