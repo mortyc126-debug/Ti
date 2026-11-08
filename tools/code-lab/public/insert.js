@@ -210,6 +210,7 @@
     window.CodeLabContext.register({
       id: 'html-attributes',
       languages: ['html', 'svg'],
+      contexts: ['html-attribute'],
       priority: 100,
       resolve: snapshot => {
         const raw = tagCtx(snapshot.editor);
@@ -228,6 +229,7 @@
     });
     window.CodeLabContext.register({
       id: 'call-arguments',
+      contexts: ['css-value', 'call-argument'],
       priority: 50,
       resolve: snapshot => {
         const raw = callCtx(snapshot.editor);
