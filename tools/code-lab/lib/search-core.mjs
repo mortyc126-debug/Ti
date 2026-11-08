@@ -245,7 +245,7 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     for (let i = 0; i < directedPieces.length; i++) {
       const currentLang = canonicalLanguage(directedPieces[i].lang || '');
       const count = languageCounts.get(currentLang) || 0;
-      if (count > largestCount) {
+      if (count > 1 && count >= largestCount) {
         largestCount = count;
         replaceIndex = i;
       }
