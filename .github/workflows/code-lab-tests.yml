@@ -77,3 +77,21 @@ jobs:
             query-phrase-audit.json
           if-no-files-found: warn
           retention-days: 7
+
+  browser-smoke:
+    runs-on: ubuntu-latest
+    needs: test
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Playwright outside the repository
+        run: npm install --prefix /tmp/code-lab-browser --no-save --no-package-lock playwright
+      - name: Install Chromium
+        run: /tmp/code-lab-browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Run Code Lab browser smoke tests
+        run: |
+          cp tools/code-lab/tests/browser-smoke.mjs /tmp/code-lab-browser/browser-smoke.mjs
+          node /tmp/code-lab-browser/browser-smoke.mjs
