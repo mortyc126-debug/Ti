@@ -98,21 +98,37 @@
 
   // ── атрибуты внутри HTML-тега ──
   // курсор внутри открывающего тега: <img |  <img sr|  <button type="|  → режим «имя атрибута» или «значение»
-  function tagCtx(ed){
-    const ta = taOf(ed), cm = ta && ta.__cm; if(!cm) return null;
+  function editorActions(ed, prefix){
+    const ta = taOf(ed), cm = ta && ta.__cm; if(!cm) return {};
+    const cur = cm.getCursor('from'), curTo = cm.getCursor('to'), coords = cm.cursorCoords(true, 'window');
+    const from = { line: cur.line, ch: cur.ch - String(prefix || '').length };
+    return {
+      x: coords.left,
+      y: coords.bottom + 4,
+      put: text => { cm.replaceRange(text, from, curTo); slot(cm, from, text); cm.focus(); }
+    };
+  }
+  function textBeforeCursor(snapshot, lineWindow){
+    const lines = String(snapshot.code || '').split(/\r?\n/);
+    const cursor = snapshot.cursor || { line: 0, ch: 0 };
+    const start = Math.max(0, cursor.line - (lineWindow || cursor.line));
+    return lines.slice(start, cursor.line).concat(String(lines[cursor.line] || '').slice(0, cursor.ch)).join('\n');
+  }
+  function tagCtx(snapshot){
+    const ed = snapshot.editor, ta = taOf(ed), cm = ta && ta.__cm; if(!cm) return null;
     // выделено «…» из шаблона — подсказываем, чем его заменить
-    const ph = cm.somethingSelected() && cm.getSelection() === '…'; if(cm.somethingSelected() && !ph) return null;
-    const cur = cm.getCursor('from'), curTo = cm.getCursor('to'), before = cm.getRange({ line: Math.max(0, cur.line - 6), ch: 0 }, cur);
+    const ph = Boolean(snapshot.selectedText) && snapshot.selectedText === '…';
+    if(snapshot.selectedText && !ph) return null;
+    const cur = snapshot.cursor || cm.getCursor('from'), before = textBeforeCursor(snapshot, 6);
     const m = before.match(/<([a-zA-Z][\w-]*)(\s[^<>]*)$/); if(!m) return null;
-    const tail = m[2], tag = m[1].toLowerCase(), c = cm.cursorCoords(true, 'window');
-    const mk = prefix => { const from = { line: cur.line, ch: cur.ch - prefix.length }; return t => { cm.replaceRange(t, from, curTo); slot(cm, from, t); cm.focus(); }; };
+    const tail = m[2], tag = m[1].toLowerCase();
     const vm = tail.match(/([^\s=]+)\s*=\s*(["'])([^"']*)$/);
-    if(vm) return { mode: 'value', tag, attr: vm[1].toLowerCase(), prefix: vm[3], x: c.left, y: c.bottom + 4, put: mk(vm[3]) };
+    if(vm) return Object.assign({ mode: 'value', tag, attr: vm[1].toLowerCase(), prefix: vm[3] }, editorActions(ed, vm[3]));
     if(((tail.match(/"/g) || []).length % 2) || ((tail.match(/'/g) || []).length % 2)) return null;   // внутри значения без «=» рядом
     const prefix = (tail.match(/([^\s="'\/]*)$/) || ['', ''])[1];
     if(/=\s*$/.test(tail)) return null;
     const have = [...tail.matchAll(/\s([^\s=\/>"']+)/g)].map(x => x[1].toLowerCase());
-    return { mode: 'name', tag, prefix, have, x: c.left, y: c.bottom + 4, put: mk(prefix) };
+    return Object.assign({ mode: 'name', tag, prefix, have }, editorActions(ed, prefix));
   }
   const BOOL = new Set('hidden disabled required readonly checked multiple selected autoplay muted loop controls playsinline defer async novalidate open reversed allowfullscreen inert autofocus ismap default nomodule formnovalidate'.split(' '));
   const rulesCache = {};
@@ -139,15 +155,14 @@
 
   // ── параметры вызова (JS/Python) и значения свойства (CSS) ──
   // курсор в скобках вызова: какая функция, какой по счёту аргумент, в кавычках ли
-  function callCtx(ed){
-    const ta = taOf(ed), cm = ta && ta.__cm; if(!cm) return null;
-    const ph = cm.somethingSelected() && cm.getSelection() === '…'; if(cm.somethingSelected() && !ph) return null;
-    const cur = cm.getCursor('from'), curTo = cm.getCursor('to'), lang = canonL(ed.__f && ed.__f.lang);
-    const before = cm.getRange({ line: Math.max(0, cur.line - 5), ch: 0 }, cur), c = cm.cursorCoords(true, 'window');
-    const mk = prefix => { const from = { line: cur.line, ch: cur.ch - prefix.length }; return t => { cm.replaceRange(t, from, curTo); slot(cm, from, t); cm.focus(); }; };
+  function callCtx(snapshot){
+    const ed = snapshot.editor, ta = taOf(ed), cm = ta && ta.__cm; if(!cm) return null;
+    const ph = snapshot.selectedText === '…'; if(snapshot.selectedText && !ph) return null;
+    const cur = snapshot.cursor || cm.getCursor('from'), lang = canonL(snapshot.language);
+    const before = textBeforeCursor(snapshot, 5), actions = prefix => editorActions(ed, prefix);
     if(lang === 'css'){
-      const m = cm.getLine(cur.line).slice(0, cur.ch).match(/^\s*([a-z-]+)\s*:\s*([\w-]*)$/i); if(!m) return null;
-      return { kind: 'css', lang, fn: m[1].toLowerCase(), prefix: m[2], x: c.left, y: c.bottom + 4, put: mk(m[2]) };
+      const m = String(snapshot.beforeCursor || '').match(/^\s*([a-z-]+)\s*:\s*([\w-]*)$/i); if(!m) return null;
+      return Object.assign({ kind: 'css', lang, fn: m[1].toLowerCase(), prefix: m[2] }, actions(m[2]));
     }
     // скобки вызова есть почти в любом языке; разметка и данные — не про вызовы
     if(/^(html|svg|xml|md|markdown|txt|text|json|yaml|)$/.test(lang)) return null;
@@ -166,7 +181,7 @@
     const top = st[st.length - 1]; if(!top || top.ch !== '(') return null;
     const fm = before.slice(0, top.at).match(/([A-Za-z_$][\w$]*)\s*$/); if(!fm || /^(if|for|while|switch|catch|function|return|def|elif|with)$/.test(fm[1])) return null;
     const prefix = q ? before.slice(qAt + 1) : (before.match(/[\w$]*$/) || [''])[0];
-    return { kind: 'call', lang, fn: fm[1], arg: top.commas, inQuote: !!q, prefix, x: c.left, y: c.bottom + 4, put: mk(prefix) };
+    return Object.assign({ kind: 'call', lang, fn: fm[1], arg: top.commas, inQuote: !!q, prefix }, actions(prefix));
   }
   async function callRoots(cc){
     if(!window.StructureRules) return [];
@@ -213,7 +228,7 @@
       contexts: ['html-attribute'],
       priority: 100,
       resolve: snapshot => {
-        const raw = tagCtx(snapshot.editor);
+        const raw = tagCtx(snapshot);
         return raw && Object.assign({}, raw, {
           kind: 'html-attribute',
           expected: raw.mode === 'value' ? 'attribute-value' : 'attribute-name',
@@ -232,7 +247,7 @@
       contexts: ['css-value', 'call-argument'],
       priority: 50,
       resolve: snapshot => {
-        const raw = callCtx(snapshot.editor);
+        const raw = callCtx(snapshot);
         if(!raw) return null;
         return Object.assign({}, raw, {
           kind: raw.kind === 'css' ? 'css-value' : 'call-argument',
