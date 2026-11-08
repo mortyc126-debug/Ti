@@ -240,16 +240,27 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     .sort((a, b) => b[1].combinedScore - a[1].combinedScore);
   for (const [lang, candidate] of missingLanguageCandidates) {
     if (languageCounts.has(lang)) continue;
-    let replaceIndex = -1;
-    let largestCount = 1;
-    for (let i = 0; i < directedPieces.length; i++) {
-      const currentLang = canonicalLanguage(directedPieces[i].lang || '');
-      const count = languageCounts.get(currentLang) || 0;
-      if (count > 1 && count >= largestCount) {
-        largestCount = count;
-        replaceIndex = i;
+    const findReplaceIndex = (start, end) => {
+      let replaceIndex = -1;
+      let largestCount = 1;
+      for (let i = start; i <= end; i++) {
+        const currentLang = canonicalLanguage(directedPieces[i].lang || '');
+        const count = languageCounts.get(currentLang) || 0;
+        if (count > 1 && count >= largestCount) {
+          largestCount = count;
+          replaceIndex = i;
+        }
       }
+      return replaceIndex;
+    };
+    // Сначала вытесняем дубли после первых трёх результатов, затем — в пределах первой десятки.
+    let replaceIndex = directedPieces.length > 3
+      ? findReplaceIndex(3, Math.min(directedPieces.length - 1, 9))
+      : findReplaceIndex(0, directedPieces.length - 1);
+    if (replaceIndex < 0 && directedPieces.length > 3) {
+      replaceIndex = findReplaceIndex(3, directedPieces.length - 1);
     }
+    if (replaceIndex < 0) replaceIndex = findReplaceIndex(0, directedPieces.length - 1);
     if (replaceIndex >= 0) {
       const replaced = directedPieces[replaceIndex];
       const replacedLang = canonicalLanguage(replaced.lang || '');
