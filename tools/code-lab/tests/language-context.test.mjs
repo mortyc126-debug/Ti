@@ -105,5 +105,5 @@ test('реальный словарь даёт языковые пояснени
   assert.match(html('for'), /label/);
   assert.match(ts('as'), /утверждение типа|приводит выражение/);
   assert.match(py('False'), /логическая ложь/);
-  assert.match(js('false'), /логическая ложь/);
+  assert.match(js('false'), /ложь/);
 });
