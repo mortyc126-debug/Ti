@@ -3,6 +3,7 @@
 // Ничего не изменяет. Отчёт: audit-library-report.json в текущей рабочей папке.
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { makeLook } from '../lib/annotate.mjs';
 import crypto from 'node:crypto';
 
 const root=path.resolve(process.argv[2]||'tools/code-lab/library');
@@ -43,6 +44,9 @@ const set=new Set(files);
 const records=[],missingMeta=[],invalidMeta=[],duplicateIds=new Map(),rawHashes=new Map(),normalizedHashes=new Map();
 const noteStats={total:0,orphanTotal:0,concept:0,orphanAlreadyInWordNotes:0,swapped:0,invalid:0,anchored:0,uniqueToken:0,multipleTokens:0,composite:0,absent:0,empty:0};
 const noteCases=[],conceptNotes=[];
+const dictionaryNoteStats={total:0,matched:0,stale:0,missing:0};
+const dictionaryNoteCases=[];
+const keywordDict=JSON.parse(await fs.readFile(path.resolve('tools/code-lab/public/keyword-dict.json'),'utf8'));
 const viewCodeStats={eligible:0,exact:0,formatOnly:0,mismatch:0,missing:0};
 const viewCodeCases=[];
 const extLang={js:'js',mjs:'js',cjs:'js',jsx:'js',ts:'ts',tsx:'ts',py:'python',html:'html',htm:'html',css:'css',svg:'svg',json:'json',sql:'sql',rb:'ruby',php:'php',go:'go',lua:'lua',sh:'sh',bash:'bash',ps1:'powershell',r:'r',pl:'perl',txt:'txt'};
@@ -91,6 +95,7 @@ for(const file of files){
     }
   }
   const lang=String(meta.lang||extLang[ext]||'').toLowerCase();
+  const look=makeLook(lang,keywordDict);
   const expected=extLang[ext];
   const notes=Array.isArray(meta.wordNotes)?meta.wordNotes:[];
   const codeLines=code.split('\n');
@@ -106,6 +111,13 @@ for(const file of files){
     const swapped=tokenKinds.has(note.note)&&typeof note.kind==='string'&&!tokenKinds.has(note.kind);
     if(swapped) noteStats.swapped++;
     const explanation=swapped?note.kind:note.note;
+    if(note.source==='dict'){
+      dictionaryNoteStats.total++;
+      const current=look(note.text);
+      if(!current){dictionaryNoteStats.missing++;dictionaryNoteCases.push({file:rel,id,text:note.text,lang,classification:'dictionary-entry-missing',storedExplanation:explanation});}
+      else if(current!==explanation){dictionaryNoteStats.stale++;dictionaryNoteCases.push({file:rel,id,text:note.text,lang,classification:'dictionary-explanation-stale',storedExplanation:explanation,currentExplanation:current});}
+      else dictionaryNoteStats.matched++;
+    }
     if(typeof note.text!=='string'||!note.text.trim()){
       noteStats.invalid++;
       noteCases.push({
@@ -163,7 +175,8 @@ const report={
     emptyDesc:records.filter(x=>x.emptyDesc).length,langMismatch:records.filter(x=>x.langMismatch).length},
   duplicateIds:groups(duplicateIds),exactCodeDuplicates:groups(rawHashes),
   formatNormalizedCandidates:groups(normalizedHashes),duplicateReview,missingMeta,invalidMeta,records,notes:noteStats,noteCases,conceptNotes,
-  viewCodeAudit:viewCodeStats,viewCodeCases
+  viewCodeAudit:viewCodeStats,viewCodeCases,
+  dictionaryNoteAudit:dictionaryNoteStats,dictionaryNoteCases
 };
 await fs.writeFile(output,JSON.stringify(report,null,2)+'\n','utf8');
 console.log(JSON.stringify({
@@ -172,5 +185,6 @@ console.log(JSON.stringify({
   formatNormalizedCandidateGroups:report.formatNormalizedCandidates.length,
   noteStats:report.notes,viewCodeAudit:report.viewCodeAudit,
   sampleViewCodeMismatches:report.viewCodeCases.slice(0,30),
+  dictionaryNoteAudit:report.dictionaryNoteAudit,sampleDictionaryNoteMismatches:report.dictionaryNoteCases.slice(0,30),
   sampleAmbiguousNotes:report.noteCases.slice(0,30),conceptSamples:report.conceptNotes.slice(0,20)
 },null,2));
