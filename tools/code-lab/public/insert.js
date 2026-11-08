@@ -191,7 +191,7 @@
   if(window.CodeLabContext){
     window.CodeLabContext.register({
       id: 'html-attributes',
-      languages: ['html'],
+      languages: ['html', 'svg'],
       priority: 100,
       resolve: snapshot => {
         const raw = tagCtx(snapshot.editor);
