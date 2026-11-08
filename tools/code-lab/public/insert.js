@@ -199,6 +199,11 @@
           kind: 'html-attribute',
           expected: raw.mode === 'value' ? 'attribute-value' : 'attribute-name',
           symbol: raw.attr || raw.tag,
+          constraints: {
+            tag: raw.tag,
+            existingAttributes: raw.have || [],
+            valueMode: raw.mode === 'value'
+          },
           legacy: raw
         });
       }
@@ -213,10 +218,21 @@
           kind: raw.kind === 'css' ? 'css-value' : 'call-argument',
           expected: raw.kind === 'css' ? 'property-value' : (raw.inQuote ? 'argument-value' : 'argument'),
           symbol: raw.fn,
+          constraints: {
+            argumentIndex: Number.isInteger(raw.arg) ? raw.arg : null,
+            insideString: Boolean(raw.inQuote),
+            property: raw.kind === 'css' ? raw.fn : null
+          },
           legacy: raw
         });
       }
     });
+  }
+
+  function rankRoots(roots, context){
+    return window.CodeLabContext
+      ? window.CodeLabContext.rankCandidates(roots, context)
+      : roots;
   }
 
   // запасной путь: слова словаря по началу («quer» → querySelector), если дерева нет
@@ -267,7 +283,7 @@
     if(tc){
       const my0 = ++seq, tr = await tagRoots(tc);
       if(my0 !== seq && resolved) return;
-      if(tr.length){ ctx = Object.assign({}, c || {}, { x: tc.x, y: tc.y, put: tc.put, ed }); render(ctx, tr); return; }
+      if(tr.length){ ctx = Object.assign({}, c || {}, { x: tc.x, y: tc.y, put: tc.put, ed, syntaxContext: resolved }); render(ctx, rankRoots(tr, resolved)); return; }
     }
     // Параметры вызова и значения CSS-свойств проходят через тот же контракт провайдера.
     const cc = !tc
@@ -278,7 +294,7 @@
     if(cc){
       const my1 = ++seq, cr = await callRoots(cc);
       if(my1 !== seq && resolved) return;
-      if(cr.length){ ctx = Object.assign({}, c || {}, { x: cc.x, y: cc.y, put: cc.put, ed }); render(ctx, cr); return; }
+      if(cr.length){ ctx = Object.assign({}, c || {}, { x: cc.x, y: cc.y, put: cc.put, ed, syntaxContext: resolved }); render(ctx, rankRoots(cr, resolved)); return; }
     }
     if(!c || (!force && !c.word)){ hide(); return; }
     const my = ++seq;
