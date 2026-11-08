@@ -20,12 +20,21 @@ async function walk(dir){
     if(e.isDirectory()) await walk(p); else files.push(p);
   }
 }
+const isIdentifierToken=token=>/^[\p{L}_$][\p{L}\p{N}_$]*$/u.test(String(token||''));
 function positions(code,token){
   if(!token) return [];
   const out=[];
+  const identifier=isIdentifierToken(token);
   code.replace(/\r\n?/g,'\n').split('\n').forEach((line,lineNo)=>{
     let at=0;
-    while((at=line.indexOf(token,at))!==-1){out.push({line:lineNo,col:at});at+=Math.max(1,token.length);}
+    while((at=line.indexOf(token,at))!==-1){
+      const before=at>0?line[at-1]:'';
+      const after=line[at+token.length]||'';
+      const leftBoundary=!/[\p{L}\p{N}_$]/u.test(before);
+      const rightBoundary=!/[\p{L}\p{N}_$]/u.test(after);
+      if(!identifier||(leftBoundary&&rightBoundary)) out.push({line:lineNo,col:at});
+      at+=Math.max(1,token.length);
+    }
   });
   return out;
 }
@@ -94,7 +103,7 @@ for(const file of files){
     if(anchored){noteStats.anchored++;cls='exact-position';}
     else if(hits.length===1){noteStats.uniqueToken++;cls='unique-token-elsewhere';}
     else if(hits.length>1){noteStats.multipleTokens++;cls='multiple-token-occurrences';}
-    else if(code.includes(note.text)){noteStats.composite++;cls='composite-or-substring';}
+    else if(!isIdentifierToken(note.text)&&code.includes(note.text)){noteStats.composite++;cls='composite-or-substring';}
     else{noteStats.absent++;cls='not-in-current-code';}
     if(isOrphan||!anchored||swapped) noteCases.push({
       file:rel,id,text:note.text,explanation,source:note.source||'',
