@@ -97,23 +97,5 @@
       "note": "Выполняет клик по элементу.",
       "source": "custom"
     }
-  ],
-  "orphanNotes": [
-    {
-      "line": 4,
-      "col": 51,
-      "text": "click",
-      "kind": "fn",
-      "note": "Выполняет клик по элементу.",
-      "source": "custom"
-    },
-    {
-      "line": 4,
-      "col": 51,
-      "text": "click",
-      "kind": "fn",
-      "note": "Выполняет клик по элементу.",
-      "source": "custom"
-    }
   ]
 }

@@ -146,23 +146,5 @@
       "note": "log — печатает значение в консоль. console.log(x) — показать x.",
       "source": "dict"
     }
-  ],
-  "orphanNotes": [
-    {
-      "line": 7,
-      "col": 16,
-      "text": "click",
-      "kind": "fn",
-      "note": "Выполняет клик с цепочкой событий мыши.",
-      "source": "custom"
-    },
-    {
-      "line": 7,
-      "col": 16,
-      "text": "click",
-      "kind": "fn",
-      "note": "Выполняет клик с цепочкой событий мыши.",
-      "source": "custom"
-    }
   ]
 }

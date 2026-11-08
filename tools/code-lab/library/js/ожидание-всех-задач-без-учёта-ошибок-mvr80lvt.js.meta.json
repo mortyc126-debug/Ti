@@ -160,23 +160,5 @@
       "note": "log — печатает значение в консоль. console.log(x) — показать x.",
       "source": "dict"
     }
-  ],
-  "orphanNotes": [
-    {
-      "line": 6,
-      "col": 60,
-      "text": "catch",
-      "kind": "kw",
-      "note": "Перехватывает отказ и подставляет другой результат.",
-      "source": "custom"
-    },
-    {
-      "line": 6,
-      "col": 60,
-      "text": "catch",
-      "kind": "kw",
-      "note": "Перехватывает отказ и подставляет другой результат.",
-      "source": "custom"
-    }
   ]
 }

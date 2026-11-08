@@ -156,39 +156,5 @@
       "note": "создать экземпляр объекта через конструктор",
       "source": "dict"
     }
-  ],
-  "orphanNotes": [
-    {
-      "line": 1,
-      "col": 2,
-      "text": "constructor",
-      "kind": "fn",
-      "note": "function Object() { [native code] }",
-      "source": "custom"
-    },
-    {
-      "line": 5,
-      "col": 2,
-      "text": "constructor",
-      "kind": "fn",
-      "note": "function Object() { [native code] }",
-      "source": "custom"
-    },
-    {
-      "line": 1,
-      "col": 2,
-      "text": "constructor",
-      "kind": "fn",
-      "note": "function Object() { [native code] }",
-      "source": "custom"
-    },
-    {
-      "line": 5,
-      "col": 2,
-      "text": "constructor",
-      "kind": "fn",
-      "note": "function Object() { [native code] }",
-      "source": "custom"
-    }
   ]
 }

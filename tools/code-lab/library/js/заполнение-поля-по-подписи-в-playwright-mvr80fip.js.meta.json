@@ -88,23 +88,5 @@
       "note": "Очищает поле и вводит значение.",
       "source": "custom"
     }
-  ],
-  "orphanNotes": [
-    {
-      "line": 4,
-      "col": 33,
-      "text": "fill",
-      "kind": "fn",
-      "note": "Очищает поле и вводит значение.",
-      "source": "custom"
-    },
-    {
-      "line": 4,
-      "col": 33,
-      "text": "fill",
-      "kind": "fn",
-      "note": "Очищает поле и вводит значение.",
-      "source": "custom"
-    }
   ]
 }
