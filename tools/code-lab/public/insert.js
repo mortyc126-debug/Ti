@@ -186,6 +186,40 @@
     return out;
   }
 
+  // Языковые контексты подключаются как адаптеры к общему контракту.
+  // Здесь остаётся только распознавание локального синтаксиса; маршрутизация и форма контекста общие.
+  if(window.CodeLabContext){
+    window.CodeLabContext.register({
+      id: 'html-attributes',
+      languages: ['html'],
+      priority: 100,
+      resolve: snapshot => {
+        const raw = tagCtx(snapshot.editor);
+        return raw && Object.assign({}, raw, {
+          kind: 'html-attribute',
+          expected: raw.mode === 'value' ? 'attribute-value' : 'attribute-name',
+          symbol: raw.attr || raw.tag,
+          legacy: raw
+        });
+      }
+    });
+    window.CodeLabContext.register({
+      id: 'call-arguments',
+      languages: ['css', 'js', 'python', 'ts', 'java', 'c', 'cpp', 'csharp', 'go', 'rust', 'php', 'ruby'],
+      priority: 50,
+      resolve: snapshot => {
+        const raw = callCtx(snapshot.editor);
+        if(!raw) return null;
+        return Object.assign({}, raw, {
+          kind: raw.kind === 'css' ? 'css-value' : 'call-argument',
+          expected: raw.kind === 'css' ? 'property-value' : (raw.inQuote ? 'argument-value' : 'argument'),
+          symbol: raw.fn,
+          legacy: raw
+        });
+      }
+    });
+  }
+
   // запасной путь: слова словаря по началу («quer» → querySelector), если дерева нет
   function flatFallback(word, d, lang){
     const lq = word.toLowerCase(); const out = []; const seen = new Set();
@@ -223,12 +257,30 @@
     clearTimeout(timer); cancelVariantRequest(); cancelTemplateRequest();
     if(composing) return;
     const c = wordCtx(ed, force);
-    // внутри HTML-тега — его атрибуты и их значения (правила структуры), даже без набранных букв
-    const tc = /^(html|htm|svg|xml)$/i.test((ed && ed.__f && ed.__f.lang) || '') && tagCtx(ed);   // при выделенном «…» wordCtx пуст — тег смотрим сами
-    if(tc){ const my0 = ++seq; const tr = await tagRoots(tc); if(my0 !== seq) return; if(tr.length){ ctx = Object.assign({}, c || {}, { x: tc.x, y: tc.y, put: tc.put, ed }); render(ctx, tr); return; } }
-    // в скобках вызова — параметры и значения; после «свойство:» в CSS — значения свойства
-    const cc = !tc && callCtx(ed);
-    if(cc){ const my1 = ++seq; const cr = await callRoots(cc); if(my1 !== seq) return; if(cr.length){ ctx = Object.assign({}, c || {}, { x: cc.x, y: cc.y, put: cc.put, ed }); render(ctx, cr); return; } }
+    // Контекст сначала разрешается общим ядром; языковые адаптеры отвечают только за распознавание синтаксиса.
+    const resolved = window.CodeLabContext
+      ? window.CodeLabContext.resolve({ editor: ed, language: (ed && ed.__f && ed.__f.lang) || '' })
+      : null;
+    const legacyLang = (ed && ed.__f && ed.__f.lang) || '';
+    const tc = resolved && resolved.kind === 'html-attribute'
+      ? resolved.legacy
+      : (!window.CodeLabContext && /^(html|htm|svg|xml)$/i.test(legacyLang) ? tagCtx(ed) : null);
+    if(tc){
+      const my0 = ++seq, tr = await tagRoots(tc);
+      if(my0 !== seq && resolved) return;
+      if(tr.length){ ctx = Object.assign({}, c || {}, { x: tc.x, y: tc.y, put: tc.put, ed }); render(ctx, tr); return; }
+    }
+    // Параметры вызова и значения CSS-свойств проходят через тот же контракт провайдера.
+    const cc = !tc
+      ? (resolved && (resolved.kind === 'css-value' || resolved.kind === 'call-argument')
+          ? resolved.legacy
+          : (!window.CodeLabContext ? callCtx(ed) : null))
+      : null;
+    if(cc){
+      const my1 = ++seq, cr = await callRoots(cc);
+      if(my1 !== seq && resolved) return;
+      if(cr.length){ ctx = Object.assign({}, c || {}, { x: cc.x, y: cc.y, put: cc.put, ed }); render(ctx, cr); return; }
+    }
     if(!c || (!force && !c.word)){ hide(); return; }
     const my = ++seq;
     let roots = [];
