@@ -229,7 +229,7 @@
     // в скобках вызова — параметры и значения; после «свойство:» в CSS — значения свойства
     const cc = !tc && callCtx(ed);
     if(cc){ const my1 = ++seq; const cr = await callRoots(cc); if(my1 !== seq) return; if(cr.length){ ctx = Object.assign({}, c || {}, { x: cc.x, y: cc.y, put: cc.put, ed }); render(ctx, cr); return; } }
-    if(!c || (!force && c.word.length < 2)){ hide(); return; }
+    if(!c || (!force && !c.word)){ hide(); return; }
     const my = ++seq;
     let roots = [];
     if(c.word){ const r = await fetchVariants('/api/variants?q=' + encodeURIComponent(c.word) + '&lang=' + encodeURIComponent(c.lang)); roots = (r && r.roots) || []; }
