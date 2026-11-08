@@ -73,6 +73,19 @@ try {
   if (await cm.count() && await cm.isVisible()) {
     await cm.click();
     await page.keyboard.press('Control+A');
+    await page.keyboard.type('align-items: en');
+    await page.waitForFunction(() => {
+      const popup = document.querySelector('.ac-pop');
+      return popup && [...popup.querySelectorAll('.ac-r')].some(row => /^end$/i.test(row.dataset.code || ''));
+    }, undefined, { timeout: 15_000 });
+    const contextualValues = await page.locator('.ac-pop .ac-r').evaluateAll(rows => rows.map(row => row.dataset.code || ''));
+    assert.ok(contextualValues.some(value => /^end$/i.test(value)),
+      'CSS value suggestions did not use the align-items property context');
+    await page.keyboard.press('Escape');
+  }
+  if (await cm.count() && await cm.isVisible()) {
+    await cm.click();
+    await page.keyboard.press('Control+A');
     await page.keyboard.type('m'); // однобуквенный префикс должен сразу открыть CSS-варианты
   } else {
     const textarea = cssEditor.locator('textarea.sb-code');
