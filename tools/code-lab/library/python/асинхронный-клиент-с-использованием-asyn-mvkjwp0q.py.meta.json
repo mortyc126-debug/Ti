@@ -104,8 +104,8 @@
       "source": "dict"
     },
     {
-      "line": 8,
-      "col": 4,
+      "line": 15,
+      "col": 8,
       "text": "return",
       "kind": "kw",
       "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
@@ -136,8 +136,8 @@
       "source": "dict"
     },
     {
-      "line": 13,
-      "col": 4,
+      "line": 26,
+      "col": 8,
       "text": "print",
       "kind": "fn",
       "note": "print — напечатать значение (Python: вывод в консоль).",

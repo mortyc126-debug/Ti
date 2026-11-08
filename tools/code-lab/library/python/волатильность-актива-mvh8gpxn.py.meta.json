@@ -52,7 +52,7 @@
       "source": "dict"
     },
     {
-      "line": 3,
+      "line": 8,
       "col": 24,
       "text": "stdev",
       "kind": "fn",
@@ -68,7 +68,7 @@
       "source": "dict"
     },
     {
-      "line": 4,
+      "line": 9,
       "col": 0,
       "text": "print",
       "kind": "fn",

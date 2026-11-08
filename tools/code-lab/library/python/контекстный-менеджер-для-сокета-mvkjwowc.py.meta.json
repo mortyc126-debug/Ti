@@ -217,7 +217,7 @@
       "source": "dict"
     },
     {
-      "line": 15,
+      "line": 14,
       "col": 8,
       "text": "if",
       "kind": "kw",
@@ -265,7 +265,7 @@
       "source": "dict"
     },
     {
-      "line": 18,
+      "line": 17,
       "col": 15,
       "text": "False",
       "kind": "kw",
@@ -273,7 +273,7 @@
       "source": "dict"
     },
     {
-      "line": 21,
+      "line": 19,
       "col": 0,
       "text": "try",
       "kind": "kw",
@@ -305,7 +305,7 @@
       "source": "dict"
     },
     {
-      "line": 25,
+      "line": 23,
       "col": 4,
       "text": "print",
       "kind": "fn",

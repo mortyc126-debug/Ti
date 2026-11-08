@@ -39,34 +39,10 @@
     },
     {
       "line": 2,
-      "col": 16,
-      "text": "a",
-      "kind": "name",
-      "note": "a — селектор всех ссылок",
-      "source": "dict"
-    },
-    {
-      "line": 2,
-      "col": 21,
-      "text": "a",
-      "kind": "name",
-      "note": "a — селектор всех ссылок",
-      "source": "dict"
-    },
-    {
-      "line": 2,
       "col": 23,
       "text": "for",
       "kind": "kw",
       "note": "for — цикл: повторять блок заданное число раз.",
-      "source": "dict"
-    },
-    {
-      "line": 2,
-      "col": 27,
-      "text": "a",
-      "kind": "name",
-      "note": "a — селектор всех ссылок",
       "source": "dict"
     },
     {
@@ -78,15 +54,15 @@
       "source": "dict"
     },
     {
-      "line": 2,
-      "col": 35,
+      "line": 5,
+      "col": 45,
       "text": "zip",
       "kind": "fn",
       "note": "zip — идёт по двум спискам попарно",
       "source": "dict"
     },
     {
-      "line": 3,
+      "line": 6,
       "col": 0,
       "text": "print",
       "kind": "fn",
