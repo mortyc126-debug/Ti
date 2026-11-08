@@ -116,7 +116,19 @@
     if(window.codelabExplainAt) for(const w of line.matchAll(/[A-Za-z_$#.@][\w$-]*/g)){
       if(taken.some(([a, b]) => w.index >= a && w.index < b)) continue;
       const hit = window.codelabExplainAt(line, w.index + 1, lang);
-      if(hit && hit.term && hit.to - hit.from > w[0].length + 1){ taken.push([hit.from, hit.to]); out.push({ from: hit.from, to: hit.to, text: line.slice(hit.from, hit.to), label: shortOf(hit.text), note: hit.text, path: '', rel: relOf(hit.term, lang, d, hit.text) }); }
+      if(hit && hit.term && hit.to - hit.from > w[0].length + 1){
+        taken.push([hit.from, hit.to]);
+        const related = lang === 'css' ? meaning(hit.term, lang, d) : null;
+        out.push({
+          from: hit.from,
+          to: hit.to,
+          text: line.slice(hit.from, hit.to),
+          label: related && related.label || shortOf(hit.text),
+          note: [hit.text, related && related.note].filter(Boolean).join('; '),
+          path: related && related.path || '',
+          rel: related && related.rel || relOf(hit.term, lang, d, hit.text)
+        });
+      }
     }
     const free = [];
     while((m = re.exec(line))){
