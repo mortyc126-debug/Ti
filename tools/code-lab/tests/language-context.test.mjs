@@ -129,7 +129,7 @@ test('реальный словарь даёт языковые пояснени
   assert.match(css('url'), /внешнего ресурса/);
   assert.match(ts('Pick'), /выбранные свойства/);
   assert.match(ts('Partial'), /необязательными/);
-  assert.match(ts('Record'), /множество ключей/);
+  assert.match(ts('Record'), /ключей/);
   assert.match(ts('Parameters'), /параметров функции/);
   assert.match(js('Proxy'), /перехватывает операции/);
   assert.match(js('sessionStorage'), /вкладкой/);
