@@ -31,6 +31,7 @@ try {
   const context = await browser.newContext();
   await context.addInitScript(() => {
     localStorage.removeItem('codelab_sandbox');
+    localStorage.removeItem('codelab_sb_active');
     localStorage.setItem('codelab_mode', 'sandbox');
     localStorage.setItem('codelab_ac', 'on');
     localStorage.setItem('codelab_ac_speed', 'instant');
@@ -50,6 +51,10 @@ try {
   );
   assert.ok(cssIndex >= 0, 'default CSS editor was not created');
   const cssEditor = page.locator('#sbEds .sb-ed').nth(cssIndex);
+  await page.locator('#sbTabs').waitFor({ state: 'visible' });
+  const cssTab = page.locator('#sbTabs .sb-tab').filter({ hasText: 'style.css' }).first();
+  await cssTab.click();
+  await cssEditor.waitFor({ state: 'visible' });
   const cm = cssEditor.locator('.CodeMirror');
   if (await cm.count() && await cm.isVisible()) {
     await cm.click();
