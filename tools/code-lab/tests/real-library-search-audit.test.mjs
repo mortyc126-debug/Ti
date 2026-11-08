@@ -194,7 +194,7 @@ async function main() {
   assert.ok(compositionTargetKeys.has('<button>'), 'составная задача должна находить HTML-кнопку');
   for (const language of ['html', 'css', 'js']) {
     assert.ok(compositionRootLanguages.has(language), 'дерево одной задачи должно содержать корни языка ' + language);
-    assert.ok(compositionPieceLanguages.has(language), 'связанные фрагменты одной задачи должны содержать язык ' + language);
+    assert.ok(compositionPieceLanguages.has(language), 'связанные фрагменты одной задачи должны содержать язык ' + language + '; languages=' + JSON.stringify([...compositionPieceLanguages]) + '; pieces=' + JSON.stringify(compositionResult.pieces.map(piece => ({ title: piece.title, lang: piece.lang, targets: piece.matchedTargets }))));
   }
   assert.ok(compositionTargetKeys.has('promise.all'), 'два источника должны связываться с параллельным ожиданием Promise.all');
 
