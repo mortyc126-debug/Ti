@@ -73,7 +73,7 @@ try {
   if (await cm.count() && await cm.isVisible()) {
     await cm.click();
     await page.keyboard.press('Control+A');
-    await page.keyboard.type('align-items: en');
+    await page.keyboard.type('.card { align-items: en');
     await page.waitForFunction(() => {
       const popup = document.querySelector('.ac-pop');
       return popup && [...popup.querySelectorAll('.ac-r')].some(row => /^end$/i.test(row.dataset.code || ''));
