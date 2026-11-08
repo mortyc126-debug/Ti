@@ -154,7 +154,7 @@ try {
     const cm = original && original.__cm;
     const input = cm && cm.getWrapperElement().offsetParent !== null
       ? ed.querySelector('.CodeMirror textarea') : original;
-    input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: 'отступ' }));
+    input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: 'margin' }));
   });
   await page.waitForSelector('.ac-pop', { timeout: 15_000 });
 
@@ -203,7 +203,7 @@ try {
     { timeout: 10_000 }
   );
   await page.keyboard.press('Control+A');
-  await page.keyboard.type('отступ');
+  await page.keyboard.type('margin');
   await staleVariantRequest;
   await page.keyboard.press('Control+A');
   await page.keyboard.type('padding');
