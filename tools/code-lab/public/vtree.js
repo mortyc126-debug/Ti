@@ -242,8 +242,14 @@
     load(ctx.word); inp.focus(); inp.select();
   }
   document.addEventListener('mousedown', e => { if(pop && !pop.contains(e.target)) hide(); });
+  // Не открываем дерево посреди IME-композиции в редакторе.
+  edsEl.addEventListener('compositionstart', () => { composing = true; if(pop) hide(); }, true);
+  edsEl.addEventListener('compositionend', () => { composing = false; }, true);
   // Ctrl+Пробел в редакторе
-  edsEl.addEventListener('keydown', e => { if((e.ctrlKey || e.metaKey) && e.code === 'Space'){ e.preventDefault(); e.stopPropagation(); open(); } }, true);
+  edsEl.addEventListener('keydown', e => {
+    if(composing || e.isComposing) return;
+    if((e.ctrlKey || e.metaKey) && e.code === 'Space'){ e.preventDefault(); e.stopPropagation(); open(); }
+  }, true);
   // кнопка на панели — рядом с поиском
   const b = document.createElement('button'); b.className = 'btn'; b.id = 'sbVarBtn'; b.textContent = 'варианты';
   b.title = 'дерево вариантов для слова у курсора: «отступ» → внешний / внутренний → … (Ctrl+Пробел)';
