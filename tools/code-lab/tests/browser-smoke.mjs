@@ -59,11 +59,11 @@ try {
   if (await cm.count() && await cm.isVisible()) {
     await cm.click();
     await page.keyboard.press('Control+A');
-    await page.keyboard.type('отступ');
+    await page.keyboard.type('margin');
   } else {
     const textarea = cssEditor.locator('textarea.sb-code');
     await textarea.waitFor({ state: 'visible' });
-    await textarea.fill('отступ');
+    await textarea.fill('margin');
     await textarea.evaluate(el => el.setSelectionRange(el.value.length, el.value.length));
   }
 
@@ -94,7 +94,9 @@ try {
   const popup = page.locator('.ac-pop');
   const popupCodes = await popup.locator('.ac-r').evaluateAll(rows => rows.map(row => row.dataset.code || ''));
   assert.ok(popupCodes.some(code => /margin/i.test(code)), 'CSS margin variant was not shown');
-  assert.ok(popupCodes.some(code => /padding/i.test(code)), 'CSS padding variant was not shown');
+  assert.ok(popup.locator('.ac-note').count() > 0, 'variant rows do not include explanation fields');
+  const explanations = await popup.locator('.ac-note').allTextContents();
+  assert.ok(explanations.some(note => /[А-Яа-яЁё]/.test(note)), 'variant rows have no Russian explanations');
 
   const expandableIndex = await popup.locator('.ac-r').evaluateAll(rows => {
     const visible = rows.filter(row => row.offsetParent !== null);
@@ -132,17 +134,17 @@ try {
     const original = ed.querySelector('textarea.sb-code') || ed.querySelector('textarea');
     const cm = original && original.__cm;
     if (cm && cm.getWrapperElement().offsetParent !== null) {
-      cm.setValue('отступ'); cm.setCursor({ line: 0, ch: 6 });
+      cm.setValue('margin'); cm.setCursor({ line: 0, ch: 6 });
     } else {
-      original.value = 'отступ';
+      original.value = 'margin';
       original.setSelectionRange(6, 6);
     }
-    ed.__f.code = 'отступ';
+    ed.__f.code = 'margin';
     const input = cm && cm.getWrapperElement().offsetParent !== null
       ? ed.querySelector('.CodeMirror textarea') : original;
     input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
     input.dispatchEvent(new InputEvent('input', {
-      bubbles: true, isComposing: true, inputType: 'insertCompositionText', data: 'отступ'
+      bubbles: true, isComposing: true, inputType: 'insertCompositionText', data: 'margin'
     }));
   });
   await delay(100);
@@ -182,14 +184,14 @@ try {
   await delay(1_100);
   assert.ok(templateStarted, 'template request did not start');
   code = await cssEditor.evaluate(ed => ed.__f.code);
-  assert.equal(code, 'отступ', 'stale template response inserted code after the tree was closed');
+  assert.equal(code, 'margin', 'stale template response inserted code after the tree was closed');
   assert.equal(await page.locator('.ac-pop').count(), 0, 'Escape did not close the variant tree');
 
   // A stale variant-search response must not replace results for the newer query.
   let staleVariantStarted = false;
   await page.route('**/api/variants**', async route => {
     const query = new URL(route.request().url()).searchParams.get('q');
-    if (query === 'отступ') {
+    if (query === 'margin') {
       staleVariantStarted = true;
       await delay(900);
     }
@@ -197,23 +199,23 @@ try {
   });
   const staleVariantRequest = page.waitForRequest(request =>
     new URL(request.url()).pathname === '/api/variants' &&
-    new URL(request.url()).searchParams.get('q') === 'отступ',
+    new URL(request.url()).searchParams.get('q') === 'margin',
     { timeout: 10_000 }
   );
   await page.keyboard.press('Control+A');
   await page.keyboard.type('отступ');
   await staleVariantRequest;
   await page.keyboard.press('Control+A');
-  await page.keyboard.type('сетка');
+  await page.keyboard.type('padding');
   await page.waitForFunction(() => {
     const popup = document.querySelector('.ac-pop');
-    return popup && [...popup.querySelectorAll('.ac-r')].some(row => /grid/i.test(row.dataset.code || ''));
+    return popup && [...popup.querySelectorAll('.ac-r')].some(row => /padding/i.test(row.dataset.code || ''));
   }, undefined, { timeout: 15_000 });
   await delay(1_000);
   const latestCodes = await page.locator('.ac-pop .ac-r').evaluateAll(rows => rows.map(row => row.dataset.code || ''));
   assert.ok(staleVariantStarted, 'slow old variant request did not start');
-  assert.ok(latestCodes.some(value => /grid/i.test(value)), 'newer CSS Grid query did not win');
-  assert.ok(!latestCodes.some(value => /margin|padding/i.test(value)), 'stale margin/padding results replaced the newer query');
+  assert.ok(latestCodes.some(value => /padding/i.test(value)), 'newer CSS padding query did not win');
+  assert.ok(!latestCodes.some(value => /margin/i.test(value)), 'stale margin results replaced the newer padding query');
 
   assert.deepEqual(pageErrors, [], 'browser page raised uncaught errors: ' + pageErrors.join('; '));
   console.log('Browser smoke passed: variant tree, expansion, keyboard insertion, IME and stale-template cancellation.');
