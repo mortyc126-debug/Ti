@@ -136,3 +136,30 @@ test('a broken provider does not prevent later providers from resolving context'
     removeWorking();
   }
 });
+
+test('editor snapshot exposes stable cursor, line and token context', () => {
+  const snapshot = Context.createSnapshot({
+    language: 'javascript',
+    code: 'const total = values.re',
+    cursor: { line: 0, ch: 23 },
+    selectedText: '',
+  });
+  assert.equal(snapshot.language, 'js');
+  assert.equal(snapshot.currentLine, 'const total = values.re');
+  assert.equal(snapshot.beforeCursor, 'const total = values.re');
+  assert.equal(snapshot.afterCursor, '');
+  assert.equal(snapshot.prefix, 're');
+  assert.deepEqual(snapshot.cursor, { line: 0, ch: 23 });
+});
+
+test('editor snapshot handles multiline code and clamps negative cursor positions', () => {
+  const snapshot = Context.createSnapshot({
+    language: 'py',
+    code: 'first line\\nsecond line',
+    cursor: { line: 1, ch: -4 },
+  });
+  assert.equal(snapshot.language, 'python');
+  assert.equal(snapshot.currentLine, 'second line');
+  assert.equal(snapshot.beforeCursor, '');
+  assert.equal(snapshot.afterCursor, 'second line');
+});
