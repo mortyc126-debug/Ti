@@ -107,6 +107,7 @@ try {
       original.value = 'отступ';
       original.setSelectionRange(6, 6);
     }
+    ed.__f.code = 'отступ';
     const input = ed.querySelector('.CodeMirror textarea') || original;
     input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
     input.dispatchEvent(new InputEvent('input', {
@@ -129,6 +130,14 @@ try {
     await delay(900);
     try { await route.continue(); } catch (_) {}
   });
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const collapsedIndex = await popup.locator('.ac-r').evaluateAll(rows =>
+      rows.findIndex(row => row.offsetParent !== null &&
+        row.nextElementSibling?.classList.contains('ac-kids') && row.nextElementSibling.hidden)
+    );
+    if (collapsedIndex < 0) break;
+    await popup.locator('.ac-r').nth(collapsedIndex).locator('.ac-t').click();
+  }
   const pieceIndex = await popup.locator('.ac-r').evaluateAll(rows =>
     rows.findIndex(row => row.offsetParent !== null && row.dataset.piece)
   );
