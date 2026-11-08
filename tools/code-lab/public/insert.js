@@ -221,6 +221,29 @@
 
   // Языковые контексты подключаются как адаптеры к общему контракту.
   // Здесь остаётся только распознавание локального синтаксиса; маршрутизация и форма контекста общие.
+  if(window.CodeLabContext && window.CSSContext){
+    window.CodeLabContext.register({
+      id: 'css-syntax',
+      languages: ['css'],
+      contexts: ['css-value', 'css-property', 'css-selector', 'css-function-argument', 'css-comment', 'css-string'],
+      priority: 120,
+      resolve: snapshot => {
+        const raw = window.CSSContext.resolve(snapshot);
+        if(!raw) return null;
+        if(raw.kind === 'css-value'){
+          const legacy = Object.assign({
+            kind: 'css',
+            lang: 'css',
+            fn: raw.property,
+            prefix: raw.prefix
+          }, editorActions(snapshot.editor, raw.prefix));
+          return Object.assign({}, raw, { fn: raw.property, lang: 'css', legacy });
+        }
+        return raw;
+      }
+    });
+  }
+
   if(window.CodeLabContext){
     window.CodeLabContext.register({
       id: 'html-attributes',
@@ -312,6 +335,7 @@
     const resolved = window.CodeLabContext
       ? window.CodeLabContext.resolve(snapshot)
       : null;
+    if(resolved && resolved.suppressAutocomplete){ hide(); return; }
     const legacyLang = (ed && ed.__f && ed.__f.lang) || '';
     const tc = resolved && resolved.kind === 'html-attribute'
       ? resolved.legacy
