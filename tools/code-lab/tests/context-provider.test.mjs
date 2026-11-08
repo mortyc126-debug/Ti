@@ -76,6 +76,9 @@ test('context preserves syntax constraints and source information', () => {
       fn: 'fetch',
       argumentIndex: 1,
       constraints: { allowed: ['string'], required: true },
+      relations: [{ type: 'requires', target: 'AbortSignal' }],
+      explanation: 'Значение второго аргумента.',
+      source: 'typescript-call-adapter',
       sourceRange: { from: 10, to: 14 },
       confidence: 0.8,
       scope: 'function',
@@ -88,6 +91,9 @@ test('context preserves syntax constraints and source information', () => {
     assert.equal(result.callable, 'fetch');
     assert.equal(result.argumentIndex, 1);
     assert.deepEqual(result.constraints, { allowed: ['string'], required: true });
+    assert.deepEqual(result.relations, [{ type: 'requires', target: 'AbortSignal' }]);
+    assert.equal(result.explanation, 'Значение второго аргумента.');
+    assert.equal(result.source, 'typescript-call-adapter');
     assert.deepEqual(result.sourceRange, { from: 10, to: 14 });
     assert.equal(result.confidence, 0.8);
     assert.equal(result.scope, 'function');
