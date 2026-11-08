@@ -118,7 +118,9 @@
       const hit = window.codelabExplainAt(line, w.index + 1, lang);
       if(hit && hit.term && hit.to - hit.from > w[0].length + 1){
         taken.push([hit.from, hit.to]);
-        const related = lang === 'css' ? meaning(hit.term, lang, d) : null;
+        const hasShorthandRelation = lang === 'css' && window.CSSShorthands &&
+          (window.CSSShorthands.get(hit.term) || window.CSSShorthands.forLonghand(hit.term).length);
+        const related = hasShorthandRelation ? meaning(hit.term, lang, d) : null;
         out.push({
           from: hit.from,
           to: hit.to,
