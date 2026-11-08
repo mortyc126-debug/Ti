@@ -46,12 +46,11 @@
   const DELAYS = { instant: 0, fast: 45, normal: 100, calm: 200 };
   let acSpeed = 'fast'; try { acSpeed = localStorage.getItem('codelab_ac_speed') || 'fast'; } catch(_){}
   if(!Object.prototype.hasOwnProperty.call(DELAYS, acSpeed)) acSpeed = 'normal';
-  const trace = (...x) => { if(Array.isArray(window.__acTrace)) window.__acTrace.push(x); };
-  const scheduleShow = ed => { trace('schedule', ed && ed.__f && ed.__f.lang); hide(); timer = setTimeout(() => { trace('timer-fired'); show(ed, false); }, DELAYS[acSpeed]); trace('timer-set', timer, DELAYS[acSpeed]); };
+  const scheduleShow = ed => { hide(); timer = setTimeout(() => show(ed, false), DELAYS[acSpeed]); };
   let pop = null, ctx = null, seq = 0, timer = null, sel = 0, requestController = null, templateController = null, composing = false;
   function cancelVariantRequest(){ if(requestController){ requestController.abort(); requestController = null; } }
   function cancelTemplateRequest(){ if(templateController){ templateController.abort(); templateController = null; } }
-  function hide(){ trace('hide', !!timer, !!pop, new Error().stack); clearTimeout(timer); seq++; cancelVariantRequest(); cancelTemplateRequest(); if(pop){ pop.remove(); pop = null; } ctx = null; }
+  function hide(){ clearTimeout(timer); seq++; cancelVariantRequest(); cancelTemplateRequest(); if(pop){ pop.remove(); pop = null; } ctx = null; }
   async function fetchVariants(url){
     cancelVariantRequest(); cancelTemplateRequest();
     const controller = new AbortController(); requestController = controller;
@@ -230,7 +229,7 @@
     // в скобках вызова — параметры и значения; после «свойство:» в CSS — значения свойства
     const cc = !tc && callCtx(ed);
     if(cc){ const my1 = ++seq; const cr = await callRoots(cc); if(my1 !== seq) return; if(cr.length){ ctx = Object.assign({}, c || {}, { x: cc.x, y: cc.y, put: cc.put, ed }); render(ctx, cr); return; } }
-    if(!c || (!force && c.word.length < 2)){ trace('return-short', !!c, c && c.word); hide(); return; }
+    if(!c || (!force && c.word.length < 2)){ hide(); return; }
     const my = ++seq;
     let roots = [];
     if(c.word){ const r = await fetchVariants('/api/variants?q=' + encodeURIComponent(c.word) + '&lang=' + encodeURIComponent(c.lang)); roots = (r && r.roots) || []; }
@@ -241,7 +240,7 @@
       roots = ((r && r.roots) || []).filter(n => !n.group).concat(roots.length ? roots : ((r && r.roots) || []).filter(n => n.group)); }
     if(!roots.length && c.word && /^[\w$.-]+$/.test(c.word)){ const d = await (window.codelabKwDict ? window.codelabKwDict(c.lang) : Promise.resolve({})); if(my !== seq) return; roots = flatFallback(c.word, d || {}, c.lang); }
     if(!roots.length){ if(force){ ctx = c; render(c, [], true); } else hide(); return; }
-    ctx = c; trace('render', roots.length); render(c, roots);
+    ctx = c; render(c, roots);
   }
   function render(c, roots, empty){
     if(!pop){ pop = document.createElement('div'); pop.className = 'ac-pop'; document.body.appendChild(pop);
@@ -263,15 +262,14 @@
   // Во время IME-композиции не перехватываем Enter/стрелки и не ищем промежуточный текст.
   edsEl.addEventListener('compositionstart', e => {
     const ed = e.target.closest && e.target.closest('.sb-ed'); if(!ed) return;
-    trace('compositionstart', e.target && e.target.className); composing = true; hide();
+    composing = true; hide();
   }, true);
   edsEl.addEventListener('compositionend', e => {
-    trace('compositionend', e.target && e.target.className); composing = false;
+    composing = false;
     const ed = e.target.closest && e.target.closest('.sb-ed'); if(ed && acOn) scheduleShow(ed);
   }, true);
   // input покрывает обычный ввод, вставку и экранную клавиатуру; IME запускается после compositionend.
   edsEl.addEventListener('input', e => {
-    trace('input', e.target && e.target.className, acOn, composing, e.isComposing);
     if(!acOn || composing || e.isComposing) return;
     const ed = e.target.closest && e.target.closest('.sb-ed'); if(!ed) return;
     scheduleShow(ed);
@@ -293,7 +291,11 @@
       if(rs[sel]){ e.preventDefault(); accept(rs[sel]); } }
     else if(e.key === 'Escape'){ e.preventDefault(); hide(); }
   }, true);
-  edsEl.addEventListener('scroll', hide, true);
+  // Ignore CodeMirror's programmatic caret-follow scrolling; close only on user scroll gestures.
+  edsEl.addEventListener('scroll', e => { if(e.target === edsEl) hide(); }, true);
+  edsEl.addEventListener('wheel', hide, true);
+  edsEl.addEventListener('touchmove', hide, { capture: true, passive: true });
+  edsEl.addEventListener('keydown', e => { if(pop && (e.key === 'PageUp' || e.key === 'PageDown')) hide(); }, true);
   document.addEventListener('mousedown', e => { if(pop && !pop.contains(e.target)) hide(); }, true);
 
   // галочка — в меню «Подсказки» (sb-toolbar.js)
