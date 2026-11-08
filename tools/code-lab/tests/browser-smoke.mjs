@@ -30,7 +30,6 @@ try {
   browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
   const context = await browser.newContext();
   await context.addInitScript(() => {
-    window.__acTrace = [];
     localStorage.removeItem('codelab_sandbox');
     localStorage.removeItem('codelab_sb_active');
     localStorage.setItem('codelab_mode', 'sandbox');
@@ -56,16 +55,6 @@ try {
   const cssTab = page.locator('#sbTabs .sb-tab').filter({ hasText: 'style.css' }).first();
   await cssTab.click();
   await cssEditor.waitFor({ state: 'visible' });
-  await page.evaluate(() => {
-    window.__autocompleteInputs = [];
-    document.querySelector('#sbEds').addEventListener('input', event => {
-      window.__autocompleteInputs.push({
-        target: event.target.className,
-        closestEditor: !!event.target.closest('.sb-ed'),
-        composing: !!event.isComposing
-      });
-    }, true);
-  });
   const cm = cssEditor.locator('.CodeMirror');
   if (await cm.count() && await cm.isVisible()) {
     await cm.click();
@@ -78,42 +67,7 @@ try {
     await textarea.evaluate(el => el.setSelectionRange(el.value.length, el.value.length));
   }
 
-  const browserDebug = await page.evaluate(() => ({
-    sandboxApi: !!window.codelabSandbox,
-    sandboxVisible: getComputedStyle(document.querySelector('#sandbox')).display,
-    editorTabs: [...document.querySelectorAll('#sbTabs .sb-tab')].map(tab => tab.innerText),
-    activeId: localStorage.getItem('codelab_sb_active'),
-    autocompleteStyle: [...document.querySelectorAll('style')].some(style => style.textContent.includes('.ac-pop'))
-  }));
-  const editorDebug = await cssEditor.evaluate(ed => {
-    const original = ed.querySelector('textarea.sb-code');
-    const cm = original && original.__cm;
-    const cursor = cm ? cm.getCursor() : null;
-    return {
-    className: ed.className,
-    cmValue: cm ? cm.getValue() : null,
-    cursor,
-    cursorLine: cm && cursor ? cm.getLine(cursor.line) : null,
-    display: getComputedStyle(ed).display,
-    file: ed.__f && { name: ed.__f.name, lang: ed.__f.lang, code: ed.__f.code },
-    textareas: [...ed.querySelectorAll('textarea')].map(ta => ({
-      className: ta.className, display: getComputedStyle(ta).display,
-      visibility: getComputedStyle(ta).visibility, value: ta.value,
-      hasCodeMirror: !!ta.__cm, rect: ta.getBoundingClientRect().toJSON()
-    })),
-    codeMirror: [...ed.querySelectorAll('.CodeMirror')].map(cm => ({
-      display: getComputedStyle(cm).display, visibility: getComputedStyle(cm).visibility,
-      rect: cm.getBoundingClientRect().toJSON()
-    }))
-  };});
-  const apiDebug = await page.evaluate(async () => {
-    const result = await fetch('/api/variants?q=margin&lang=css').then(response => response.json());
-    return { lang: result.lang, roots: (result.roots || []).map(root => ({ term: root.term, label: root.label, note: root.note })) };
-  });
-  const inputEvents = await page.evaluate(() => window.__autocompleteInputs);
   await delay(300);
-  const acTrace = await page.evaluate(() => window.__acTrace);
-  console.log('browser debug:', JSON.stringify({ browserDebug, editorDebug, apiDebug, inputEvents, acTrace }));
 
   const autoPopupOpened = await page.locator('.ac-pop').count() > 0;
   if (!autoPopupOpened) await page.keyboard.press('Control+Space');
