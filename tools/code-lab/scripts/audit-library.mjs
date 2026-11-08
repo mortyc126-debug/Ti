@@ -81,12 +81,12 @@ for(const file of files){
     }else{
       const sourceNorm=norm(code),viewNorm=norm(viewCode);
       const same=sourceNorm===viewNorm;
-      const formatOnly=!same&&sourceNorm.replace(/[ \\t]+/g,' ').replace(/\\n+/g,'\\n')===viewNorm.replace(/[ \\t]+/g,' ').replace(/\\n+/g,'\\n');
+      const formatOnly=!same&&sourceNorm.replace(/[ \t]+/g,' ').replace(/\n+/g,'\n')===viewNorm.replace(/[ \t]+/g,' ').replace(/\n+/g,'\n');
       if(same)viewCodeStats.exact++;
       else if(formatOnly)viewCodeStats.formatOnly++;
       else{
         viewCodeStats.mismatch++;
-        viewCodeCases.push({file:rel,id,title:meta.title||'',classification:'source-view-mismatch',sourceLines:code.split('\\n').length,viewLines:viewCode.split('\\n').length,sourceLength:code.length,viewLength:viewCode.length,sourceHash:hash(sourceNorm),viewHash:hash(viewNorm),sourcePreview:code.split('\\n').slice(0,5),viewPreview:viewCode.split('\\n').slice(0,5)});
+        viewCodeCases.push({file:rel,id,title:meta.title||'',classification:'source-view-mismatch',sourceLines:code.split('\n').length,viewLines:viewCode.split('\n').length,sourceLength:code.length,viewLength:viewCode.length,sourceHash:hash(sourceNorm),viewHash:hash(viewNorm),sourcePreview:code.split('\n').slice(0,5),viewPreview:viewCode.split('\n').slice(0,5)});
       }
     }
   }
