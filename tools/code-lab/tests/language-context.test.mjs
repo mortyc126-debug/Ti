@@ -85,7 +85,8 @@ test('реальный словарь даёт языковые пояснени
   const dict = JSON.parse(fs.readFileSync(new URL('../public/keyword-dict.json', import.meta.url), 'utf8'));
   dict.langs = {};
   for (const lang of ['python', 'js', 'sql', 'ts', 'html', 'css']) {
-    dict.langs[lang] = JSON.parse(fs.readFileSync(new URL('../public/dict/langs/' + lang + '.json', import.meta.url), 'utf8'));
+    const entries = JSON.parse(fs.readFileSync(new URL('../public/dict/langs/' + lang + '.json', import.meta.url), 'utf8'));
+    dict.langs[lang] = Object.fromEntries(Object.entries(entries).map(([key, value]) => [key.toLowerCase(), value]));
   }
   const py = makeLook('python', dict), js = makeLook('js', dict), sql = makeLook('sql', dict), html = makeLook('html', dict), ts = makeLook('ts', dict);
   const css = makeLook('css', dict);

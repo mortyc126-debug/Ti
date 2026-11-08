@@ -53,7 +53,8 @@ try{
   const langDir=new URL('../public/dict/langs/',import.meta.url);
   for(const file of (await fs.readdir(langDir)).filter(n=>n.endsWith('.json'))){
     const lang=file.replace(/\.json$/,'').toLowerCase();
-    const entries=JSON.parse(await fs.readFile(new URL(file,langDir),'utf8'));
+    const rawEntries=JSON.parse(await fs.readFile(new URL(file,langDir),'utf8'));
+    const entries=Object.fromEntries(Object.entries(rawEntries).map(([key,value])=>[String(key).toLowerCase(),value]));
     keywordDict.langs[lang]=Object.assign({},keywordDict.langs[lang]||{},entries);
   }
   dictionaryNoteStats.available=true;
