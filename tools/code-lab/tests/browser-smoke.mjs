@@ -103,7 +103,7 @@ try {
 
   const insertIndex = await popup.locator('.ac-r').evaluateAll(rows => {
     const visible = rows.filter(row => row.offsetParent !== null);
-    return visible.findIndex(row => row.dataset.code && row.dataset.code.trim() && !row.classList.contains('ac-grp'));
+    return visible.findIndex(row => row.dataset.code && /margin/i.test(row.dataset.code) && !row.classList.contains('ac-grp'));
   });
   assert.ok(insertIndex >= 0, 'variant tree has no insertable code row');
   const selectedIndex = await popup.locator('.ac-r').evaluateAll(rows => {
