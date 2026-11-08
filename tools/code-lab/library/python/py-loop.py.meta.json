@@ -146,7 +146,7 @@
         "title": "Применение",
         "code": {
           "language": "python",
-          "content": "foriinrange(3):\n    print(i)"
+          "content": "for i in range(3):\n    print(i)"
         },
         "steps": [
           "Проверь требования и подготовь входные данные/окружение.",

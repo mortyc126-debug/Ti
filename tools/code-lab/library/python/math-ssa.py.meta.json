@@ -47,7 +47,7 @@
       "source": "custom"
     },
     {
-      "line": 2,
+      "line": 13,
       "col": 0,
       "text": "def",
       "kind": "kw",
@@ -55,23 +55,23 @@
       "source": "custom"
     },
     {
-      "line": 2,
-      "col": 19,
+      "line": 13,
+      "col": 31,
       "text": "L",
       "kind": "name",
       "note": "Длина окна — главный параметр SSA (сколько точек в окне).",
       "source": "custom"
     },
     {
-      "line": 3,
-      "col": 4,
-      "text": "N",
+      "line": 13,
+      "col": 26,
+      "text": "ряд",
       "kind": "name",
       "note": "Длина ряда.",
       "source": "custom"
     },
     {
-      "line": 3,
+      "line": 28,
       "col": 8,
       "text": "len",
       "kind": "fn",
@@ -79,7 +79,7 @@
       "source": "dict"
     },
     {
-      "line": 4,
+      "line": 28,
       "col": 4,
       "text": "K",
       "kind": "name",
@@ -87,23 +87,23 @@
       "source": "custom"
     },
     {
-      "line": 4,
-      "col": 8,
-      "text": "N",
+      "line": 28,
+      "col": 12,
+      "text": "ряд",
       "kind": "name",
       "note": "Длина ряда.",
       "source": "custom"
     },
     {
-      "line": 4,
-      "col": 12,
+      "line": 28,
+      "col": 19,
       "text": "L",
       "kind": "name",
       "note": "Длина окна — главный параметр SSA (сколько точек в окне).",
       "source": "custom"
     },
     {
-      "line": 6,
+      "line": 29,
       "col": 4,
       "text": "X",
       "kind": "name",
@@ -111,7 +111,7 @@
       "source": "custom"
     },
     {
-      "line": 6,
+      "line": 29,
       "col": 8,
       "text": "np",
       "kind": "name",
@@ -119,7 +119,7 @@
       "source": "custom"
     },
     {
-      "line": 6,
+      "line": 29,
       "col": 11,
       "text": "column_stack",
       "kind": "fn",
@@ -127,7 +127,7 @@
       "source": "custom"
     },
     {
-      "line": 6,
+      "line": 29,
       "col": 29,
       "text": "i",
       "kind": "name",
@@ -135,7 +135,7 @@
       "source": "custom"
     },
     {
-      "line": 6,
+      "line": 29,
       "col": 31,
       "text": "i",
       "kind": "name",
@@ -143,55 +143,55 @@
       "source": "custom"
     },
     {
-      "line": 6,
-      "col": 33,
+      "line": 29,
+      "col": 35,
       "text": "L",
       "kind": "name",
       "note": "Длина окна — главный параметр SSA (сколько точек в окне).",
       "source": "custom"
     },
     {
-      "line": 6,
-      "col": 36,
+      "line": 29,
+      "col": 38,
       "text": "for",
       "kind": "kw",
       "note": "Перебор — создаёт окна ряд[i:i+L].",
       "source": "custom"
     },
     {
-      "line": 6,
-      "col": 40,
+      "line": 29,
+      "col": 42,
       "text": "i",
       "kind": "name",
       "note": "Номер окна.",
       "source": "custom"
     },
     {
-      "line": 6,
-      "col": 42,
+      "line": 29,
+      "col": 44,
       "text": "in",
       "kind": "kw",
       "note": "По чему перебираем.",
       "source": "custom"
     },
     {
-      "line": 6,
-      "col": 45,
+      "line": 29,
+      "col": 47,
       "text": "range",
       "kind": "fn",
       "note": "Последовательность 0..K-1.",
       "source": "custom"
     },
     {
-      "line": 6,
-      "col": 51,
+      "line": 29,
+      "col": 53,
       "text": "K",
       "kind": "name",
       "note": "Сколько окон поместится.",
       "source": "custom"
     },
     {
-      "line": 8,
+      "line": 30,
       "col": 4,
       "text": "U",
       "kind": "name",
@@ -199,7 +199,7 @@
       "source": "custom"
     },
     {
-      "line": 8,
+      "line": 30,
       "col": 7,
       "text": "S",
       "kind": "name",
@@ -207,7 +207,7 @@
       "source": "custom"
     },
     {
-      "line": 8,
+      "line": 30,
       "col": 10,
       "text": "Vt",
       "kind": "name",
@@ -215,7 +215,7 @@
       "source": "custom"
     },
     {
-      "line": 8,
+      "line": 30,
       "col": 15,
       "text": "np",
       "kind": "name",
@@ -223,7 +223,7 @@
       "source": "custom"
     },
     {
-      "line": 8,
+      "line": 30,
       "col": 18,
       "text": "linalg",
       "kind": "name",
@@ -231,7 +231,7 @@
       "source": "custom"
     },
     {
-      "line": 8,
+      "line": 30,
       "col": 25,
       "text": "svd",
       "kind": "fn",
@@ -239,7 +239,7 @@
       "source": "custom"
     },
     {
-      "line": 8,
+      "line": 30,
       "col": 29,
       "text": "X",
       "kind": "name",
@@ -247,7 +247,7 @@
       "source": "custom"
     },
     {
-      "line": 8,
+      "line": 30,
       "col": 46,
       "text": "False",
       "kind": "kw",
@@ -255,7 +255,7 @@
       "source": "dict"
     },
     {
-      "line": 10,
+      "line": 31,
       "col": 4,
       "text": "X0",
       "kind": "name",
@@ -263,7 +263,7 @@
       "source": "custom"
     },
     {
-      "line": 10,
+      "line": 31,
       "col": 9,
       "text": "S",
       "kind": "name",
@@ -271,7 +271,7 @@
       "source": "custom"
     },
     {
-      "line": 10,
+      "line": 31,
       "col": 16,
       "text": "np",
       "kind": "name",
@@ -279,7 +279,7 @@
       "source": "custom"
     },
     {
-      "line": 10,
+      "line": 31,
       "col": 19,
       "text": "outer",
       "kind": "fn",
@@ -287,7 +287,7 @@
       "source": "custom"
     },
     {
-      "line": 10,
+      "line": 31,
       "col": 25,
       "text": "U",
       "kind": "name",
@@ -295,7 +295,7 @@
       "source": "custom"
     },
     {
-      "line": 10,
+      "line": 31,
       "col": 34,
       "text": "Vt",
       "kind": "name",
@@ -303,7 +303,7 @@
       "source": "custom"
     },
     {
-      "line": 12,
+      "line": 32,
       "col": 4,
       "text": "return",
       "kind": "kw",
@@ -311,7 +311,7 @@
       "source": "custom"
     },
     {
-      "line": 12,
+      "line": 32,
       "col": 32,
       "text": "X0",
       "kind": "name",
@@ -350,7 +350,7 @@
         "title": "Применение",
         "code": {
           "language": "python",
-          "content": "import numpy as np\n\ndef ssa_тренд(ряд, L):\n    N = len(ряд)\n    K = N - L + 1\n    # 1) траекторная матрица: столбцы — окна длины L\n    X = np.column_stack([ряд[i:i+L] for i in range(K)])\n    # 2) разложение SVD: X = U · S · Vt (главные компоненты)\n    U, S, Vt = np.linalg.svd(X, full_matrices=False)\n    # 3) первая компонента (самая мощная) = тренд, собираем матрицу ранга 1\n    X0 = S[0] * np.outer(U[:, 0], Vt[0])\n    # 4) диагональное усреднение матрицы обратно в ряд\n    return _усреднить_диагонали(X0)"
+          "content": "import numpy as np\n\ndef _усреднить_диагонали(матрица):\n    \"\"\"Восстановить временной ряд усреднением антидиагоналей матрицы.\"\"\"\n    длина = матрица.shape[0] + матрица.shape[1] - 1\n    суммы = np.zeros(длина, dtype=float)\n    количества = np.zeros(длина, dtype=int)\n    for i in range(матрица.shape[0]):\n        for j in range(матрица.shape[1]):\n            суммы[i + j] += матрица[i, j]\n            количества[i + j] += 1\n    return суммы / количества\n\ndef ssa_первая_компонента(ряд, L):\n    \"\"\"Восстановить ряд из первой ранговой компоненты SSA.\n\n    Первая компонента не обязательно является трендом: для выделения тренда\n    нужно обоснованно выбрать несколько компонент и суммировать их.\n    \"\"\"\n    ряд = np.asarray(ряд, dtype=float)\n    if ряд.ndim != 1:\n        raise ValueError(\"Ряд должен быть одномерным\")\n    if not np.all(np.isfinite(ряд)):\n        raise ValueError(\"Ряд должен содержать только конечные числа\")\n    if not isinstance(L, (int, np.integer)) or isinstance(L, (bool, np.bool_)):\n        raise ValueError(\"Длина окна L должна быть целым числом\")\n    if not 2 <= L < len(ряд):\n        raise ValueError(\"Длина окна L должна быть от 2 до длины ряда - 1\")\n    K = len(ряд) - L + 1\n    X = np.column_stack([ряд[i:i + L] for i in range(K)])\n    U, S, Vt = np.linalg.svd(X, full_matrices=False)\n    X0 = S[0] * np.outer(U[:, 0], Vt[0])\n    return _усреднить_диагонали(X0)\n\nряд = [10, 12, 11, 14, 15, 17, 16, 19]\nprint(ssa_первая_компонента(ряд, L=4).round(2).tolist())\n"
         },
         "steps": [
           "Проверь требования и подготовь входные данные/окружение.",

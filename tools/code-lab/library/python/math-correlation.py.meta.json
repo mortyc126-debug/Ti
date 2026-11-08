@@ -63,7 +63,7 @@
       "source": "custom"
     },
     {
-      "line": 8,
+      "line": 12,
       "col": 7,
       "text": "np",
       "kind": "name",
@@ -71,7 +71,7 @@
       "source": "custom"
     },
     {
-      "line": 8,
+      "line": 12,
       "col": 10,
       "text": "corrcoef",
       "kind": "fn",
@@ -79,7 +79,7 @@
       "source": "custom"
     },
     {
-      "line": 9,
+      "line": 13,
       "col": 0,
       "text": "print",
       "kind": "fn",
@@ -118,7 +118,7 @@
         "title": "Применение",
         "code": {
           "language": "python",
-          "content": "import numpy as np\n\n# матрица доходностей: строки — активы, столбцы — дни\nдоходности = np.array([\n    [0.01, -0.02, 0.03],   # актив A\n    [0.02, -0.01, 0.025],  # актив B\n])\n\nкорр = np.corrcoef(доходности)   # матрица 2×2\nprint(корр)"
+          "content": "import numpy as np\n\n# Матрица доходностей: строки — активы, столбцы — дни.\nдоходности = np.array([\n    [0.01, -0.02, 0.03],   # актив A\n    [0.02, -0.01, 0.025],  # актив B\n], dtype=float)\n\nif доходности.ndim != 2 or доходности.shape[0] < 2 or доходности.shape[1] < 2:\n    raise ValueError(\"Нужны минимум два актива и два наблюдения\")\nif not np.all(np.isfinite(доходности)):\n    raise ValueError(\"Матрица доходностей должна содержать конечные значения\")\nif np.any(np.std(доходности, axis=1, ddof=1) == 0):\n    raise ValueError(\"Корреляция не определена для постоянного ряда\")\n\nкорр = np.corrcoef(доходности)   # корреляционная матрица активов\nprint(корр)\n"
         },
         "steps": [
           "Проверь требования и подготовь входные данные/окружение.",
