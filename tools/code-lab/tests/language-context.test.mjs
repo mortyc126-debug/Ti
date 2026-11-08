@@ -123,4 +123,15 @@ test('реальный словарь даёт языковые пояснени
   assert.match(js('getAttribute'), /атрибут/);
   assert.match(js('slice'), /копию/);
   assert.match(js('includes'), /содерж/);
+  assert.match(py('append'), /добавляет один элемент/);
+  assert.match(html('target'), /контекст/);
+  assert.match(css('url'), /внешнего ресурса/);
+  assert.match(ts('Pick'), /выбранные свойства/);
+  assert.match(ts('Partial'), /необязательными/);
+  assert.match(ts('Record'), /множество ключей/);
+  assert.match(ts('Parameters'), /параметров функции/);
+  assert.match(js('Proxy'), /перехватывает операции/);
+  assert.match(js('sessionStorage'), /вкладкой/);
+  assert.match(js('setInterval'), /повторно/);
+  assert.match(js('WebAssembly'), /модулей WebAssembly/);
 });

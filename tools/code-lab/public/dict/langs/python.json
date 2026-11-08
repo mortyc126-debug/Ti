@@ -3725,5 +3725,6 @@
   "zlib.compress(b)": "сжатие данных",
   "zlib.compress(b) zlib.decompress(b)": "базовое сжатие",
   "zoneinfo.available_timezones()": "доступные пояса",
-  "zoneinfo.zoneinfo(\"europe/moscow\")": "пояс из базы IANA (3.9+)"
+  "zoneinfo.zoneinfo(\"europe/moscow\")": "пояс из базы IANA (3.9+)",
+  "append": "list.append(value) добавляет один элемент в конец списка и изменяет исходный список; возвращает None."
 }
