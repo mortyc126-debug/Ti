@@ -51,7 +51,7 @@
   let pop = null, ctx = null, seq = 0, timer = null, sel = 0, requestController = null, templateController = null, composing = false;
   function cancelVariantRequest(){ if(requestController){ requestController.abort(); requestController = null; } }
   function cancelTemplateRequest(){ if(templateController){ templateController.abort(); templateController = null; } }
-  function hide(){ trace('hide', !!timer, !!pop); clearTimeout(timer); seq++; cancelVariantRequest(); cancelTemplateRequest(); if(pop){ pop.remove(); pop = null; } ctx = null; }
+  function hide(){ trace('hide', !!timer, !!pop, new Error().stack); clearTimeout(timer); seq++; cancelVariantRequest(); cancelTemplateRequest(); if(pop){ pop.remove(); pop = null; } ctx = null; }
   async function fetchVariants(url){
     cancelVariantRequest(); cancelTemplateRequest();
     const controller = new AbortController(); requestController = controller;
@@ -263,10 +263,10 @@
   // Во время IME-композиции не перехватываем Enter/стрелки и не ищем промежуточный текст.
   edsEl.addEventListener('compositionstart', e => {
     const ed = e.target.closest && e.target.closest('.sb-ed'); if(!ed) return;
-    composing = true; hide();
+    trace('compositionstart', e.target && e.target.className); composing = true; hide();
   }, true);
   edsEl.addEventListener('compositionend', e => {
-    composing = false;
+    trace('compositionend', e.target && e.target.className); composing = false;
     const ed = e.target.closest && e.target.closest('.sb-ed'); if(ed && acOn) scheduleShow(ed);
   }, true);
   // input покрывает обычный ввод, вставку и экранную клавиатуру; IME запускается после compositionend.
