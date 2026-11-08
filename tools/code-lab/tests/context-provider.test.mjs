@@ -155,7 +155,7 @@ test('editor snapshot exposes stable cursor, line and token context', () => {
 test('editor snapshot handles multiline code and clamps negative cursor positions', () => {
   const snapshot = Context.createSnapshot({
     language: 'py',
-    code: 'first line\\nsecond line',
+    code: 'first line\nsecond line',
     cursor: { line: 1, ch: -4 },
   });
   assert.equal(snapshot.language, 'python');
