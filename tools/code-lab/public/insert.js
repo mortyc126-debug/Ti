@@ -46,7 +46,8 @@
   const DELAYS = { instant: 0, fast: 45, normal: 100, calm: 200 };
   let acSpeed = 'fast'; try { acSpeed = localStorage.getItem('codelab_ac_speed') || 'fast'; } catch(_){}
   if(!Object.prototype.hasOwnProperty.call(DELAYS, acSpeed)) acSpeed = 'normal';
-  const scheduleShow = ed => { hide(); timer = setTimeout(() => show(ed, false), DELAYS[acSpeed]); };
+  const trace = (...items) => { try { (window.__acTrace || (window.__acTrace = [])).push(items); } catch(_){} };
+  const scheduleShow = ed => { trace('schedule', ed && ed.__f && ed.__f.lang); hide(); timer = setTimeout(() => { trace('timer-fired'); show(ed, false); }, DELAYS[acSpeed]); };
   let pop = null, ctx = null, seq = 0, timer = null, sel = 0, requestController = null, templateController = null, composing = false;
   function cancelVariantRequest(){ if(requestController){ requestController.abort(); requestController = null; } }
   function cancelTemplateRequest(){ if(templateController){ templateController.abort(); templateController = null; } }
@@ -221,26 +222,29 @@
 
   async function show(ed, force){
     clearTimeout(timer); cancelVariantRequest(); cancelTemplateRequest();
+    trace('show-start', composing, !!ed, force);
     if(composing) return;
     const c = wordCtx(ed, force);
+    trace('word-context', c && c.word, c && c.lang);
     // внутри HTML-тега — его атрибуты и их значения (правила структуры), даже без набранных букв
     const tc = /^(html|htm|svg|xml)$/i.test((ed && ed.__f && ed.__f.lang) || '') && tagCtx(ed);   // при выделенном «…» wordCtx пуст — тег смотрим сами
     if(tc){ const my0 = ++seq; const tr = await tagRoots(tc); if(my0 !== seq) return; if(tr.length){ ctx = Object.assign({}, c || {}, { x: tc.x, y: tc.y, put: tc.put, ed }); render(ctx, tr); return; } }
     // в скобках вызова — параметры и значения; после «свойство:» в CSS — значения свойства
     const cc = !tc && callCtx(ed);
     if(cc){ const my1 = ++seq; const cr = await callRoots(cc); if(my1 !== seq) return; if(cr.length){ ctx = Object.assign({}, c || {}, { x: cc.x, y: cc.y, put: cc.put, ed }); render(ctx, cr); return; } }
-    if(!c || (!force && c.word.length < 2)){ hide(); return; }
+    if(!c || (!force && c.word.length < 2)){ trace('short-context', c && c.word); hide(); return; }
     const my = ++seq;
     let roots = [];
     if(c.word){ const r = await fetchVariants('/api/variants?q=' + encodeURIComponent(c.word) + '&lang=' + encodeURIComponent(c.lang)); roots = (r && r.roots) || []; }
-    if(my !== seq) return;
+    if(my !== seq){ trace('stale-response', my, seq); return; }
+    trace('variants-response', roots.length);
     // в языке файла пусто (или файл без языка) — показываем другие языки, сгруппированно по языку
     // (только куски по названию — тоже «пусто»: термины другого языка ставим перед ними)
     if(!roots.some(n => !n.group) && c.word && /[А-Яа-яЁё]/.test(c.word)){ const r = await fetchVariants('/api/variants?q=' + encodeURIComponent(c.word)); if(my !== seq) return;
       roots = ((r && r.roots) || []).filter(n => !n.group).concat(roots.length ? roots : ((r && r.roots) || []).filter(n => n.group)); }
     if(!roots.length && c.word && /^[\w$.-]+$/.test(c.word)){ const d = await (window.codelabKwDict ? window.codelabKwDict(c.lang) : Promise.resolve({})); if(my !== seq) return; roots = flatFallback(c.word, d || {}, c.lang); }
-    if(!roots.length){ if(force){ ctx = c; render(c, [], true); } else hide(); return; }
-    ctx = c; render(c, roots);
+    if(!roots.length){ trace('no-roots', force); if(force){ ctx = c; render(c, [], true); } else hide(); return; }
+    trace('render-roots', roots.length); ctx = c; render(c, roots);
   }
   function render(c, roots, empty){
     if(!pop){ pop = document.createElement('div'); pop.className = 'ac-pop'; document.body.appendChild(pop);
