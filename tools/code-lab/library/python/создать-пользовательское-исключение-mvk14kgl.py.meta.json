@@ -117,7 +117,7 @@
       "source": "dict"
     },
     {
-      "line": 5,
+      "line": 4,
       "col": 8,
       "text": "super",
       "kind": "fn",
@@ -141,7 +141,7 @@
       "source": "dict"
     },
     {
-      "line": 9,
+      "line": 7,
       "col": 4,
       "text": "if",
       "kind": "kw",

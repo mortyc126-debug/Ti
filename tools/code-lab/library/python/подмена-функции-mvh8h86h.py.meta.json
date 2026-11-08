@@ -32,7 +32,7 @@
   "status": "described",
   "wordNotes": [
     {
-      "line": 0,
+      "line": 1,
       "col": 0,
       "text": "from",
       "kind": "kw",
@@ -40,7 +40,7 @@
       "source": "dict"
     },
     {
-      "line": 0,
+      "line": 1,
       "col": 5,
       "text": "unittest",
       "kind": "name",
@@ -72,7 +72,7 @@
       "source": "dict"
     },
     {
-      "line": 3,
+      "line": 4,
       "col": 4,
       "text": "return",
       "kind": "kw",
@@ -88,7 +88,7 @@
       "source": "dict"
     },
     {
-      "line": 6,
+      "line": 8,
       "col": 4,
       "text": "with",
       "kind": "kw",
@@ -104,15 +104,15 @@
       "source": "dict"
     },
     {
-      "line": 6,
-      "col": 37,
+      "line": 8,
+      "col": 58,
       "text": "return_value",
       "kind": "name",
       "note": "return_value — что вернёт заглушка",
       "source": "dict"
     },
     {
-      "line": 7,
+      "line": 9,
       "col": 8,
       "text": "assert",
       "kind": "kw",

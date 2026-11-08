@@ -48,7 +48,7 @@
       "source": "dict"
     },
     {
-      "line": 6,
+      "line": 20,
       "col": 0,
       "text": "print",
       "kind": "fn",
