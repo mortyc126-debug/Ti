@@ -40,38 +40,6 @@
       "source": "custom"
     },
     {
-      "line": 0,
-      "col": 13,
-      "text": "к",
-      "kind": "op",
-      "note": "Текущий кусок (имя выдумываешь сам).",
-      "source": "custom"
-    },
-    {
-      "line": 1,
-      "col": 4,
-      "text": "к",
-      "kind": "op",
-      "note": "Текущий кусок (имя выдумываешь сам).",
-      "source": "custom"
-    },
-    {
-      "line": 1,
-      "col": 7,
-      "text": "к",
-      "kind": "op",
-      "note": "Текущий кусок (имя выдумываешь сам).",
-      "source": "custom"
-    },
-    {
-      "line": 1,
-      "col": 14,
-      "text": "к",
-      "kind": "op",
-      "note": "Текущий кусок (имя выдумываешь сам).",
-      "source": "custom"
-    },
-    {
       "line": 1,
       "col": 18,
       "text": "split",
@@ -133,22 +101,6 @@
       "text": "in",
       "kind": "kw",
       "note": "«в» — по чему перебираем.",
-      "source": "custom"
-    },
-    {
-      "line": 2,
-      "col": 28,
-      "text": "к",
-      "kind": "op",
-      "note": "Текущий кусок (имя выдумываешь сам).",
-      "source": "custom"
-    },
-    {
-      "line": 2,
-      "col": 31,
-      "text": "к",
-      "kind": "op",
-      "note": "Текущий кусок (имя выдумываешь сам).",
       "source": "custom"
     },
     {
