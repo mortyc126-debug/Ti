@@ -291,8 +291,7 @@
       if(rs[sel]){ e.preventDefault(); accept(rs[sel]); } }
     else if(e.key === 'Escape'){ e.preventDefault(); hide(); }
   }, true);
-  // Ignore CodeMirror's programmatic caret-follow scrolling; close only on user scroll gestures.
-  edsEl.addEventListener('scroll', e => { if(e.target === edsEl) hide(); }, true);
+  // Ignore programmatic scroll events; user wheel/touch/keyboard gestures close the popup below.
   edsEl.addEventListener('wheel', hide, true);
   edsEl.addEventListener('touchmove', hide, { capture: true, passive: true });
   edsEl.addEventListener('keydown', e => { if(pop && (e.key === 'PageUp' || e.key === 'PageDown')) hide(); }, true);
