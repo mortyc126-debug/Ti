@@ -23,6 +23,7 @@
   .vt-b{overflow:auto;padding:4px 4px 8px}
   .vt-r{display:flex;align-items:flex-start;gap:4px;border-radius:7px;padding:4px 6px;cursor:pointer}
   .vt-r:hover{background:var(--s2,#1a1030)}
+  .vt-r.sel{background:color-mix(in srgb,var(--name,#3dd9ff) 16%,transparent)}
   .vt-t{flex:0 0 16px;color:var(--text3,#9c90c4);text-align:center;font-size:11px;line-height:20px;cursor:pointer;user-select:none}
   .vt-t:hover{color:var(--acc,#ff2fae)}
   .vt-m{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
@@ -38,8 +39,31 @@
   `;
   document.head.appendChild(st);
 
-  let pop = null, ctx = null, seq = 0;
-  function hide(){ if(pop){ pop.remove(); pop = null; } ctx = null; }
+  let pop = null, ctx = null, seq = 0, loadTimer = null, loadController = null, pieceController = null, composing = false, selected = 0;
+  function cancelLoad(){ if(loadController){ loadController.abort(); loadController = null; } }
+  function cancelPiece(){ if(pieceController){ pieceController.abort(); pieceController = null; } }
+  function hide(){
+    clearTimeout(loadTimer); loadTimer = null; seq++;
+    cancelLoad(); cancelPiece();
+    if(pop){ pop.remove(); pop = null; }
+    ctx = null; selected = 0;
+  }
+  const rows = () => pop ? [...pop.querySelectorAll('.vt-r')].filter(row => row.offsetParent !== null) : [];
+  function mark(){
+    const visible = rows();
+    if(!visible.length){ selected = 0; return; }
+    selected = Math.max(0, Math.min(selected, visible.length - 1));
+    visible.forEach((row, index) => row.classList.toggle('sel', index === selected));
+    visible[selected].scrollIntoView({ block: 'nearest' });
+  }
+  function toggle(row, open){
+    const kids = row && row.nextElementSibling && row.nextElementSibling.classList.contains('vt-kids') ? row.nextElementSibling : null;
+    if(!kids) return false;
+    kids.hidden = open == null ? !kids.hidden : !open;
+    const arrow = row.querySelector('.vt-t');
+    if(arrow) arrow.textContent = kids.hidden ? '▸' : '▾';
+    return true;
+  }
 
   // слово под курсором (или выделение) + чем его заменить
   function wordCtx(){
@@ -78,11 +102,17 @@
   }
 
   async function load(q){
-    const my = ++seq; const body = pop.querySelector('.vt-b');
-    if(!q){ body.innerHTML = '<div class="vt-none">напиши, что нужно: «отступ», «найти элемент», «цикл»…</div>'; return; }
+    if(!pop || !ctx) return;
+    const my = ++seq, currentPop = pop, currentCtx = ctx;
+    cancelLoad(); cancelPiece();
+    const body = currentPop.querySelector('.vt-b');
+    if(!q){ body.innerHTML = '<div class="vt-none">напиши, что нужно: «отступ», «найти элемент», «цикл»…</div>'; selected = 0; return; }
     body.innerHTML = '<div class="vt-none">ищу…</div>';
-    const r = await fetch('/api/search/task?q=' + encodeURIComponent(q) + '&lang=' + encodeURIComponent(ctx.lang || '') + '&limit=60').then(x => x.json()).catch(() => null);
-    if(my !== seq || !pop) return;
+    const controller = new AbortController(); loadController = controller;
+    const r = await fetch('/api/search/task?q=' + encodeURIComponent(q) + '&lang=' + encodeURIComponent(currentCtx.lang || '') + '&limit=60', { signal:controller.signal })
+      .then(x => x.json()).catch(() => null);
+    if(loadController === controller) loadController = null;
+    if(my !== seq || pop !== currentPop || ctx !== currentCtx) return;
     const roots = ((r && r.roots) || []).filter(n => n.label !== 'куски из библиотеки');
     const pieces = (r && r.pieces) || [];
     const canonical = value => String(value || '').toLowerCase().replace(/^<([a-z][a-z0-9-]*)>$/, '$1');
@@ -136,32 +166,78 @@
         piece: piece.id, children: []
       });
     }
-    if(!byLang.size){ body.innerHTML = '<div class="vt-none">подходящих конструкций и фрагментов не нашлось — попробуй уточнить действие или объект</div>'; return; }
+    if(!byLang.size){ body.innerHTML = '<div class="vt-none">подходящих конструкций и фрагментов не нашлось — попробуй уточнить действие или объект</div>'; selected = 0; return; }
     body.innerHTML = [...byLang.entries()].map(([l, list]) => (byLang.size > 1 ? '<div class="vt-g">' + esc(l.toUpperCase() || 'ОБЩЕЕ') + '</div>' : '') + list.map(n => rowHtml(n, 0)).join('')).join('');
+    selected = 0; mark();
   }
 
   function open(){
+    if(composing) return;
     hide(); ctx = wordCtx();
+    const currentCtx = ctx;
     pop = document.createElement('div'); pop.className = 'vt';
     pop.innerHTML = '<div class="vt-h"><input placeholder="что нужно сделать…"><button class="vt-o" title="что показывать первым">' + (order === 'code' ? 'код ↑' : 'описание ↑') + '</button><button class="vt-x" title="закрыть (Esc)">×</button></div><div class="vt-b"></div>';
     document.body.appendChild(pop);
     pop.style.left = Math.max(8, Math.min(ctx.x, innerWidth - pop.offsetWidth - 8)) + 'px';
     pop.style.top = Math.max(8, Math.min(ctx.y, innerHeight - 260)) + 'px';
-    const inp = pop.querySelector('input'); inp.value = ctx.word;
-    let t = null; inp.oninput = () => { clearTimeout(t); t = setTimeout(() => load(inp.value.trim()), 250); };
-    inp.onkeydown = e => { if(e.key === 'Escape') hide(); if(e.key === 'Enter'){ const first = pop.querySelector('.vt-r'); if(first) first.click(); } };
+    const inp = pop.querySelector('input');
+    inp.value = ctx.word;
+    const scheduleLoad = () => {
+      clearTimeout(loadTimer);
+      seq++; cancelLoad(); cancelPiece();
+      loadTimer = setTimeout(() => {
+        loadTimer = null;
+        if(pop && ctx === currentCtx) load(inp.value.trim());
+      }, 250);
+    };
+    inp.addEventListener('compositionstart', () => {
+      composing = true; clearTimeout(loadTimer); loadTimer = null;
+      seq++; cancelLoad(); cancelPiece();
+    });
+    inp.addEventListener('compositionend', () => {
+      composing = false; scheduleLoad();
+    });
+    inp.oninput = () => { if(!composing) scheduleLoad(); };
+    inp.onkeydown = e => {
+      if(composing || e.isComposing) return;
+      const visible = rows(), row = visible[selected];
+      if(e.key === 'Escape'){ e.preventDefault(); hide(); }
+      else if(e.key === 'ArrowDown' && visible.length){ e.preventDefault(); selected = (selected + 1) % visible.length; mark(); }
+      else if(e.key === 'ArrowUp' && visible.length){ e.preventDefault(); selected = (selected - 1 + visible.length) % visible.length; mark(); }
+      else if(e.key === 'ArrowRight' && row){ if(toggle(row, true)){ e.preventDefault(); mark(); } }
+      else if(e.key === 'ArrowLeft' && row){
+        const kids = row.nextElementSibling && row.nextElementSibling.classList.contains('vt-kids') ? row.nextElementSibling : null;
+        const parentKids = row.closest('.vt-kids');
+        if(kids && !kids.hidden){ e.preventDefault(); toggle(row, false); mark(); }
+        else if(parentKids && parentKids.previousElementSibling){ e.preventDefault(); const parent = parentKids.previousElementSibling; toggle(parent, false); selected = rows().indexOf(parent); mark(); }
+      }
+      else if(e.key === 'Enter' && row){
+        e.preventDefault();
+        const kids = row.nextElementSibling && row.nextElementSibling.classList.contains('vt-kids') ? row.nextElementSibling : null;
+        if(!row.dataset.code && !row.dataset.piece && kids){ toggle(row, true); mark(); }
+        else row.click();
+      }
+    };
     pop.querySelector('.vt-x').onclick = hide;
-    pop.querySelector('.vt-o').onclick = e => { order = order === 'code' ? 'note' : 'code'; try { localStorage.setItem('codelab_var_order', order); } catch(_){}
+    pop.querySelector('.vt-o').onclick = e => { order = order === 'code' ? 'note' : 'code'; try { localStorage.setItem('codelab_var_order', order); } catch(_){} 
       e.target.textContent = order === 'code' ? 'код ↑' : 'описание ↑'; pop.querySelectorAll('.vt-m').forEach(m => m.classList.toggle('note-first', order === 'note')); };
     pop.querySelector('.vt-b').addEventListener('click', async e => {
       const row = e.target.closest('.vt-r'); if(!row) return;
       const kids = row.nextElementSibling && row.nextElementSibling.classList.contains('vt-kids') ? row.nextElementSibling : null;
       // ▸ — раскрыть разновидности; клик по коду — вставить
-      if(e.target.closest('.vt-t')){ if(kids){ kids.hidden = !kids.hidden; row.querySelector('.vt-t').textContent = kids.hidden ? '▸' : '▾'; } return; }
+      if(e.target.closest('.vt-t')){ if(kids){ toggle(row); mark(); } return; }
+      const targetCtx = ctx, targetPop = pop, targetSeq = seq;
       let code = row.dataset.code;
-      if(row.dataset.piece){ const tp = await fetch('/api/template?id=' + encodeURIComponent(row.dataset.piece)).then(x => x.json()).catch(() => ({}));
-        code = tp.code != null ? tp.code : (Array.isArray(tp.lines) ? tp.lines.map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n') : ''); }
-      if(code && ctx){ ctx.put(code); hide(); }
+      if(row.dataset.piece){
+        cancelPiece();
+        const controller = new AbortController(); pieceController = controller;
+        const tp = await fetch('/api/template?id=' + encodeURIComponent(row.dataset.piece), { signal:controller.signal })
+          .then(x => x.json()).catch(() => ({}));
+        if(pieceController === controller) pieceController = null;
+        if(ctx !== targetCtx || pop !== targetPop || seq !== targetSeq) return;
+        code = tp.code != null ? tp.code : (Array.isArray(tp.lines) ? tp.lines.map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n') : '');
+      }
+      if(code && ctx === targetCtx && pop === targetPop && seq === targetSeq){ targetCtx.put(code); hide(); }
     });
     load(ctx.word); inp.focus(); inp.select();
   }
