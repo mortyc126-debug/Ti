@@ -50,8 +50,8 @@ try {
       api.listProviders().some(provider => provider.id === 'html-attributes');
   }, undefined, { timeout: 15_000 });
   const registeredAdapters = await page.evaluate(() => window.CodeLabContext.listProviders());
-  assert.ok(registeredAdapters.some(provider => provider.languages?.includes('css')),
-    'CSS context adapter was not registered');
+  assert.ok(registeredAdapters.some(provider => provider.contexts?.includes('css-value')),
+    'CSS value context was not registered');
   assert.ok(registeredAdapters.some(provider => provider.languages?.includes('html')),
     'HTML context adapter was not registered');
 
