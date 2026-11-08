@@ -25,7 +25,11 @@ const noteIdentity = n => [noteAnchor(n), n.note ?? '', n.kind ?? '', n.source ?
 
 const pairs = report.duplicateReview.map((group, index) => {
   const files = group.files || [];
-  const candidates = files.filter(f => stableId(f.id));
+  // A filename-derived fallback is not a persisted passport ID and cannot be
+  // used as a canonical ID or redirect target during a future consolidation.
+  const candidates = files.every(file => file.hasOwnId === true)
+    ? files.filter(file => stableId(file.id))
+    : [];
   const canonical = candidates.length === 1 ? candidates[0] : null;
   const secondary = canonical ? files.filter(f => f !== canonical) : [];
   const allNotes = files.flatMap(file => [
