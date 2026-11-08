@@ -47,11 +47,11 @@
   let acSpeed = 'fast'; try { acSpeed = localStorage.getItem('codelab_ac_speed') || 'fast'; } catch(_){}
   if(!Object.prototype.hasOwnProperty.call(DELAYS, acSpeed)) acSpeed = 'normal';
   const trace = (...x) => { if(Array.isArray(window.__acTrace)) window.__acTrace.push(x); };
-  const scheduleShow = ed => { trace('schedule', ed && ed.__f && ed.__f.lang); hide(); timer = setTimeout(() => { trace('timer'); show(ed, false); }, DELAYS[acSpeed]); };
+  const scheduleShow = ed => { trace('schedule', ed && ed.__f && ed.__f.lang); hide(); timer = setTimeout(() => { trace('timer-fired'); show(ed, false); }, DELAYS[acSpeed]); trace('timer-set', timer, DELAYS[acSpeed]); };
   let pop = null, ctx = null, seq = 0, timer = null, sel = 0, requestController = null, templateController = null, composing = false;
   function cancelVariantRequest(){ if(requestController){ requestController.abort(); requestController = null; } }
   function cancelTemplateRequest(){ if(templateController){ templateController.abort(); templateController = null; } }
-  function hide(){ clearTimeout(timer); seq++; cancelVariantRequest(); cancelTemplateRequest(); if(pop){ pop.remove(); pop = null; } ctx = null; }
+  function hide(){ trace('hide', !!timer, !!pop); clearTimeout(timer); seq++; cancelVariantRequest(); cancelTemplateRequest(); if(pop){ pop.remove(); pop = null; } ctx = null; }
   async function fetchVariants(url){
     cancelVariantRequest(); cancelTemplateRequest();
     const controller = new AbortController(); requestController = controller;
