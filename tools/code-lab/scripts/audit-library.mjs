@@ -43,6 +43,8 @@ const set=new Set(files);
 const records=[],missingMeta=[],invalidMeta=[],duplicateIds=new Map(),rawHashes=new Map(),normalizedHashes=new Map();
 const noteStats={total:0,orphanTotal:0,concept:0,orphanAlreadyInWordNotes:0,swapped:0,invalid:0,anchored:0,uniqueToken:0,multipleTokens:0,composite:0,absent:0,empty:0};
 const noteCases=[],conceptNotes=[];
+const viewCodeStats={eligible:0,exact:0,formatOnly:0,mismatch:0,missing:0};
+const viewCodeCases=[];
 const extLang={js:'js',mjs:'js',cjs:'js',jsx:'js',ts:'ts',tsx:'ts',py:'python',html:'html',htm:'html',css:'css',svg:'svg',json:'json',sql:'sql',rb:'ruby',php:'php',go:'go',lua:'lua',sh:'sh',bash:'bash',ps1:'powershell',r:'r',pl:'perl',txt:'txt'};
 for(const file of files){
   if(file.endsWith('.meta.json')||file.endsWith('.bak')||file.endsWith('.tmp')) continue;
@@ -68,6 +70,25 @@ for(const file of files){
   for(const [map,key] of [[rawHashes,exact],[normalizedHashes,formatted]]){
     if(!map.has(key)) map.set(key,[]);
     map.get(key).push(rel);
+  }
+  const useView=meta?.component?.views?.use;
+  if(useView){
+    viewCodeStats.eligible++;
+    const viewCode=useView?.code?.content;
+    if(typeof viewCode!=='string'||!viewCode.trim()){
+      viewCodeStats.missing++;
+      viewCodeCases.push({file:rel,id,title:meta.title||'',classification:'missing-view-code'});
+    }else{
+      const sourceNorm=norm(code),viewNorm=norm(viewCode);
+      const same=sourceNorm===viewNorm;
+      const formatOnly=!same&&sourceNorm.replace(/[ \\t]+/g,' ').replace(/\\n+/g,'\\n')===viewNorm.replace(/[ \\t]+/g,' ').replace(/\\n+/g,'\\n');
+      if(same)viewCodeStats.exact++;
+      else if(formatOnly)viewCodeStats.formatOnly++;
+      else{
+        viewCodeStats.mismatch++;
+        viewCodeCases.push({file:rel,id,title:meta.title||'',classification:'source-view-mismatch',sourceLines:code.split('\\n').length,viewLines:viewCode.split('\\n').length,sourceLength:code.length,viewLength:viewCode.length,sourceHash:hash(sourceNorm),viewHash:hash(viewNorm),sourcePreview:code.split('\\n').slice(0,5),viewPreview:viewCode.split('\\n').slice(0,5)});
+      }
+    }
   }
   const lang=String(meta.lang||extLang[ext]||'').toLowerCase();
   const expected=extLang[ext];
@@ -138,13 +159,15 @@ const report={
     duplicateIdGroups:[...duplicateIds.values()].filter(v=>v.length>1).length,
     emptyDesc:records.filter(x=>x.emptyDesc).length,langMismatch:records.filter(x=>x.langMismatch).length},
   duplicateIds:groups(duplicateIds),exactCodeDuplicates:groups(rawHashes),
-  formatNormalizedCandidates:groups(normalizedHashes),duplicateReview,missingMeta,invalidMeta,records,notes:noteStats,noteCases,conceptNotes
+  formatNormalizedCandidates:groups(normalizedHashes),duplicateReview,missingMeta,invalidMeta,records,notes:noteStats,noteCases,conceptNotes,
+  viewCodeAudit:viewCodeStats,viewCodeCases
 };
 await fs.writeFile(output,JSON.stringify(report,null,2)+'\n','utf8');
 console.log(JSON.stringify({
   report:output,totals:report.totals,
   exactDuplicateGroups:report.exactCodeDuplicates.length,
   formatNormalizedCandidateGroups:report.formatNormalizedCandidates.length,
-  noteStats:report.notes,
+  noteStats:report.notes,viewCodeAudit:report.viewCodeAudit,
+  sampleViewCodeMismatches:report.viewCodeCases.slice(0,30),
   sampleAmbiguousNotes:report.noteCases.slice(0,30),conceptSamples:report.conceptNotes.slice(0,20)
 },null,2));
