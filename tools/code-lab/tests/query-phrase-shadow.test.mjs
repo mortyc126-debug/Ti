@@ -170,7 +170,6 @@ const reduceIndex = createLegacyQueryPhraseShadow({
 assert.equal(reduceIndex.search('свернуть боковую панель').total, 0);
 assert.equal(reduceIndex.search('свернуть массив').hits[0].targetKey, '.reduce');
 
-console.log('query-phrase-shadow: isolated index and content-filter tests passed');
 
 
 const scopedUsage = {
@@ -292,3 +291,5 @@ const mixedWeb = mixedWebIndex.search('получить данные из нес
 assert.deepEqual(mixedWeb.hits.map(hit => hit.targetKey), ['fetch']);
 assert.deepEqual(mixedWeb.rankedPieces.map(piece => piece.id), ['js-fetch']);
 assert.equal(mixedWebIndex.search('получить данные из нескольких источников через CSS Grid', { language: 'css', scope: 'web' }).total, 0);
+
+console.log('query-phrase-shadow: isolated index and content-filter tests passed');
