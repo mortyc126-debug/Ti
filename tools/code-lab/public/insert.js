@@ -46,7 +46,8 @@
   const DELAYS = { instant: 0, fast: 45, normal: 100, calm: 200 };
   let acSpeed = 'fast'; try { acSpeed = localStorage.getItem('codelab_ac_speed') || 'fast'; } catch(_){}
   if(!Object.prototype.hasOwnProperty.call(DELAYS, acSpeed)) acSpeed = 'normal';
-  const trace = (...x) => { if(Array.isArray(window.__acTrace)) window.__acTrace.push(x); };\n  const scheduleShow = ed => { trace('schedule', ed && ed.__f && ed.__f.lang); hide(); timer = setTimeout(() => { trace('timer'); show(ed, false); }, DELAYS[acSpeed]); };
+  const trace = (...x) => { if(Array.isArray(window.__acTrace)) window.__acTrace.push(x); };
+  const scheduleShow = ed => { trace('schedule', ed && ed.__f && ed.__f.lang); hide(); timer = setTimeout(() => { trace('timer'); show(ed, false); }, DELAYS[acSpeed]); };
   let pop = null, ctx = null, seq = 0, timer = null, sel = 0, requestController = null, templateController = null, composing = false;
   function cancelVariantRequest(){ if(requestController){ requestController.abort(); requestController = null; } }
   function cancelTemplateRequest(){ if(templateController){ templateController.abort(); templateController = null; } }
@@ -270,7 +271,8 @@
   }, true);
   // input покрывает обычный ввод, вставку и экранную клавиатуру; IME запускается после compositionend.
   edsEl.addEventListener('input', e => {
-    trace('input', e.target && e.target.className, acOn, composing, e.isComposing);\n    if(!acOn || composing || e.isComposing) return;
+    trace('input', e.target && e.target.className, acOn, composing, e.isComposing);
+    if(!acOn || composing || e.isComposing) return;
     const ed = e.target.closest && e.target.closest('.sb-ed'); if(!ed) return;
     scheduleShow(ed);
   }, true);
