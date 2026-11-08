@@ -27,12 +27,12 @@
   "status": "described",
   "wordNotes": [
     {
-      "line": 0,
-      "col": 0,
-      "text": "",
-      "kind": "?.() — вызвать, только если функция существует.",
-      "note": "kw",
-      "source": "dict"
+      "line": 2,
+      "col": 6,
+      "text": "?.",
+      "kind": "op",
+      "note": "?.() — вызвать функцию, только если она существует.",
+      "source": "custom"
     },
     {
       "line": 1,

@@ -5,16 +5,16 @@
   "title": "АУДИТ ПОКРЫТИЯ",
   "lang": "json",
   "group": "Инструменты разработки / Проверки качества",
-  "desc": "",
+  "desc": "Машиночитаемый отчёт по этапам расширения и проверке Python-библиотеки: число фрагментов, результаты AST-проверки и проверки метаданных, запуски новых примеров, ошибки и исправления ID.",
   "output": "",
   "tags": [],
   "aliases": [],
   "source": {
     "title": null,
-    "desc": null,
+    "desc": "ai",
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [],
   "component": {
     "tags": {
