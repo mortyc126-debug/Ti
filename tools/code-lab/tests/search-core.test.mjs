@@ -93,6 +93,21 @@ test('точное совпадение с названием фрагмента
   assert.equal(result.pieces[0].id, 'exact-title');
 });
 
+test('одно общее слово в названии не получает приоритет точного совпадения над направленным фрагментом', () => {
+  const result = combineTaskSearch({
+    query: 'Получить данные из двух источников и вывести имя в шапку, список в основной блок, итог внизу',
+    directed: { hits: [], rankedPieces: [
+      { id: 'fetch-piece', title: 'fetch + await — получить данные', lang: 'js', targetKey: 'fetch', position: 1 }
+    ] },
+    library: { hits: [
+      { id: 'generic-block', title: 'Статическое поле и блок инициализации вместе', lang: 'js', why: [{ q: 'блок', kind: 'exact', in: 'название' }] }
+    ] },
+    variants: { roots: [] }
+  });
+  assert.equal(result.pieces[0].id, 'fetch-piece');
+  assert.ok(result.pieces.findIndex(piece => piece.id === 'generic-block') > 0);
+});
+
 test('объясняет результаты, найденные только одним источником', () => {
   const result = combineTaskSearch({
     query: 'отступ',
