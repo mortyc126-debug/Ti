@@ -20,6 +20,7 @@
       id: provider.id,
       priority: Number.isFinite(provider.priority) ? provider.priority : 0,
       languages: provider.languages ? new Set(provider.languages.map(normalizeLanguage)) : null,
+      contexts: provider.contexts ? new Set(provider.contexts.map(value => String(value))) : null,
       resolve: provider.resolve
     };
     providers.set(provider.id, entry);
@@ -140,7 +141,8 @@
       .map(provider => ({
         id: provider.id,
         priority: provider.priority,
-        languages: provider.languages ? Array.from(provider.languages) : null
+        languages: provider.languages ? Array.from(provider.languages) : null,
+        contexts: provider.contexts ? Array.from(provider.contexts) : null
       }))
       .sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id));
   }
