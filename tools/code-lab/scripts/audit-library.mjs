@@ -106,7 +106,7 @@ for(const file of files){
     }
   }
   const lang=String(meta.lang||extLang[ext]||'').toLowerCase();
-  const look=keywordDict?makeLook(lang,keywordDict):()=>null;
+  const look=dictionaryNoteStats.available?makeLook(lang,keywordDict):()=>null;
   const expected=extLang[ext];
   const notes=Array.isArray(meta.wordNotes)?meta.wordNotes:[];
   const codeLines=code.split('\n');
@@ -122,7 +122,7 @@ for(const file of files){
     const swapped=tokenKinds.has(note.note)&&typeof note.kind==='string'&&!tokenKinds.has(note.kind);
     if(swapped) noteStats.swapped++;
     const explanation=swapped?note.kind:note.note;
-    if(note.source==='dict'&&keywordDict){
+    if(note.source==='dict'&&dictionaryNoteStats.available){
       dictionaryNoteStats.total++;
       const current=look(note.text);
       if(!current){dictionaryNoteStats.missing++;dictionaryNoteCases.push({file:rel,id,text:note.text,lang,classification:'dictionary-entry-missing',storedExplanation:explanation});}
