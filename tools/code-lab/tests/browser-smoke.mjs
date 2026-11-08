@@ -29,7 +29,7 @@ try {
 
   browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
   const context = await browser.newContext();
-  await context.addInitScript(() => {
+  await context.addInitScript(() => {\n    window.__acTrace = [];
     localStorage.removeItem('codelab_sandbox');
     localStorage.removeItem('codelab_sb_active');
     localStorage.setItem('codelab_mode', 'sandbox');
@@ -110,7 +110,7 @@ try {
     return { lang: result.lang, roots: (result.roots || []).map(root => ({ term: root.term, label: root.label, note: root.note })) };
   });
   const inputEvents = await page.evaluate(() => window.__autocompleteInputs);
-  console.log('browser debug:', JSON.stringify({ browserDebug, editorDebug, apiDebug, inputEvents }));
+  const acTrace = await page.evaluate(() => window.__acTrace);\n  console.log('browser debug:', JSON.stringify({ browserDebug, editorDebug, apiDebug, inputEvents, acTrace }));
 
   await delay(300);
   const autoPopupOpened = await page.locator('.ac-pop').count() > 0;
