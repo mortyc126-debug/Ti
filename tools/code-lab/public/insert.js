@@ -46,7 +46,7 @@
   const DELAYS = { instant: 0, fast: 45, normal: 100, calm: 200 };
   let acSpeed = 'fast'; try { acSpeed = localStorage.getItem('codelab_ac_speed') || 'fast'; } catch(_){}
   if(!Object.prototype.hasOwnProperty.call(DELAYS, acSpeed)) acSpeed = 'normal';
-  const scheduleShow = ed => { hide(); timer = setTimeout(() => show(ed, false), DELAYS[acSpeed]); };
+  const trace = (...x) => { if(Array.isArray(window.__acTrace)) window.__acTrace.push(x); };\n  const scheduleShow = ed => { trace('schedule', ed && ed.__f && ed.__f.lang); hide(); timer = setTimeout(() => { trace('timer'); show(ed, false); }, DELAYS[acSpeed]); };
   let pop = null, ctx = null, seq = 0, timer = null, sel = 0, requestController = null, templateController = null, composing = false;
   function cancelVariantRequest(){ if(requestController){ requestController.abort(); requestController = null; } }
   function cancelTemplateRequest(){ if(templateController){ templateController.abort(); templateController = null; } }
@@ -229,7 +229,7 @@
     // в скобках вызова — параметры и значения; после «свойство:» в CSS — значения свойства
     const cc = !tc && callCtx(ed);
     if(cc){ const my1 = ++seq; const cr = await callRoots(cc); if(my1 !== seq) return; if(cr.length){ ctx = Object.assign({}, c || {}, { x: cc.x, y: cc.y, put: cc.put, ed }); render(ctx, cr); return; } }
-    if(!c || (!force && c.word.length < 2)){ hide(); return; }
+    if(!c || (!force && c.word.length < 2)){ trace('return-short', !!c, c && c.word); hide(); return; }
     const my = ++seq;
     let roots = [];
     if(c.word){ const r = await fetchVariants('/api/variants?q=' + encodeURIComponent(c.word) + '&lang=' + encodeURIComponent(c.lang)); roots = (r && r.roots) || []; }
@@ -240,7 +240,7 @@
       roots = ((r && r.roots) || []).filter(n => !n.group).concat(roots.length ? roots : ((r && r.roots) || []).filter(n => n.group)); }
     if(!roots.length && c.word && /^[\w$.-]+$/.test(c.word)){ const d = await (window.codelabKwDict ? window.codelabKwDict(c.lang) : Promise.resolve({})); if(my !== seq) return; roots = flatFallback(c.word, d || {}, c.lang); }
     if(!roots.length){ if(force){ ctx = c; render(c, [], true); } else hide(); return; }
-    ctx = c; render(c, roots);
+    ctx = c; trace('render', roots.length); render(c, roots);
   }
   function render(c, roots, empty){
     if(!pop){ pop = document.createElement('div'); pop.className = 'ac-pop'; document.body.appendChild(pop);
@@ -270,7 +270,7 @@
   }, true);
   // input покрывает обычный ввод, вставку и экранную клавиатуру; IME запускается после compositionend.
   edsEl.addEventListener('input', e => {
-    if(!acOn || composing || e.isComposing) return;
+    trace('input', e.target && e.target.className, acOn, composing, e.isComposing);\n    if(!acOn || composing || e.isComposing) return;
     const ed = e.target.closest && e.target.closest('.sb-ed'); if(!ed) return;
     scheduleShow(ed);
   }, true);
