@@ -68,12 +68,25 @@ for(const file of files){
   const noteKey=n=>JSON.stringify([n?.text,n?.line,n?.col,n?.note,n?.kind,n?.source]);
   const wordNoteKeys=new Set(notes.map(noteKey));
   function inspect(note,isOrphan){
-    if(!note||typeof note!=='object'||typeof note.text!=='string'){noteStats.invalid++;return;}
-    if(note.kind==='concept'){noteStats.concept++;conceptNotes.push({file:rel,id,text:note.text,explanation:note.note||'',source:note.source||''});return;}
-    if(isOrphan&&wordNoteKeys.has(noteKey(note))) noteStats.orphanAlreadyInWordNotes++;
+    if(!note||typeof note!=='object'){noteStats.invalid++;noteCases.push({
+      file:rel,id,text:'',explanation:'',source:'',line:null,col:null,
+      classification:'invalid-note-record',occurrences:0,anchored:false,swapped:false,isOrphan
+    });return;}
     const swapped=tokenKinds.has(note.note)&&typeof note.kind==='string'&&!tokenKinds.has(note.kind);
     if(swapped) noteStats.swapped++;
     const explanation=swapped?note.kind:note.note;
+    if(typeof note.text!=='string'||!note.text.trim()){
+      noteStats.invalid++;
+      noteCases.push({
+        file:rel,id,text:typeof note.text==='string'?note.text:'',explanation:typeof explanation==='string'?explanation:'',
+        source:note.source||'',line:note.line??null,col:note.col??null,
+        classification:typeof note.text==='string'?'empty-token-text':'invalid-token-text',
+        occurrences:0,anchored:false,swapped,isOrphan
+      });
+      return;
+    }
+    if(note.kind==='concept'){noteStats.concept++;conceptNotes.push({file:rel,id,text:note.text,explanation:note.note||'',source:note.source||''});return;}
+    if(isOrphan&&wordNoteKeys.has(noteKey(note))) noteStats.orphanAlreadyInWordNotes++;
     if(typeof explanation!=='string'||!explanation.trim()){noteStats.empty++;return;}
     const hits=positions(code,note.text);
     const anchored=hits.some(p=>p.line===note.line&&p.col===note.col);
