@@ -55,6 +55,16 @@ try {
   const cssTab = page.locator('#sbTabs .sb-tab').filter({ hasText: 'style.css' }).first();
   await cssTab.click();
   await cssEditor.waitFor({ state: 'visible' });
+  await page.evaluate(() => {
+    window.__autocompleteInputs = [];
+    document.querySelector('#sbEds').addEventListener('input', event => {
+      window.__autocompleteInputs.push({
+        target: event.target.className,
+        closestEditor: !!event.target.closest('.sb-ed'),
+        composing: !!event.isComposing
+      });
+    }, true);
+  });
   const cm = cssEditor.locator('.CodeMirror');
   if (await cm.count() && await cm.isVisible()) {
     await cm.click();
@@ -74,8 +84,15 @@ try {
     activeId: localStorage.getItem('codelab_sb_active'),
     autocompleteStyle: [...document.querySelectorAll('style')].some(style => style.textContent.includes('.ac-pop'))
   }));
-  const editorDebug = await cssEditor.evaluate(ed => ({
+  const editorDebug = await cssEditor.evaluate(ed => {
+    const original = ed.querySelector('textarea.sb-code');
+    const cm = original && original.__cm;
+    const cursor = cm ? cm.getCursor() : null;
+    return {
     className: ed.className,
+    cmValue: cm ? cm.getValue() : null,
+    cursor,
+    cursorLine: cm && cursor ? cm.getLine(cursor.line) : null,
     display: getComputedStyle(ed).display,
     file: ed.__f && { name: ed.__f.name, lang: ed.__f.lang, code: ed.__f.code },
     textareas: [...ed.querySelectorAll('textarea')].map(ta => ({
@@ -87,10 +104,19 @@ try {
       display: getComputedStyle(cm).display, visibility: getComputedStyle(cm).visibility,
       rect: cm.getBoundingClientRect().toJSON()
     }))
-  }));
-  console.log('browser debug:', JSON.stringify({ browserDebug, editorDebug }));
+  };});
+  const apiDebug = await page.evaluate(async () => {
+    const result = await fetch('/api/variants?q=margin&lang=css').then(response => response.json());
+    return { lang: result.lang, roots: (result.roots || []).map(root => ({ term: root.term, label: root.label, note: root.note })) };
+  });
+  const inputEvents = await page.evaluate(() => window.__autocompleteInputs);
+  console.log('browser debug:', JSON.stringify({ browserDebug, editorDebug, apiDebug, inputEvents }));
 
-  await page.waitForSelector('.ac-pop', { timeout: 20_000 });
+  await delay(300);
+  const autoPopupOpened = await page.locator('.ac-pop').count() > 0;
+  if (!autoPopupOpened) await page.keyboard.press('Control+Space');
+  await page.waitForSelector('.ac-pop', { timeout: 5_000 });
+  assert.ok(autoPopupOpened, 'typing a code token did not open autocomplete automatically');
   const popup = page.locator('.ac-pop');
   const popupCodes = await popup.locator('.ac-r').evaluateAll(rows => rows.map(row => row.dataset.code || ''));
   assert.ok(popupCodes.some(code => /margin/i.test(code)), 'CSS margin variant was not shown');
