@@ -479,3 +479,33 @@ test('общий JavaScript/TypeScript API не дублируется межд�
   });
   assert.equal(tsOnly.roots.find(root => root.term === 'addEventListener')?.lang, 'ts');
 });
+
+
+test('сохраняет связанные фрагменты HTML, CSS и JS при заполнении лимита одним языком', () => {
+  const htmlPiece = { id: 'html-button', title: 'Кнопка страницы', lang: 'html', relevanceScore: 80 };
+  const cssPiece = { id: 'css-grid', title: 'Сетка страницы через Grid', lang: 'css', relevanceScore: 75 };
+  const jsPiece = { id: 'js-fetch', title: 'Получить данные через fetch', lang: 'js', relevanceScore: 70 };
+  const result = combineTaskSearch({
+    query: 'сделать страницу с кнопкой, расположить блок через CSS Grid и загрузить данные',
+    limit: 3,
+    directed: {
+      hits: [
+        { targetKey: '<button>', score: 70, pieces: [htmlPiece] },
+        { targetKey: 'grid', score: 65, pieces: [cssPiece] },
+        { targetKey: 'fetch', score: 60, pieces: [jsPiece] }
+      ],
+      rankedPieces: [
+        { id: 'js-fetch', title: 'Получить данные через fetch', lang: 'js', position: 1, matchedTargets: ['fetch'] },
+        { id: 'js-json', title: 'Разобрать JSON', lang: 'js', position: 2, matchedTargets: ['fetch'] },
+        { id: 'js-all', title: 'Дождаться всех запросов', lang: 'js', position: 3, matchedTargets: ['fetch'] }
+      ]
+    },
+    library: { hits: [] },
+    variants: { roots: [] }
+  });
+  const linked = result.pieces.filter(piece => (piece.matchedTargets || []).length > 0);
+  assert.deepEqual(new Set(linked.map(piece => piece.lang)), new Set(['html', 'css', 'js']));
+  assert.ok(linked.some(piece => piece.id === 'css-grid'));
+  assert.ok(linked.some(piece => piece.id === 'html-button'));
+  assert.ok(linked.some(piece => piece.id === 'js-fetch'));
+});
