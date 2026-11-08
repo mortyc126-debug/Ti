@@ -35,7 +35,7 @@
     const cursor = source.cursor && Number.isInteger(source.cursor.line) && Number.isInteger(source.cursor.ch)
       ? { line: Math.max(0, source.cursor.line), ch: Math.max(0, source.cursor.ch) }
       : null;
-    const lines = code.split(/\\r?\\n/);
+    const lines = code.split(/\r?\n/);
     const currentLine = cursor ? String(lines[cursor.line] || '') : String(source.currentLine || '');
     const beforeCursor = cursor ? currentLine.slice(0, cursor.ch) : String(source.beforeCursor || '');
     const afterCursor = cursor ? currentLine.slice(cursor.ch) : String(source.afterCursor || '');
@@ -47,7 +47,7 @@
       beforeCursor,
       afterCursor,
       selectedText: String(source.selectedText || ''),
-      prefix: String(source.prefix == null ? (beforeCursor.match(/[\\w$-]*$/) || [''])[0] : source.prefix)
+      prefix: String(source.prefix == null ? (beforeCursor.match(/[\w$-]*$/) || [''])[0] : source.prefix)
     });
   }
 
