@@ -195,15 +195,69 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     }
     directedById = makeCandidateMap(fallback, false);
   }
+  const targetHits = (directed?.hits || []).filter(hit => targetCompatible(hit.targetKey) && (hit.pieces || []).some(inTaskScope));
   const directedPieces = [...directedById.values()].filter(inTaskScope).sort((a, b) => {
     const rank = item => item._rankPosition ?? (-(item.combinedScore || 0));
     return rank(a) - rank(b) ||
       (a.targetPosition || Infinity) - (b.targetPosition || Infinity) ||
       (a.piecePositionWithinTarget || Infinity) - (b.piecePositionWithinTarget || Infinity) ||
       String(a.title || a.id).localeCompare(String(b.title || b.id), 'ru');
-  }).slice(0, max).map(({ _rankPosition, ...piece }) => piece);
+  }).slice(0, max);
 
-  directedPieces.forEach((piece, index) => {
+  // Общая выдача не должна потерять единственный связанный фрагмент языка,
+  // если верхние позиции глобального рейтинга заняты несколькими фрагментами другого языка.
+  const languageCounts = new Map();
+  for (const piece of directedPieces) {
+    const lang = canonicalLanguage(piece.lang || '');
+    languageCounts.set(lang, (languageCounts.get(lang) || 0) + 1);
+  }
+  const coverageCandidates = new Map();
+  for (const hit of targetHits) {
+    for (const piece of hit.pieces || []) {
+      if (!piece?.id || !inTaskScope(piece)) continue;
+      const lang = canonicalLanguage(piece.lang || '');
+      if (!lang || languageCounts.has(lang)) continue;
+      const candidate = {
+        ...piece,
+        matchedTargets: [...new Set([...(targetMemberships.get(piece.id) || []), hit.targetKey].filter(Boolean))],
+        targetKey: hit.targetKey,
+        targetScore: hit.score,
+        combinedScore: (Number(hit.score) || 0) * 1000 + (Number(piece.relevanceScore) || 0)
+      };
+      const previous = coverageCandidates.get(lang);
+      if (!previous || candidate.combinedScore > previous.combinedScore) coverageCandidates.set(lang, candidate);
+    }
+  }
+  const missingLanguageCandidates = [...coverageCandidates.entries()]
+    .sort((a, b) => b[1].combinedScore - a[1].combinedScore);
+  for (const [lang, candidate] of missingLanguageCandidates) {
+    if (languageCounts.has(lang)) continue;
+    let replaceIndex = -1;
+    let largestCount = 1;
+    for (let i = 0; i < directedPieces.length; i++) {
+      const currentLang = canonicalLanguage(directedPieces[i].lang || '');
+      const count = languageCounts.get(currentLang) || 0;
+      if (count > largestCount) {
+        largestCount = count;
+        replaceIndex = i;
+      }
+    }
+    if (replaceIndex >= 0) {
+      const replaced = directedPieces[replaceIndex];
+      const replacedLang = canonicalLanguage(replaced.lang || '');
+      candidate._rankPosition = replaced._rankPosition ?? (replaceIndex + 1);
+      directedPieces[replaceIndex] = candidate;
+      languageCounts.set(replacedLang, Math.max(0, (languageCounts.get(replacedLang) || 1) - 1));
+      languageCounts.set(lang, 1);
+    } else if (directedPieces.length < max) {
+      candidate._rankPosition = max + directedPieces.length + 1;
+      directedPieces.push(candidate);
+      languageCounts.set(lang, 1);
+    }
+  }
+  const selectedDirectedPieces = directedPieces.map(({ _rankPosition, ...piece }) => piece);
+
+  selectedDirectedPieces.forEach((piece, index) => {
     const item = ensure(piece.id);
     Object.assign(item, {
       title: piece.title || item.title, lang: piece.lang || item.lang,
@@ -276,7 +330,6 @@ export function combineTaskSearch({ query, language = '', limit = 60, library, d
     phraseRank: item._phraseRank, lexicalRank: item._lexicalRank, why: item.why
   }));
 
-  const targetHits = (directed?.hits || []).filter(hit => targetCompatible(hit.targetKey) && (hit.pieces || []).some(inTaskScope));
   // Общие runtime API JavaScript и TypeScript — одна конструкция, а не два варианта дерева.
   // При поиске без явного языка показываем JS-корень, если библиотека содержит примеры на обоих языках;
   // при активном TypeScript-контексте сохраняем TS-корень.
