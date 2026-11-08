@@ -30,6 +30,9 @@ try {
   browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
   const context = await browser.newContext();
   await context.addInitScript(() => {
+    // Контекст инициализируется только для основной страницы: sandboxed preview iframe
+    // намеренно не имеет same-origin и не должен получать доступ к localStorage.
+    if (window.top !== window) return;
     localStorage.removeItem('codelab_sandbox');
     localStorage.removeItem('codelab_sb_active');
     localStorage.setItem('codelab_mode', 'sandbox');
