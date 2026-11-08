@@ -47,11 +47,12 @@
   let acSpeed = 'fast'; try { acSpeed = localStorage.getItem('codelab_ac_speed') || 'fast'; } catch(_){}
   if(!Object.prototype.hasOwnProperty.call(DELAYS, acSpeed)) acSpeed = 'normal';
   const scheduleShow = ed => { hide(); timer = setTimeout(() => show(ed, false), DELAYS[acSpeed]); };
-  let pop = null, ctx = null, seq = 0, timer = null, sel = 0, requestController = null;
+  let pop = null, ctx = null, seq = 0, timer = null, sel = 0, requestController = null, templateController = null, composing = false;
   function cancelVariantRequest(){ if(requestController){ requestController.abort(); requestController = null; } }
-  function hide(){ clearTimeout(timer); seq++; cancelVariantRequest(); if(pop){ pop.remove(); pop = null; } ctx = null; }
+  function cancelTemplateRequest(){ if(templateController){ templateController.abort(); templateController = null; } }
+  function hide(){ clearTimeout(timer); seq++; cancelVariantRequest(); cancelTemplateRequest(); if(pop){ pop.remove(); pop = null; } ctx = null; }
   async function fetchVariants(url){
-    cancelVariantRequest();
+    cancelVariantRequest(); cancelTemplateRequest();
     const controller = new AbortController(); requestController = controller;
     try { return await fetch(url, { signal:controller.signal }).then(r => r.json()); }
     catch(error){ if(error && error.name !== 'AbortError') return null; return null; }
@@ -198,19 +199,29 @@
   function toggle(row, open){ const kids = row.nextElementSibling && row.nextElementSibling.classList.contains('ac-kids') ? row.nextElementSibling : null; if(!kids) return false;
     kids.hidden = open == null ? !kids.hidden : !open; row.querySelector('.ac-t').textContent = kids.hidden ? '▸' : '▾'; return true; }
   async function accept(row){
-    if(!row || !ctx) return;
+    const targetCtx = ctx, targetPop = pop, targetSeq = seq;
+    if(!row || !targetCtx) return;
     if(row.classList.contains('ac-grp')){ toggle(row); mark(); return; }
     let code = row.dataset.code;
-    if(row.dataset.piece){ const t = await fetch('/api/template?id=' + encodeURIComponent(row.dataset.piece)).then(r => r.json()).catch(() => ({}));
-      code = t.code != null ? t.code : (Array.isArray(t.lines) ? t.lines.map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n') : ''); }
-    const ed = ctx.ed;
-    if(code) ctx.put(code); hide();
+    if(row.dataset.piece){
+      cancelTemplateRequest();
+      const controller = new AbortController(); templateController = controller;
+      const t = await fetch('/api/template?id=' + encodeURIComponent(row.dataset.piece), { signal:controller.signal })
+        .then(r => r.json()).catch(() => ({}));
+      if(templateController === controller) templateController = null;
+      if(ctx !== targetCtx || pop !== targetPop || seq !== targetSeq) return;
+      code = t.code != null ? t.code : (Array.isArray(t.lines) ? t.lines.map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n') : '');
+    }
+    if(ctx !== targetCtx || pop !== targetPop || seq !== targetSeq) return;
+    const ed = targetCtx.ed;
+    if(code) targetCtx.put(code); hide();
     // вставили атрибут со значением — сразу варианты значения (type="…" → button, submit, reset)
     if(ed && /="…"/.test(code || '')) setTimeout(() => show(ed, false), 30);
   }
 
   async function show(ed, force){
-    clearTimeout(timer); cancelVariantRequest();
+    clearTimeout(timer); cancelVariantRequest(); cancelTemplateRequest();
+    if(composing) return;
     const c = wordCtx(ed, force);
     // внутри HTML-тега — его атрибуты и их значения (правила структуры), даже без набранных букв
     const tc = /^(html|htm|svg|xml)$/i.test((ed && ed.__f && ed.__f.lang) || '') && tagCtx(ed);   // при выделенном «…» wordCtx пуст — тег смотрим сами
@@ -248,13 +259,23 @@
     pop.style.top = (below ? c.y : Math.max(8, c.y - pop.offsetHeight - 28)) + 'px';
   }
 
-  // Событие input покрывает печать, вставку, IME и экранную клавиатуру.
-  // Отдельный keyup не нужен: он дублировал запрос после каждого символа.
+  // Во время IME-композиции не перехватываем Enter/стрелки и не ищем промежуточный текст.
+  edsEl.addEventListener('compositionstart', e => {
+    const ed = e.target.closest && e.target.closest('.sb-ed'); if(!ed) return;
+    composing = true; hide();
+  }, true);
+  edsEl.addEventListener('compositionend', e => {
+    composing = false;
+    const ed = e.target.closest && e.target.closest('.sb-ed'); if(ed && acOn) scheduleShow(ed);
+  }, true);
+  // input покрывает обычный ввод, вставку и экранную клавиатуру; IME запускается после compositionend.
   edsEl.addEventListener('input', e => {
-    if(!acOn) return; const ed = e.target.closest && e.target.closest('.sb-ed'); if(!ed) return;
+    if(!acOn || composing || e.isComposing) return;
+    const ed = e.target.closest && e.target.closest('.sb-ed'); if(!ed) return;
     scheduleShow(ed);
   }, true);
   edsEl.addEventListener('keydown', e => {
+    if(composing || e.isComposing) return;
     if((e.ctrlKey || e.metaKey) && e.code === 'Space'){ e.preventDefault(); e.stopPropagation(); const ed = e.target.closest && e.target.closest('.sb-ed'); if(ed) show(ed, true); return; }
     if(!pop) return;
     const rs = rows();
