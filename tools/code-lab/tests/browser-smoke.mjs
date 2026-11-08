@@ -45,6 +45,17 @@ try {
   await page.goto(origin + '/constructor.html', { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#sbEds .sb-ed', { timeout: 30_000 });
   await page.waitForFunction(() => {
+    const api = window.CodeLabContext;
+    return api && api.listProviders().some(provider => provider.id === 'call-arguments') &&
+      api.listProviders().some(provider => provider.id === 'html-attributes');
+  }, undefined, { timeout: 15_000 });
+  const registeredAdapters = await page.evaluate(() => window.CodeLabContext.listProviders());
+  assert.ok(registeredAdapters.some(provider => provider.languages?.includes('css')),
+    'CSS context adapter was not registered');
+  assert.ok(registeredAdapters.some(provider => provider.languages?.includes('html')),
+    'HTML context adapter was not registered');
+
+  await page.waitForFunction(() => {
     const box = document.querySelector('#sandbox');
     return box && getComputedStyle(box).display !== 'none';
   }, undefined, { timeout: 30_000 });
