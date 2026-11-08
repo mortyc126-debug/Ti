@@ -173,23 +173,5 @@
       "note": "log — печатает значение в консоль. console.log(x) — показать x.",
       "source": "dict"
     }
-  ],
-  "orphanNotes": [
-    {
-      "line": 6,
-      "col": 67,
-      "text": "abort",
-      "kind": "fn",
-      "note": "Отменяет все запросы с этим сигналом.",
-      "source": "custom"
-    },
-    {
-      "line": 6,
-      "col": 67,
-      "text": "abort",
-      "kind": "fn",
-      "note": "Отменяет все запросы с этим сигналом.",
-      "source": "custom"
-    }
   ]
 }

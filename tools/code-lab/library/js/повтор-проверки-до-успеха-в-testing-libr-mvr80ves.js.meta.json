@@ -116,23 +116,5 @@
       "note": "Проверяет, что элемент виден пользователю.",
       "source": "custom"
     }
-  ],
-  "orphanNotes": [
-    {
-      "line": 6,
-      "col": 57,
-      "text": "toBeVisible",
-      "kind": "fn",
-      "note": "Проверяет, что элемент виден пользователю.",
-      "source": "custom"
-    },
-    {
-      "line": 6,
-      "col": 57,
-      "text": "toBeVisible",
-      "kind": "fn",
-      "note": "Проверяет, что элемент виден пользователю.",
-      "source": "custom"
-    }
   ]
 }

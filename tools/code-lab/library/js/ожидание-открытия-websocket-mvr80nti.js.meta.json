@@ -115,39 +115,5 @@
       "note": "true — логическая «истина» (да).",
       "source": "dict"
     }
-  ],
-  "orphanNotes": [
-    {
-      "line": 3,
-      "col": 46,
-      "text": "once",
-      "kind": "name",
-      "note": "Обработчик срабатывает один раз и снимается сам.",
-      "source": "custom"
-    },
-    {
-      "line": 4,
-      "col": 47,
-      "text": "once",
-      "kind": "name",
-      "note": "Обработчик срабатывает один раз и снимается сам.",
-      "source": "custom"
-    },
-    {
-      "line": 3,
-      "col": 46,
-      "text": "once",
-      "kind": "name",
-      "note": "Обработчик срабатывает один раз и снимается сам.",
-      "source": "custom"
-    },
-    {
-      "line": 4,
-      "col": 47,
-      "text": "once",
-      "kind": "name",
-      "note": "Обработчик срабатывает один раз и снимается сам.",
-      "source": "custom"
-    }
   ]
 }
