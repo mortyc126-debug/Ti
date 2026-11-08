@@ -53,6 +53,11 @@ test('контекст округления вниз отделяет floor от
   assert.ok(matchQueryPhrase('округлить до двух знаков', 'округлить до двух знаков', 'toFixed(2)'));
 });
 
+test('слово «список» не подменяется JavaScript Array без явного запроса на массив', () => {
+  assert.equal(matchQueryPhrase('список в основной блок', 'массив JavaScript', 'array'), null);
+  assert.ok(matchQueryPhrase('массив JavaScript', 'массив JavaScript', 'array'));
+});
+
 test('контекст списка и словаря Python не смешивает два типа коллекций', () => {
   assert.equal(matchQueryPhrase('список Python', 'словарь Python', 'dict'), null);
   assert.equal(matchQueryPhrase('словарь Python', 'список Python', 'list'), null);

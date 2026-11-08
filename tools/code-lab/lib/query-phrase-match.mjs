@@ -36,6 +36,8 @@ function contextConflict(query, phrase, targetKey) {
   const qSpacing = /отступ|padding|margin/.test(q);
   if (qSpacing && (target === 'in' || target.endsWith('appendchild') || target.endsWith('textcontent'))) return true;
   const qList = /спис|массив|\blist\b/.test(q);
+  const qArray = /массив|\barray\b/.test(q);
+  if(qList && !qArray && target === 'array') return true;
   const qDict = /словар|\bdict\b|\bdictionary\b/.test(q);
   if (qList && !qDict && /^(?:dict(?:\.|\(|$)|\*\*x$|\|$)/.test(target)) return true;
   if (qDict && !qList && /^list(?:\.|\(|$)/.test(target)) return true;

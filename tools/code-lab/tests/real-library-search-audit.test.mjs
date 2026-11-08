@@ -262,6 +262,7 @@ async function main() {
   assert.ok(!taskResultMap.get(linkQuery).pieces.slice(0, 5).some(piece => !(piece.matchedTargets || []).length), 'несвязанные лексические совпадения не должны занимать первые пять позиций, если найдены направленные фрагменты');
   const dataTargets = taskResultMap.get(dataQuery).targets.map(x => x.targetKey);
   assert.ok(!dataTargets.some(term => /^<select\b/.test(term)), 'список данных для вывода не должен превращаться в выпадающее поле select');
+  assert.ok(!dataTargets.includes('array'), 'слово «список» в интерфейсной задаче не должно превращаться в JavaScript Array без запроса на массив');
   assert.ok(!taskResultMap.get(dataQuery).roots.some(root => /^<(?:form|input|datalist)\b/i.test(String(root.term || ''))), 'обычный вывод данных на страницу не должен превращаться в форму поиска или поле ввода');
   assert.ok(dataTargets.indexOf('fetch') >= 0 && dataTargets.indexOf('response.json()') > dataTargets.indexOf('fetch'), 'получение данных должно стоять выше разбора JSON-ответа: ' + dataTargets.join(', ') + '; counts=' + JSON.stringify(taskResultMap.get(dataQuery).counts));
   assert.ok(taskResultMap.get(dataQuery).counts.directedPieces > 0, 'по найденным целям должны подбираться связанные фрагменты');
