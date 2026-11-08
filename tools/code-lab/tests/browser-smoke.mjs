@@ -43,7 +43,7 @@ try {
   await page.waitForFunction(() => {
     const box = document.querySelector('#sandbox');
     return box && getComputedStyle(box).display !== 'none';
-  }, { timeout: 30_000 });
+  }, undefined, { timeout: 30_000 });
 
   const cssIndex = await page.locator('#sbEds .sb-ed').evaluateAll(eds =>
     eds.findIndex(ed => ed.querySelector('.sb-lang')?.value === 'css')
@@ -64,9 +64,9 @@ try {
 
   await page.waitForSelector('.ac-pop', { timeout: 20_000 });
   const popup = page.locator('.ac-pop');
-  const popupText = await popup.innerText();
-  assert.match(popupText, /margin/i, 'CSS margin variant was not shown');
-  assert.match(popupText, /padding/i, 'CSS padding variant was not shown');
+  const popupCodes = await popup.locator('.ac-r').evaluateAll(rows => rows.map(row => row.dataset.code || ''));
+  assert.ok(popupCodes.some(code => /margin/i.test(code)), 'CSS margin variant was not shown');
+  assert.ok(popupCodes.some(code => /padding/i.test(code)), 'CSS padding variant was not shown');
 
   const expandableIndex = await popup.locator('.ac-r').evaluateAll(rows => {
     const visible = rows.filter(row => row.offsetParent !== null);
@@ -91,6 +91,7 @@ try {
     const visible = rows.filter(row => row.offsetParent !== null);
     return visible.indexOf(visible.find(row => row.classList.contains('sel')));
   });
+  assert.ok(selectedIndex >= 0, 'keyboard selection is missing');
   const delta = insertIndex - selectedIndex;
   for (let i = 0; i < Math.abs(delta); i++) await page.keyboard.press(delta > 0 ? 'ArrowDown' : 'ArrowUp');
   await page.keyboard.press('Enter');
