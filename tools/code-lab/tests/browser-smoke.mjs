@@ -153,6 +153,36 @@ try {
   assert.equal(code, 'отступ', 'stale template response inserted code after the tree was closed');
   assert.equal(await page.locator('.ac-pop').count(), 0, 'Escape did not close the variant tree');
 
+  // A stale variant-search response must not replace results for the newer query.
+  let staleVariantStarted = false;
+  await page.route('**/api/variants**', async route => {
+    const query = new URL(route.request().url()).searchParams.get('q');
+    if (query === 'отступ') {
+      staleVariantStarted = true;
+      await delay(900);
+    }
+    try { await route.continue(); } catch (_) {}
+  });
+  const staleVariantRequest = page.waitForRequest(request =>
+    new URL(request.url()).pathname === '/api/variants' &&
+    new URL(request.url()).searchParams.get('q') === 'отступ',
+    { timeout: 10_000 }
+  );
+  await page.keyboard.press('Control+A');
+  await page.keyboard.type('отступ');
+  await staleVariantRequest;
+  await page.keyboard.press('Control+A');
+  await page.keyboard.type('сетка');
+  await page.waitForFunction(() => {
+    const popup = document.querySelector('.ac-pop');
+    return popup && [...popup.querySelectorAll('.ac-r')].some(row => /grid/i.test(row.dataset.code || ''));
+  }, undefined, { timeout: 15_000 });
+  await delay(1_000);
+  const latestCodes = await page.locator('.ac-pop .ac-r').evaluateAll(rows => rows.map(row => row.dataset.code || ''));
+  assert.ok(staleVariantStarted, 'slow old variant request did not start');
+  assert.ok(latestCodes.some(value => /grid/i.test(value)), 'newer CSS Grid query did not win');
+  assert.ok(!latestCodes.some(value => /margin|padding/i.test(value)), 'stale margin/padding results replaced the newer query');
+
   assert.deepEqual(pageErrors, [], 'browser page raised uncaught errors: ' + pageErrors.join('; '));
   console.log('Browser smoke passed: variant tree, expansion, keyboard insertion, IME and stale-template cancellation.');
 } finally {
