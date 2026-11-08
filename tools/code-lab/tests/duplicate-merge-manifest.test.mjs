@@ -11,19 +11,25 @@ try {
   const outputPath = path.join(tmp, 'manifest.json');
   const report = {
     generatedAt: '2026-11-06T15:00:00.000Z',
-    duplicateReview: [{ count: 2, files: [
-      { file: 'js/пример-mvr123abc.js', id: 'пример-mvr123abc', rawHash: 'same', codeUrls: ['https://example.com/a'], metaUrls: [], metaSummary: {
-        desc: 'Коротко.', tags: [], aliases: [], component: { provides: ['x'] }, wordNotes: [
-          { line: 0, col: 0, text: 'const', kind: 'kw', note: 'Объявляет переменную.', source: 'dict' },
-          { line: 0, col: 0, text: 'const', kind: 'concept', note: 'Ключевое понятие.', source: '' }
-        ], orphanNotes: []
-      } },
-      { file: 'js/пример.js', id: 'пример', rawHash: 'same', codeUrls: [], metaUrls: [], metaSummary: {
-        desc: 'Подробное описание конструкции.', tags: ['основа'], aliases: ['пример'], component: null, wordNotes: [
-          { line: 0, col: 0, text: 'const', kind: 'name', note: 'Объявляет переменную.', source: undefined }
-        ], orphanNotes: []
-      } }
-    ] }]
+    duplicateReview: [
+      { count: 2, files: [
+        { file: 'js/пример-mvr123abc.js', id: 'пример-mvr123abc', hasOwnId: true, rawHash: 'same', codeUrls: ['https://example.com/a'], metaUrls: [], metaSummary: {
+          desc: 'Коротко.', tags: [], aliases: [], component: { provides: ['x'] }, wordNotes: [
+            { line: 0, col: 0, text: 'const', kind: 'kw', note: 'Объявляет переменную.', source: 'dict' },
+            { line: 0, col: 0, text: 'const', kind: 'concept', note: 'Ключевое понятие.', source: '' }
+          ], orphanNotes: []
+        } },
+        { file: 'js/пример.js', id: 'пример', hasOwnId: true, rawHash: 'same', codeUrls: [], metaUrls: [], metaSummary: {
+          desc: 'Подробное описание конструкции.', tags: ['основа'], aliases: ['пример'], component: null, wordNotes: [
+            { line: 0, col: 0, text: 'const', kind: 'name', note: 'Объявляет переменную.', source: undefined }
+          ], orphanNotes: []
+        } }
+      ] },
+      { count: 2, files: [
+        { file: 'js/no-id.js', id: 'no-id', hasOwnId: false, rawHash: 'same-2', codeUrls: [], metaUrls: [], metaSummary: {} },
+        { file: 'js/with-id.js', id: 'with-id', hasOwnId: true, rawHash: 'same-2', codeUrls: [], metaUrls: [], metaSummary: {} }
+      ] }
+    ]
   };
   await fs.writeFile(reportPath, JSON.stringify(report));
   const scriptPath = fileURLToPath(new URL('../scripts/build-duplicate-merge-manifest.mjs', import.meta.url));
@@ -31,8 +37,10 @@ try {
   assert.equal(run.status, 0, run.stderr || run.stdout);
   const manifest = JSON.parse(await fs.readFile(outputPath, 'utf8'));
   const pair = manifest.pairs[0];
-  assert.equal(manifest.summary.pairCount, 1);
-  assert.equal(manifest.summary.identicalCodePairs, 1);
+  assert.equal(manifest.summary.pairCount, 2);
+  assert.equal(manifest.summary.identicalCodePairs, 2);
+  assert.equal(manifest.summary.proposedCanonicalCount, 1);
+  assert.equal(manifest.summary.unresolvedCanonicalCount, 1);
   assert.equal(pair.canonical.id, 'пример');
   assert.equal(pair.legacyIds[0].redirectTo, 'пример');
   assert.equal(pair.proposedFieldMerge.desc.value, 'Подробное описание конструкции.');
@@ -42,7 +50,9 @@ try {
   assert.ok(pair.notes.anchorConflicts[0].sources.includes(''));
   assert.equal(pair.notes.conceptNotes.length, 1);
   assert.equal(pair.urls.union[0], 'https://example.com/a');
-  console.log('duplicate-merge-manifest: 12 checks passed');
+  assert.equal(manifest.pairs[1].canonical, null, 'filename-derived fallback must not become a canonical ID');
+  assert.equal(manifest.pairs[1].status, 'manual-canonical-choice-required');
+  console.log('duplicate-merge-manifest: 14 checks passed');
 } finally {
   await fs.rm(tmp, { recursive: true, force: true });
 }
