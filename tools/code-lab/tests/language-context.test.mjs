@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { makeLook, annotateLines } from '../lib/annotate.mjs';
 import { tokenize } from '../lib/tokenizer.mjs';
 import { analyzeNames } from '../lib/code-names.mjs';
@@ -77,4 +78,28 @@ test('TypeScript-specific method names are known during typo analysis', () => {
     dict: { langs: { ts: { 'client.specialMethod()': 'специальный метод' } } },
   });
   assert.deepEqual(result.typos, []);
+});
+
+
+test('реальный словарь даёт языковые пояснения для одинаковых ключевых слов', () => {
+  const dict = JSON.parse(fs.readFileSync(new URL('../public/keyword-dict.json', import.meta.url), 'utf8'));
+  const py = makeLook('python', dict), js = makeLook('js', dict), sql = makeLook('sql', dict), html = makeLook('html', dict), ts = makeLook('ts', dict);
+  assert.match(py('await'), /coroutine|awaitable/i);
+  assert.doesNotMatch(py('await'), /Promise|промис/i);
+  assert.match(js('await'), /Promise|thenable/i);
+  assert.match(py('for'), /итерируем/);
+  assert.match(js('for'), /инициализацией/);
+  assert.match(py('in'), /принадлеж/);
+  assert.match(js('in'), /свойств/);
+  assert.match(py('from'), /from модуль import/);
+  assert.match(js('from'), /ES import/);
+  assert.match(sql('from'), /источник строк/);
+  assert.match(py('as'), /псевдоним/);
+  assert.match(sql('as'), /псевдоним столбца/);
+  assert.match(py('with'), /контекстный менеджер/);
+  assert.match(sql('with'), /CTE/);
+  assert.match(html('for'), /label/);
+  assert.match(ts('as'), /утверждает тип/);
+  assert.match(py('False'), /Python/);
+  assert.match(js('false'), /JavaScript/);
 });
