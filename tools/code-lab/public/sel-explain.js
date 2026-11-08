@@ -66,6 +66,24 @@
     const c = s.split(/\s*[;(]\s*|\s+—\s+/)[0].trim(); return c.length > 70 ? c.slice(0, 68).replace(/\s+\S*$/, '') + '…' : c; };
   function meaning(term, lang, d){
     const syn = d.synonyms || {}; const lt = term.toLowerCase();
+    if(lang === 'css' && window.CSSShorthands){
+      const shorthand = window.CSSShorthands.get(lt);
+      if(shorthand) return {
+        label: 'краткая форма',
+        path: shorthand.components.join(' + '),
+        note: shorthand.name + ' задаёт ' + shorthand.components.join(' и ') + '. Порядок значений: ' +
+          shorthand.valueOrder.join(' → ') + '. ' + shorthand.notes.join(' '),
+        rel: 'сокращает'
+      };
+      const parent = window.CSSShorthands.forLonghand(lt)[0];
+      if(parent) return {
+        label: 'составляющая краткой формы',
+        path: parent.name,
+        note: lt + ' входит в ' + parent.name + '. Порядок значений: ' +
+          parent.valueOrder.join(' → ') + '. ' + parent.notes.join(' '),
+        rel: 'часть'
+      };
+    }
     const label = Array.isArray(syn[lt]) && syn[lt][0] ? syn[lt][0] : '';
     // разновидность: margin-trim → смысл предка margin («внешний отступ»)
     let path = '';
@@ -118,7 +136,7 @@
       if(!info.note && !info.path && term.includes('.')){ const last = term.split('.').pop(); const i2 = meaning(last, lang, d); if(i2.note || i2.path) info = i2; }
       // связь: ядро языка / правка / начало пояснения; запись «obj.prop =» — всегда «куда», в любом языке
       // (свойство после своего имени приходит без точки: img.src → «src», точка стоит перед ним)
-      let rel = relOf(term, lang, d, info.note);
+      let rel = info.rel || relOf(term, lang, d, info.note);
       if(lang !== 'css' && lang !== 'html' && (term.includes('.') || line[from - 1] === '.') && /^\s*[-+*/]?=(?!=)/.test(line.slice(to))) rel = 'куда';
       if(!info.note && !info.path && !rel) continue;
       out.push({ from, to, text: m[0], ...info, rel, label: info.label || (rel === 'куда' ? 'записать сюда' : '') });
