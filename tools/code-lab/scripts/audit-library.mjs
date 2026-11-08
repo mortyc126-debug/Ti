@@ -96,7 +96,7 @@ for(const file of files){
     }
   }
   const lang=String(meta.lang||extLang[ext]||'').toLowerCase();
-  const look=makeLook(lang,keywordDict);
+  const look=keywordDict?makeLook(lang,keywordDict):()=>null;
   const expected=extLang[ext];
   const notes=Array.isArray(meta.wordNotes)?meta.wordNotes:[];
   const codeLines=code.split('\n');
