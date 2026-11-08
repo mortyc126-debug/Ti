@@ -15,7 +15,6 @@ function dictExplain(word){
   if(l === 'css') {
     if(DICT.cssProps && DICT.cssProps[lw]) return DICT.cssProps[lw];
     if(DICT.cssVals && DICT.cssVals[lw]) return DICT.cssVals[lw];
-    if(DICT.langs && DICT.langs.css && DICT.langs.css[lw]) return DICT.langs.css[lw];
   }
   if(l === 'html') {
     if(DICT.htmlTags && DICT.htmlTags[lw]) return DICT.htmlTags[lw];

@@ -11,7 +11,7 @@ export function makeLook(lang, dict){
     : [dict.langs?.[L === 'htm' ? 'html' : L]];
   return v => {
     const lw = String(v).toLowerCase();
-    if(L === 'css') return PROPS[lw] || VALS[lw] || dict.langs?.css?.[lw] || W[lw] || null;
+    if(L === 'css') return PROPS[lw] || VALS[lw] || W[lw] || null;
     if(L === 'html' || L === 'htm') return TAGS[lw] || ATTRS[lw] || dict.langs?.html?.[lw] || W[lw] || null;
     for(const source of langDicts) if(source && source[lw]) return source[lw];
     return W[lw] || null;
