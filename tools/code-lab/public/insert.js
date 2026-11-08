@@ -186,6 +186,24 @@
     return out;
   }
 
+  function editorSnapshot(ed){
+    const ta = taOf(ed), cm = ta && ta.__cm;
+    const language = (ed && ed.__f && ed.__f.lang) || '';
+    if(!window.CodeLabContext) return { editor: ed, language };
+    if(!cm) return window.CodeLabContext.createSnapshot({
+      editor: ed,
+      language,
+      code: ed && ed.__f ? ed.__f.code || '' : ''
+    });
+    return window.CodeLabContext.createSnapshot({
+      editor: ed,
+      language,
+      code: cm.getValue(),
+      cursor: cm.getCursor('from'),
+      selectedText: cm.somethingSelected() ? cm.getSelection() : ''
+    });
+  }
+
   // Языковые контексты подключаются как адаптеры к общему контракту.
   // Здесь остаётся только распознавание локального синтаксиса; маршрутизация и форма контекста общие.
   if(window.CodeLabContext){
@@ -273,8 +291,9 @@
     if(composing) return;
     const c = wordCtx(ed, force);
     // Контекст сначала разрешается общим ядром; языковые адаптеры отвечают только за распознавание синтаксиса.
+    const snapshot = editorSnapshot(ed);
     const resolved = window.CodeLabContext
-      ? window.CodeLabContext.resolve({ editor: ed, language: (ed && ed.__f && ed.__f.lang) || '' })
+      ? window.CodeLabContext.resolve(snapshot)
       : null;
     const legacyLang = (ed && ed.__f && ed.__f.lang) || '';
     const tc = resolved && resolved.kind === 'html-attribute'
