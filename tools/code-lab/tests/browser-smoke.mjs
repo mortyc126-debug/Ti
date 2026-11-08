@@ -56,10 +56,6 @@ try {
   await cssTab.click();
   await cssEditor.waitFor({ state: 'visible' });
   const cm = cssEditor.locator('.CodeMirror');
-  await page.evaluate(() => {
-    window.__autoEvents = [];
-    document.querySelector('#sbEds').addEventListener('input', event => window.__autoEvents.push({ target: event.target.className, editor: !!event.target.closest('.sb-ed'), value: event.target.value }), true);
-  });
   if (await cm.count() && await cm.isVisible()) {
     await cm.click();
     await page.keyboard.press('Control+A');
@@ -71,19 +67,15 @@ try {
     await textarea.evaluate(el => el.setSelectionRange(el.value.length, el.value.length));
   }
 
-  await delay(300);
-  const autoDebug = await page.evaluate(() => {
-    const ed = document.querySelectorAll('#sbEds .sb-ed')[Array.from(document.querySelectorAll('#sbEds .sb-ed')).findIndex(x => x.querySelector('.sb-lang')?.value === 'css')];
-    const ta = ed && ed.querySelector('textarea'); const cm = ta && ta.__cm;
-    return { acOn: localStorage.getItem('codelab_ac'), speed: localStorage.getItem('codelab_ac_speed'), lang: ed && ed.__f && ed.__f.lang, value: cm ? cm.getValue() : ta && ta.value, hasCM: !!cm, popup: !!document.querySelector('.ac-pop'), inputEvents: window.__autoEvents || [], edsContains: !!(ed && document.querySelector('#sbEds').contains(ed)), pageErrors: window.__errors || [] };
-  });
-  console.log('autocomplete diagnostic:', JSON.stringify(autoDebug));
-
-  const acTrace = await page.evaluate(() => window.__acTrace || []);
-  console.log('autocomplete trace:', JSON.stringify(acTrace));
-  const autoPopupOpened = await page.locator('.ac-pop').count() > 0;
-  if (!autoPopupOpened) await page.keyboard.press('Control+Space');
-  await page.waitForSelector('.ac-pop', { timeout: 5_000 });
+  let autoPopupOpened = false;
+  try {
+    await page.waitForSelector('.ac-pop', { timeout: 5_000 });
+    autoPopupOpened = true;
+  } catch (_) {}
+  if (!autoPopupOpened) {
+    await page.keyboard.press('Control+Space');
+    await page.waitForSelector('.ac-pop', { timeout: 5_000 });
+  }
   assert.ok(autoPopupOpened, 'typing a code token did not open autocomplete automatically');
   const popup = page.locator('.ac-pop');
   const popupCodes = await popup.locator('.ac-r').evaluateAll(rows => rows.map(row => row.dataset.code || ''));
