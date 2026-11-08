@@ -44,9 +44,10 @@ const set=new Set(files);
 const records=[],missingMeta=[],invalidMeta=[],duplicateIds=new Map(),rawHashes=new Map(),normalizedHashes=new Map();
 const noteStats={total:0,orphanTotal:0,concept:0,orphanAlreadyInWordNotes:0,swapped:0,invalid:0,anchored:0,uniqueToken:0,multipleTokens:0,composite:0,absent:0,empty:0};
 const noteCases=[],conceptNotes=[];
-const dictionaryNoteStats={total:0,matched:0,stale:0,missing:0};
+const dictionaryNoteStats={available:false,total:0,matched:0,stale:0,missing:0};
 const dictionaryNoteCases=[];
-const keywordDict=JSON.parse(await fs.readFile(path.resolve('tools/code-lab/public/keyword-dict.json'),'utf8'));
+let keywordDict=null;
+try{keywordDict=JSON.parse(await fs.readFile(new URL('../public/keyword-dict.json',import.meta.url),'utf8'));dictionaryNoteStats.available=true;}catch{}
 const viewCodeStats={eligible:0,exact:0,formatOnly:0,mismatch:0,missing:0};
 const viewCodeCases=[];
 const extLang={js:'js',mjs:'js',cjs:'js',jsx:'js',ts:'ts',tsx:'ts',py:'python',html:'html',htm:'html',css:'css',svg:'svg',json:'json',sql:'sql',rb:'ruby',php:'php',go:'go',lua:'lua',sh:'sh',bash:'bash',ps1:'powershell',r:'r',pl:'perl',txt:'txt'};
@@ -111,7 +112,7 @@ for(const file of files){
     const swapped=tokenKinds.has(note.note)&&typeof note.kind==='string'&&!tokenKinds.has(note.kind);
     if(swapped) noteStats.swapped++;
     const explanation=swapped?note.kind:note.note;
-    if(note.source==='dict'){
+    if(note.source==='dict'&&keywordDict){
       dictionaryNoteStats.total++;
       const current=look(note.text);
       if(!current){dictionaryNoteStats.missing++;dictionaryNoteCases.push({file:rel,id,text:note.text,lang,classification:'dictionary-entry-missing',storedExplanation:explanation});}
