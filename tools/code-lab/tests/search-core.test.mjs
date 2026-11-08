@@ -507,5 +507,5 @@ test('сохраняет связанные фрагменты HTML, CSS и JS �
   assert.deepEqual(new Set(linked.map(piece => piece.lang)), new Set(['html', 'css', 'js']));
   assert.ok(linked.some(piece => piece.id === 'css-grid'));
   assert.ok(linked.some(piece => piece.id === 'html-button'));
-  assert.ok(linked.some(piece => piece.id === 'js-fetch'));
+  assert.ok(linked.some(piece => piece.id === 'js-fetch'), 'fetch fragment missing: ' + JSON.stringify(result.pieces.map(piece => ({ id: piece.id, lang: piece.lang, targets: piece.matchedTargets }))));
 });
