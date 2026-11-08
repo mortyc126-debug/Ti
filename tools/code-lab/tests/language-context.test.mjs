@@ -103,7 +103,7 @@ test('реальный словарь даёт языковые пояснени
   assert.match(py('with'), /контекстный менеджер/);
   assert.match(sql('with'), /CTE/);
   assert.match(html('for'), /label/);
-  assert.match(ts('as'), /утверждает тип/);
+  assert.match(ts('as'), /утверждение типа|приводит выражение/);
   assert.match(py('False'), /Python/);
   assert.match(js('false'), /JavaScript/);
 });
