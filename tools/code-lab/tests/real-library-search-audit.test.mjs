@@ -196,6 +196,7 @@ async function main() {
     assert.ok(compositionRootLanguages.has(language), 'дерево одной задачи должно содержать корни языка ' + language);
     assert.ok(compositionPieceLanguages.has(language), 'связанные фрагменты одной задачи должны содержать язык ' + language + '; languages=' + JSON.stringify([...compositionPieceLanguages]) + '; pieces=' + JSON.stringify(compositionResult.pieces.map(piece => ({ title: piece.title, lang: piece.lang, targets: piece.matchedTargets }))));
   }
+  assert.ok(compositionResult.pieces.slice(0, 10).some(piece => piece.lang === 'css' && (piece.matchedTargets || []).includes('grid')), 'связанный CSS Grid-фрагмент должен попадать в первую десятку');
   assert.ok(compositionTargetKeys.has('promise.all'), 'два источника должны связываться с параллельным ожиданием Promise.all');
 
   const taskTerms = query => {
