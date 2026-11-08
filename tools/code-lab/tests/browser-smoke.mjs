@@ -79,6 +79,8 @@ try {
   });
   console.log('autocomplete diagnostic:', JSON.stringify(autoDebug));
 
+  const acTrace = await page.evaluate(() => window.__acTrace || []);
+  console.log('autocomplete trace:', JSON.stringify(acTrace));
   const autoPopupOpened = await page.locator('.ac-pop').count() > 0;
   if (!autoPopupOpened) await page.keyboard.press('Control+Space');
   await page.waitForSelector('.ac-pop', { timeout: 5_000 });
