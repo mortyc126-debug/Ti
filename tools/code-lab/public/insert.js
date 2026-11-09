@@ -244,7 +244,7 @@
     window.CodeLabContext.register({
       id: 'css-syntax',
       languages: ['css'],
-      contexts: ['css-value', 'css-property', 'css-selector', 'css-function-argument', 'css-comment', 'css-string'],
+      contexts: ['css-value', 'css-property', 'css-selector', 'css-selector-argument', 'css-function-argument', 'css-comment', 'css-string'],
       priority: 120,
       resolve: snapshot => {
         const raw = window.CSSContext.resolve(snapshot);
@@ -336,6 +336,16 @@
     return window.CSSCandidates.variables(code, context && context.prefix);
   }
 
+  async function cssFunctionRoots(context){
+    if(!window.CSSCandidates || !window.codelabKwDict) return [];
+    const dictionary = await window.codelabKwDict('css');
+    return window.CSSCandidates.functionArguments(
+      dictionary,
+      context && context.functionName,
+      context && context.prefix
+    );
+  }
+
   async function htmlTagRoots(context){
     if(!window.HTMLCandidates || !window.codelabKwDict) return [];
     const dictionary = await window.codelabKwDict('html');
@@ -405,7 +415,18 @@
         return;
       }
     }
-    if(resolved && resolved.kind === 'css-selector' && [':', '@', '.', '#', '['].some(mark => String(resolved.prefix || '').startsWith(mark))){
+    if(resolved && resolved.kind === 'css-function-argument'){
+      const myFunction = ++seq, roots = await cssFunctionRoots(resolved);
+      if(myFunction !== seq) return;
+      if(roots.length){
+        const actions = editorActions(ed, resolved.prefix);
+        ctx = Object.assign({}, c || {}, actions, { ed, syntaxContext: resolved });
+        render(ctx, rankRoots(roots, resolved));
+        return;
+      }
+    }
+    if(resolved && (resolved.kind === 'css-selector-argument' ||
+        (resolved.kind === 'css-selector' && [':', '@', '.', '#', '['].some(mark => String(resolved.prefix || '').startsWith(mark)))){
       const mySelector = ++seq, roots = await cssSelectorRoots(resolved);
       if(mySelector !== seq) return;
       if(roots.length){
