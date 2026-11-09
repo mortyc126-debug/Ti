@@ -46,18 +46,39 @@
       }));
   }
 
+  function maskCommentsAndStrings(code) {
+    let out = '', quote = '', comment = false, escaped = false;
+    for (let i = 0; i < code.length; i++) {
+      const ch = code[i], next = code[i + 1];
+      if (comment) {
+        if (ch === '*' && next === '/') { out += '  '; i++; comment = false; }
+        else out += ch === '\n' ? '\n' : ' ';
+        continue;
+      }
+      if (quote) {
+        out += ch === '\n' ? '\n' : ' ';
+        if (escaped) escaped = false;
+        else if (ch === '\\') escaped = true;
+        else if (ch === quote) quote = '';
+        continue;
+      }
+      if (ch === '/' && next === '*') { out += '  '; i++; comment = true; continue; }
+      if (ch === '"' || ch === "'") { quote = ch; out += ' '; continue; }
+      out += ch;
+    }
+    return out;
+  }
+
   function variables(code, prefix) {
-    const query = String(prefix || '').trim().toLowerCase();
-    if (!query.startsWith('--')) return [];
-    const source = String(code || '')
-      .replace(/\/\*[\s\S]*?\*\//g, ' ')
-      .replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g, ' ');
+    const rawPrefix = String(prefix || '').trim();
+    if (!rawPrefix.startsWith('--')) return [];
+    const source = maskCommentsAndStrings(String(code || ''));
     const names = new Set();
     const pattern = /(--[a-z0-9_-]+)\s*:/gi;
     let match;
     while ((match = pattern.exec(source))) names.add(match[1]);
     return Array.from(names)
-      .filter(name => name.startsWith(String(prefix || '').trim()))
+      .filter(name => name.startsWith(rawPrefix))
       .sort()
       .map(name => ({
         code: name,
