@@ -193,7 +193,7 @@
     btn.onmousedown = e => e.preventDefault(); btn.onclick = open; document.body.appendChild(btn);
   }
   let pendingCssTransform = null;
-  function cssShorthandPreview(selection, fullCode, cursor){
+  function cssShorthandPreview(selection, fullCode, cursor, canApply){
     pendingCssTransform = null;
     if(!window.CSSShorthands || !selection) return '';
     const source = String(selection);
@@ -208,13 +208,13 @@
       if(!result.ok) return '';
       const preview = Object.entries(result.declarations)
         .map(([property, value]) => property + ': ' + value + ';').join('\n');
-      const start = window.CSSContext.offsetAt(String(fullCode || ''), cursor);
+      const start = window.CSSContext && cursor ? window.CSSContext.offsetAt(String(fullCode || ''), cursor) : -1;
       const leading = source.slice(0, source.indexOf(text));
       const trailing = source.slice(source.indexOf(text) + text.length);
-      pendingCssTransform = { source, full: String(fullCode || ''), start, end: start + source.length,
-        replacement: leading + preview, trailing };
-      return '<div class="se-transform"><b>развёрнутый вариант (предпросмотр)</b><pre>' + esc(preview) +
-        '</pre><button type="button" data-css-apply>Применить в редакторе</button></div>';
+      if(canApply && start >= 0) pendingCssTransform = { source, full: String(fullCode || ''), start, end: start + source.length,
+        replacement: leading + preview + trailing };
+      return '<div class="se-transform"><b>развёрнутый вариант (предпросмотр)</b><pre>' + esc(preview) + '</pre>' +
+        (pendingCssTransform ? '<button type="button" data-css-apply>Применить в редакторе</button>' : '') + '</div>';
     }
 
     const lines = source.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
@@ -232,10 +232,10 @@
     const replacement = result.shorthand + ': ' + result.value + ';';
     const leading = source.match(/^\\s*/)?.[0] || '';
     const trailing = source.match(/\\s*$/)?.[0] || '';
-    pendingCssTransform = { source, full, start: offset, end: offset + source.length,
+    if(canApply) pendingCssTransform = { source, full, start: offset, end: offset + source.length,
       replacement: leading + replacement + trailing };
-    return '<div class="se-transform"><b>краткая форма (предпросмотр)</b><pre>' +
-      esc(replacement) + '</pre><button type="button" data-css-apply>Применить в редакторе</button></div>';
+    return '<div class="se-transform"><b>краткая форма (предпросмотр)</b><pre>' + esc(replacement) + '</pre>' +
+      (pendingCssTransform ? '<button type="button" data-css-apply>Применить в редакторе</button>' : '') + '</div>';
   }
 
   async function open(){
@@ -285,7 +285,7 @@
         + (s.own && cm ? '<a data-go="' + s.own.line + '">к объявлению</a>' : '')
         + ruleOf(s.text).map(x => '<div class="r">' + esc(x) + '</div>').join('') + '</div>').join('');
     panel.innerHTML = '<div class="se-h"><b>что здесь</b><span>' + esc(lang.toUpperCase()) + '</span><button title="закрыть (Esc)">×</button></div>'
-      + '<div class="se-b">' + (all.length ? body + flow + '<div class="se-list">' + list + '</div>' : '<div class="se-none">в выделенном нет слов из словаря — выдели кусок побольше или добавь пояснения в словарь</div>') + cssShorthandPreview(selectedText, fullCode, selectionCursor) + '</div>';
+      + '<div class="se-b">' + (all.length ? body + flow + '<div class="se-list">' + list + '</div>' : '<div class="se-none">в выделенном нет слов из словаря — выдели кусок побольше или добавь пояснения в словарь</div>') + cssShorthandPreview(selectedText, fullCode, selectionCursor, !!cm) + '</div>';
     document.body.appendChild(panel);
     layout(panel);
     panel.querySelector('.se-h button').onclick = () => { panel.remove(); panel = null; };
