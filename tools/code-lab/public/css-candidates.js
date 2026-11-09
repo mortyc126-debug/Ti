@@ -28,10 +28,11 @@
   function selectors(dictionary, prefix) {
     const query = String(prefix || '').trim().toLowerCase();
     if (!query) return [];
-    const source = Object.assign({}, dictionary && dictionary.words || {}, dictionary && dictionary.langs && dictionary.langs.css || {});
+    const tagNames = new Set(Object.keys(dictionary && dictionary.htmlTags || {}));
+    const source = Object.assign({}, dictionary && dictionary.htmlTags || {}, dictionary && dictionary.words || {}, dictionary && dictionary.langs && dictionary.langs.css || {});
     const selectorPattern = /^(?:@[a-z][\w-]*|::?[a-z][\w-]*(?:\([^)]*\))?|[.#][\w-]+|\[[^\]]+\])$/i;
     return Object.entries(source)
-      .filter(([name, explanation]) => selectorPattern.test(name) &&
+      .filter(([name, explanation]) => (selectorPattern.test(name) || tagNames.has(name)) &&
         name.toLowerCase().startsWith(query) && typeof explanation === 'string')
       .map(([name, explanation]) => ({
         code: name,
@@ -39,7 +40,7 @@
         label: 'селектор',
         note: cleanExplanation(name, explanation),
         expected: 'selector',
-        contexts: ['css-selector'],
+        contexts: ['css-selector', 'css-selector-argument'],
         languages: ['css'],
         children: []
       }));
