@@ -64,3 +64,25 @@ test('CSS selector context retains pseudo-class punctuation in the completion pr
   assert.equal(result.kind, 'css-selector');
   assert.equal(result.prefix, ':ho');
 });
+
+
+test('CSS selector-list pseudo-functions expose selector argument context', () => {
+  const result = CSSContext.resolve(atEnd('.card:has(> .ic'));
+  assert.equal(result.kind, 'css-selector-argument');
+  assert.equal(result.expected, 'selector');
+  assert.equal(result.functionName, 'has');
+  assert.equal(result.prefix, '.ic');
+  assert.equal(result.argumentIndex, 0);
+});
+
+test('CSS nth-child and direction pseudo-functions retain argument context', () => {
+  const nth = CSSContext.resolve(atEnd(':nth-child(od'));
+  assert.equal(nth.kind, 'css-function-argument');
+  assert.equal(nth.functionName, 'nth-child');
+  assert.equal(nth.prefix, 'od');
+
+  const direction = CSSContext.resolve(atEnd(':dir(rt'));
+  assert.equal(direction.kind, 'css-function-argument');
+  assert.equal(direction.functionName, 'dir');
+  assert.equal(direction.prefix, 'rt');
+});
