@@ -615,6 +615,39 @@ try {
   );
   assert.ok(sqlSelectRows.length && sqlConditionRows.length && sqlSourceRows.length && sqlAliasRows.length,
     'SQL clause or table-alias candidate lists unexpectedly returned no rows');
+
+  await htmlEditor.evaluate(ed => {
+    const cm = ed.querySelector('textarea')?.__cm;
+    ed.__f.lang = 'sql';
+    cm.setValue('SELECT u.id FROM users AS u WHERE ');
+    const line = cm.lastLine();
+    cm.setCursor({ line, ch: cm.getLine(line).length });
+    cm.focus();
+  });
+  await page.keyboard.press('Control+Space');
+  await page.waitForFunction(() => [...document.querySelectorAll('.ac-pop .ac-r')]
+    .some(row => row.dataset.code === 'u.'));
+  const aliasPopup = page.locator('.ac-pop');
+  const aliasInsertIndex = await aliasPopup.locator('.ac-r').evaluateAll(rows => {
+    const visible = rows.filter(row => row.offsetParent !== null);
+    return visible.findIndex(row => row.dataset.code === 'u.');
+  });
+  assert.ok(aliasInsertIndex >= 0, 'SQL alias candidate was not selectable');
+  const aliasSelectedIndex = await aliasPopup.locator('.ac-r').evaluateAll(rows => {
+    const visible = rows.filter(row => row.offsetParent !== null);
+    return visible.indexOf(visible.find(row => row.classList.contains('sel')));
+  });
+  assert.ok(aliasSelectedIndex >= 0, 'SQL alias popup has no keyboard selection');
+  const aliasDelta = aliasInsertIndex - aliasSelectedIndex;
+  for (let i = 0; i < Math.abs(aliasDelta); i++) {
+    await page.keyboard.press(aliasDelta > 0 ? 'ArrowDown' : 'ArrowUp');
+  }
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => !document.querySelector('.ac-pop'));
+  const sqlAfterAliasInsert = await htmlEditor.evaluate(ed => ed.__f.code);
+  assert.match(sqlAfterAliasInsert, /WHERE\\s+u\\.$/,
+    'Selecting the explained SQL alias candidate did not insert its qualifier');
+
   await htmlEditor.evaluate(ed => { ed.__f.lang = 'html'; });
 
   assert.deepEqual(pageErrors, [], 'browser page raised uncaught errors: ' + pageErrors.join('; '));
