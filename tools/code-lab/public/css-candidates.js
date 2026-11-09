@@ -91,7 +91,43 @@
       }));
   }
 
-  const api = { properties, selectors, variables, cleanExplanation };
+
+  const functionArgumentNames = new Set([
+    'nth-child', 'nth-last-child', 'nth-of-type', 'nth-last-of-type', 'dir', 'lang'
+  ]);
+
+  function functionArguments(dictionary, functionName, prefix) {
+    const name = String(functionName || '').trim().toLowerCase();
+    if (!functionArgumentNames.has(name)) return [];
+    const query = String(prefix || '').trim().toLowerCase();
+    const source = Object.assign({}, dictionary && dictionary.cssVals || {},
+      dictionary && dictionary.langs && dictionary.langs.css || {});
+    const pattern = new RegExp('^:' + name.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\  const api = { properties, selectors, variables, cleanExplanation };') + '\\(([^()]*)\\)
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (root) root.CSSCandidates = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+, 'i');
+    return Object.entries(source)
+      .map(([key, explanation]) => {
+        const match = key.match(pattern);
+        return match && typeof explanation === 'string'
+          ? { code: match[1].trim(), explanation }
+          : null;
+      })
+      .filter(item => item && (!query || item.code.toLowerCase().startsWith(query)))
+      .map(item => ({
+        code: item.code,
+        lang: 'css',
+        label: 'аргумент псевдокласса',
+        note: cleanExplanation(':' + name + '(' + item.code + ')', item.explanation),
+        expected: 'function-argument',
+        contexts: ['css-function-argument'],
+        languages: ['css'],
+        children: []
+      }));
+  }
+
+  const api = { properties, selectors, variables, functionArguments, cleanExplanation };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.CSSCandidates = api;
 })(typeof window !== 'undefined' ? window : globalThis);
