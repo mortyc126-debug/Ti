@@ -47,7 +47,8 @@ try {
   await page.waitForFunction(() => {
     const api = window.CodeLabContext;
     return api && api.listProviders().some(provider => provider.id === 'call-arguments') &&
-      api.listProviders().some(provider => provider.id === 'html-attributes');
+      api.listProviders().some(provider => provider.id === 'html-attributes') &&
+      api.listProviders().some(provider => provider.id === 'html-tags');
   }, undefined, { timeout: 15_000 });
   const registeredAdapters = await page.evaluate(() => window.CodeLabContext.listProviders());
   assert.ok(registeredAdapters.some(provider => provider.contexts?.includes('css-value')),
@@ -323,6 +324,38 @@ try {
   assert.ok(staleVariantStarted, 'slow old variant request did not start');
   assert.ok(latestCodes.some(value => /padding/i.test(value)), 'newer CSS padding query did not win');
   assert.ok(!latestCodes.some(value => /margin/i.test(value)), 'stale margin results replaced the newer padding query');
+
+  const htmlIndex = await page.locator('#sbEds .sb-ed').evaluateAll(eds =>
+    eds.findIndex(ed => ed.querySelector('.sb-lang')?.value === 'html')
+  );
+  assert.ok(htmlIndex >= 0, 'default HTML editor was not created');
+  const htmlEditor = page.locator('#sbEds .sb-ed').nth(htmlIndex);
+  await page.locator('#sbTabs .sb-tab').filter({ hasText: 'index.html' }).first().click();
+  await htmlEditor.waitFor({ state: 'visible' });
+  const htmlCm = htmlEditor.locator('.CodeMirror');
+  if (await htmlCm.count() && await htmlCm.isVisible()) {
+    await htmlCm.click();
+    await page.keyboard.press('Control+A');
+    await page.keyboard.type('<di');
+  } else {
+    const htmlTextarea = htmlEditor.locator('textarea.sb-code');
+    await htmlTextarea.fill('<di');
+    await htmlTextarea.evaluate(el => el.setSelectionRange(el.value.length, el.value.length));
+    await page.keyboard.press('Control+Space');
+  }
+  await page.waitForFunction(() => {
+    const popup = document.querySelector('.ac-pop');
+    return popup && [...popup.querySelectorAll('.ac-r')].some(row => row.dataset.code === 'div');
+  }, undefined, { timeout: 10_000 });
+  const tagRows = await page.locator('.ac-pop .ac-r').evaluateAll(rows =>
+    rows.filter(row => row.dataset.code).map(row => ({
+      code: row.dataset.code,
+      note: row.querySelector('.ac-d')?.textContent || ''
+    }))
+  );
+  assert.ok(tagRows.some(row => row.code === 'div' && /контейнер/.test(row.note)),
+    'HTML tag context did not offer the Russian-explained div element');
+  await page.keyboard.press('Escape');
 
   assert.deepEqual(pageErrors, [], 'browser page raised uncaught errors: ' + pageErrors.join('; '));
   console.log('Browser smoke passed: variant tree, expansion, keyboard insertion, IME and stale-template cancellation.');
