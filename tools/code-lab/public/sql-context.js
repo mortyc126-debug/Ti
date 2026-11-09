@@ -17,7 +17,7 @@
     const before = code.slice(0, offset);
 
     let depth = 0, quote = '', quoteAt = -1, lineComment = false, blockComment = false;
-    const stack = [], tokens = [];
+    const stack = [], tokens = [], statementBreaks = [];
     for (let i = 0; i < before.length; i++) {
       const c = before[i], next = before[i + 1];
       if (lineComment) {
@@ -66,7 +66,8 @@
     const prefix = prefixMatch ? prefixMatch[0] : '';
     const tokenStart = offset - prefix.length;
     const currentDepth = depth;
-    const relevant = tokens.filter(token => token.depth <= currentDepth);
+    const lastBreak = statementBreaks.filter(item => item.depth <= currentDepth).at(-1)?.offset ?? -1;
+    const relevant = tokens.filter(token => token.depth <= currentDepth && token.start > lastBreak);
     let clause = 'statement';
     for (let i = 0; i < relevant.length; i++) {
       const word = relevant[i].word;
