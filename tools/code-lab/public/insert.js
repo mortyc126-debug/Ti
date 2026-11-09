@@ -121,7 +121,7 @@
     const lt = before.lastIndexOf('<'), gt = before.lastIndexOf('>');
     if(lt < 0 || lt < gt) return null;
     const tail = before.slice(lt);
-    const match = tail.match(/^<\\/?([a-z][\\w-]*)?$/i);
+    const match = tail.match(/^<\/?([a-z][\w-]*)?$/i);
     if(!match) return null;
     const prefix = match[1] || '';
     return Object.assign({
