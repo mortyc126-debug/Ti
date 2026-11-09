@@ -177,6 +177,32 @@ try {
       return preview && /place-items: center end;/.test(preview.textContent || '');
     }, undefined, { timeout: 10_000 });
     await page.locator('.se .se-h button').click();
+
+    await cm.click();
+    await page.keyboard.press('Control+A');
+    await page.keyboard.type('.card {\\n  align-items: center;\\n  justify-items: end;\\n  align-items: start;\\n}');
+    await cssEditor.evaluate(ed => {
+      const editor = ed.querySelector('textarea')?.__cm;
+      editor.setSelection({ line: 1, ch: 2 }, { line: 2, ch: 21 });
+    });
+    await page.evaluate(async () => { await window.codelabSelExplain.open(); });
+    await page.waitForSelector('.se', { timeout: 10_000 });
+    assert.equal(await page.locator('.se-transform').count(), 0,
+      'CSS shorthand collapse preview ignored a duplicate declaration in the same rule');
+    await page.locator('.se .se-h button').click();
+
+    await cm.click();
+    await page.keyboard.press('Control+A');
+    await page.keyboard.type('.card { place-items: left; }');
+    await cssEditor.evaluate(ed => {
+      const editor = ed.querySelector('textarea')?.__cm;
+      editor.setSelection({ line: 0, ch: 8 }, { line: 0, ch: 26 });
+    });
+    await page.evaluate(async () => { await window.codelabSelExplain.open(); });
+    await page.waitForSelector('.se', { timeout: 10_000 });
+    assert.equal(await page.locator('.se-transform').count(), 0,
+      'CSS shorthand expansion preview accepted a value invalid for align-items');
+    await page.locator('.se .se-h button').click();
   }
   if (await cm.count() && await cm.isVisible()) {
     await cm.click();
