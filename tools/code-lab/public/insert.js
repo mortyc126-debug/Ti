@@ -426,7 +426,7 @@
       }
     }
     if(resolved && (resolved.kind === 'css-selector-argument' ||
-        (resolved.kind === 'css-selector' && [':', '@', '.', '#', '['].some(mark => String(resolved.prefix || '').startsWith(mark)))){
+        (resolved.kind === 'css-selector' && [':', '@', '.', '#', '['].some(mark => String(resolved.prefix || '').startsWith(mark))))){
       const mySelector = ++seq, roots = await cssSelectorRoots(resolved);
       if(mySelector !== seq) return;
       if(roots.length){
