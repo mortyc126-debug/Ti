@@ -29,19 +29,20 @@
     const entries = dictionary && dictionary.langs && dictionary.langs.sql || {};
     const prefix = String(context.prefix || '').toLowerCase();
     const cteNames = context.kind === 'sql-table-source' ? ctes(code) : [];
-    const keys = [...choices[context.kind]];
-    if (cteNames.length) keys.unshift(...cteNames.map(name => name.toLowerCase()));
+    const items = choices[context.kind].map(key => ({ key, code: key.toUpperCase() }));
+    if (cteNames.length) items.unshift(...cteNames.map(name => ({ key: name.toLowerCase(), code: name, cte: true })));
     const seen = new Set();
-    return keys.filter(key => {
-      const hasExplanation = Boolean(entries[key]) || cteNames.some(name => name.toLowerCase() === key);
-      if (!hasExplanation || seen.has(key) || (prefix && !key.toLowerCase().startsWith(prefix))) return false;
-      seen.add(key);
+    return items.filter(item => {
+      const hasExplanation = Boolean(entries[item.key]) || item.cte === true;
+      if (!hasExplanation || seen.has(item.key) || (prefix && !item.key.startsWith(prefix))) return false;
+      seen.add(item.key);
       return true;
-    }).map(key => {
+    }).map(item => {
+      const key = item.key;
       const note = entries[key] || 'Объявленный CTE — именованный результат запроса.';
       const isFunction = ['count','sum','avg','min','max','coalesce','nullif','concat','lower','upper','length','substring','round'].includes(key);
       return {
-        code: key.toUpperCase(),
+        code: item.code,
         lang: 'sql',
         label: isFunction ? 'функция' : 'SQL',
         note,
