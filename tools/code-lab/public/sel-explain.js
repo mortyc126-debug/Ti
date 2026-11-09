@@ -189,10 +189,25 @@
     btn.style.left = Math.min(x + 8, innerWidth - 120) + 'px'; btn.style.top = Math.min(y + 6, innerHeight - 40) + 'px';
     btn.onmousedown = e => e.preventDefault(); btn.onclick = open; document.body.appendChild(btn);
   }
+  function cssShorthandPreview(selection){
+    if(!window.CSSShorthands || !selection) return '';
+    const match = String(selection).trim().match(/^(place-items|place-content|place-self)\\s*:\\s*([a-z-]+(?:\\s+[a-z-]+)?)\\s*;?$/i);
+    if(!match) return '';
+    const values = match[2].trim().split(/\\s+/);
+    const simple = new Set(['normal','stretch','center','start','end','self-start','self-end','flex-start','flex-end','baseline','space-between','space-around','space-evenly','left','right','auto']);
+    if(values.some(value => !simple.has(value.toLowerCase()))) return '';
+    const result = window.CSSShorthands.expand(match[1], values);
+    if(!result.ok) return '';
+    const preview = Object.entries(result.declarations)
+      .map(([property, value]) => property + ': ' + value + ';').join('\\n');
+    return '<div class="se-transform"><b>развёрнутый вариант (предпросмотр)</b><pre>' + esc(preview) + '</pre></div>';
+  }
+
   async function open(){
     hideBtn();
     const { cm, ta, lang } = activeCM();
-    let text = cm ? cm.getSelection() : (ta ? ta.value.slice(ta.selectionStart, ta.selectionEnd) : '');
+    const selectedText = cm ? cm.getSelection() : (ta ? ta.value.slice(ta.selectionStart, ta.selectionEnd) : '');
+    let text = selectedText;
     let base = cm ? cm.getCursor('from').line : 0;
     if(!text.trim() && cm){ const c = cm.getCursor(); text = cm.getLine(c.line); base = c.line; }   // без выделения — текущая строка
     // выделение с середины строки: дописываем начало, иначе номера и позиции съедут
@@ -233,7 +248,7 @@
         + (s.own && cm ? '<a data-go="' + s.own.line + '">к объявлению</a>' : '')
         + ruleOf(s.text).map(x => '<div class="r">' + esc(x) + '</div>').join('') + '</div>').join('');
     panel.innerHTML = '<div class="se-h"><b>что здесь</b><span>' + esc(lang.toUpperCase()) + '</span><button title="закрыть (Esc)">×</button></div>'
-      + '<div class="se-b">' + (all.length ? body + flow + '<div class="se-list">' + list + '</div>' : '<div class="se-none">в выделенном нет слов из словаря — выдели кусок побольше или добавь пояснения в словарь</div>') + '</div>';
+      + '<div class="se-b">' + (all.length ? body + flow + '<div class="se-list">' + list + '</div>' : '<div class="se-none">в выделенном нет слов из словаря — выдели кусок побольше или добавь пояснения в словарь</div>') + cssShorthandPreview(selectedText) + '</div>';
     document.body.appendChild(panel);
     layout(panel);
     panel.querySelector('.se-h button').onclick = () => { panel.remove(); panel = null; };
