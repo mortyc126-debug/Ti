@@ -55,7 +55,7 @@
     const currentLine = code.slice(Math.max(code.lastIndexOf('\n', end - 1) + 1, 0), end);
     const prefixOf = value => (String(value || '').match(/[-_a-zA-Z0-9]*$/) || [''])[0];
     const selectorPrefixOf = value => {
-      const match = String(value || '').match(/(?:^|[\\s>+~,(])((?:::?|[.#@])?[-_a-zA-Z0-9]*)$/);
+      const match = String(value || '').match(/(?:^|[\s>+~,(])((?:::?|[.#@])?[-_a-zA-Z0-9]*)$/);
       return match ? match[1] : prefixOf(value);
     };
 
