@@ -75,13 +75,27 @@
 
     if (parens.length) {
       const active = parens[parens.length - 1];
+      const argumentText = code.slice(active.open + 1, end);
+      const selectorFunctions = new Set(['is', 'where', 'not', 'has', 'host', 'host-context', 'slotted']);
+      if (selectorFunctions.has(active.name)) {
+        return {
+          kind: 'css-selector-argument',
+          expected: 'selector',
+          functionName: active.name,
+          symbol: ':' + active.name,
+          argumentIndex: active.index,
+          prefix: selectorPrefixOf(argumentText),
+          sourceRange: { from: active.open + 1, to: end },
+          constraints: { selectorFunction: active.name, selectorList: true }
+        };
+      }
       return {
         kind: 'css-function-argument',
         expected: 'function-argument',
         functionName: active.name,
         symbol: active.name,
         argumentIndex: active.index,
-        prefix: prefixOf(code.slice(active.open + 1, end)),
+        prefix: prefixOf(argumentText),
         sourceRange: { from: active.open + 1, to: end }
       };
     }
