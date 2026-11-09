@@ -584,8 +584,11 @@ try {
   const sqlSourceRows = await runSqlAutocomplete('SELECT * FROM users JOIN ', row =>
     row.code === 'JOIN' && /соединяет строки двух таблиц/.test(row.note)
   );
-  assert.ok(sqlSelectRows.length && sqlConditionRows.length && sqlSourceRows.length,
-    'SQL clause candidate lists unexpectedly returned no rows');
+  const sqlAliasRows = await runSqlAutocomplete('SELECT u.id FROM users AS u WHERE u.', row =>
+    row.code === 'u.' && /users/.test(row.note)
+  );
+  assert.ok(sqlSelectRows.length && sqlConditionRows.length && sqlSourceRows.length && sqlAliasRows.length,
+    'SQL clause or table-alias candidate lists unexpectedly returned no rows');
   await htmlEditor.evaluate(ed => { ed.__f.lang = 'html'; });
 
   assert.deepEqual(pageErrors, [], 'browser page raised uncaught errors: ' + pageErrors.join('; '));
