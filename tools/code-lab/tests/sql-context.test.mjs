@@ -47,3 +47,10 @@ test('SQL line comments end at a newline and CRLF offsets remain correct', () =>
 test('SQL context ignores non-SQL languages', () => {
   assert.equal(resolve('SELECT name', 'javascript'), null);
 });
+
+
+test('SQL clause detection resets after a statement separator', () => {
+  const result = resolve('SELECT old_name FROM old_table; SELECT ne');
+  assert.equal(result.kind, 'sql-select-list');
+  assert.equal(result.prefix, 'ne');
+});
