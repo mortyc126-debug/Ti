@@ -114,6 +114,25 @@
     const start = Math.max(0, cursor.line - (lineWindow || cursor.line));
     return lines.slice(start, cursor.line).concat(String(lines[cursor.line] || '').slice(0, cursor.ch)).join('\n');
   }
+  function tagNameCtx(snapshot){
+    const ed = snapshot.editor;
+    if(snapshot.selectedText) return null;
+    const before = String(snapshot.beforeCursor || '');
+    const lt = before.lastIndexOf('<'), gt = before.lastIndexOf('>');
+    if(lt < 0 || lt < gt) return null;
+    const tail = before.slice(lt);
+    const match = tail.match(/^<\\/?([a-z][\\w-]*)?$/i);
+    if(!match) return null;
+    const prefix = match[1] || '';
+    return Object.assign({
+      kind: 'html-tag',
+      expected: 'tag-name',
+      prefix,
+      closing: tail.startsWith('</'),
+      sourceRange: { from: before.length - prefix.length, to: before.length }
+    }, editorActions(ed, prefix));
+  }
+
   function tagCtx(snapshot){
     const ed = snapshot.editor, ta = taOf(ed), cm = ta && ta.__cm; if(!cm) return null;
     // выделено «…» из шаблона — подсказываем, чем его заменить
@@ -246,6 +265,13 @@
 
   if(window.CodeLabContext){
     window.CodeLabContext.register({
+      id: 'html-tags',
+      languages: ['html', 'svg'],
+      contexts: ['html-tag'],
+      priority: 110,
+      resolve: snapshot => tagNameCtx(snapshot)
+    });
+    window.CodeLabContext.register({
       id: 'html-attributes',
       languages: ['html', 'svg'],
       contexts: ['html-attribute'],
@@ -310,6 +336,12 @@
     return window.CSSCandidates.variables(code, context && context.prefix);
   }
 
+  async function htmlTagRoots(context){
+    if(!window.HTMLCandidates || !window.codelabKwDict) return [];
+    const dictionary = await window.codelabKwDict('html');
+    return window.HTMLCandidates.tags(dictionary, context && context.prefix);
+  }
+
   // запасной путь: слова словаря по началу («quer» → querySelector), если дерева нет
   function flatFallback(word, d, lang){
     const lq = word.toLowerCase(); const out = []; const seen = new Set();
@@ -353,6 +385,16 @@
       ? window.CodeLabContext.resolve(snapshot)
       : null;
     if(resolved && resolved.suppressAutocomplete){ hide(); return; }
+    if(resolved && resolved.kind === 'html-tag' && resolved.prefix){
+      const myTag = ++seq, roots = await htmlTagRoots(resolved);
+      if(myTag !== seq) return;
+      if(roots.length){
+        const actions = editorActions(ed, resolved.prefix);
+        ctx = Object.assign({}, c || {}, actions, { ed, syntaxContext: resolved });
+        render(ctx, rankRoots(roots, resolved));
+        return;
+      }
+    }
     if(resolved && resolved.kind === 'css-function-argument' && String(resolved.functionName || '').toLowerCase() === 'var'){
       const myVariable = ++seq, roots = await cssVariableRoots(resolved, snapshot.code);
       if(myVariable !== seq) return;
