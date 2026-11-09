@@ -579,7 +579,7 @@ try {
     row.code === 'COALESCE' && /первое значение из списка/.test(row.note)
   );
   const sqlConditionRows = await runSqlAutocomplete('SELECT * FROM users WHERE is', row =>
-    row.code === 'IS' && /проверка значения/.test(row.note)
+    row.code === 'IS' && /проверок вроде IS NULL/.test(row.note)
   );
   const sqlSourceRows = await runSqlAutocomplete('SELECT * FROM users JOIN ', row =>
     row.code === 'JOIN' && /соединяет строки двух таблиц/.test(row.note)
