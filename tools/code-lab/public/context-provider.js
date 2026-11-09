@@ -133,12 +133,13 @@
       const key = [code, item && item.label || '', item && item.lang || ''].join('|').toLowerCase();
       return { item, index, key, score: prefixScore + contextScore + priority, prefixMismatch: prefixScore < 0,
         blocked: !!blocked || !!expectedMismatch || !!kindMismatch || !!languageMismatch };
-    }).filter(row => {
-      if (row.blocked || (prefix && row.prefixMismatch) || !row.item) return false;
-      if (row.key === '||' || seen.has(row.key)) return false;
-      seen.add(row.key);
-      return true;
-    }).sort((a, b) => b.score - a.score || a.index - b.index)
+    }).filter(row => !row.blocked && !(prefix && row.prefixMismatch) && !!row.item)
+      .sort((a, b) => b.score - a.score || a.index - b.index)
+      .filter(row => {
+        if (row.key === '||' || seen.has(row.key)) return false;
+        seen.add(row.key);
+        return true;
+      })
       .map(row => row.item);
   }
 
