@@ -617,7 +617,7 @@ try {
   assert.ok(jsCallRows.length && pythonCallRows.length && sqlCallRows.length,
     'shared call argument UI returned no candidate rows for one of the tested languages');
 
-  const insertPythonCallCandidate = async (source, candidate, expectedSource, expectedSelection = '') => {
+  const insertPythonCallCandidate = async (source, candidate, expectedSource, expectedSelection = '', expectedNote = null) => {
     await htmlEditor.evaluate((ed, code) => {
       const cm = ed.querySelector('textarea')?.__cm;
       ed.__f.lang = 'python';
@@ -635,6 +635,10 @@ try {
       return visible.findIndex(row => row.dataset.code === code);
     }, candidate);
     assert.ok(targetIndex >= 0, 'Python call candidate was not selectable: ' + candidate);
+    const candidateNote = await popup.locator('.ac-r').evaluateAll((rows, code) =>
+      rows.find(row => row.dataset.code === code)?.querySelector('.ac-d')?.textContent || '', candidate);
+    if(expectedNote) assert.match(candidateNote, expectedNote,
+      'Python call candidate explanation is missing for ' + candidate + ': ' + candidateNote);
     const selectedIndex = await popup.locator('.ac-r').evaluateAll(rows => {
       const visible = rows.filter(row => row.offsetParent !== null);
       return visible.indexOf(visible.find(row => row.classList.contains('sel')));
@@ -653,8 +657,8 @@ try {
     assert.equal(result.code, expectedSource, 'Python call candidate insertion failed for ' + candidate);
     assert.equal(result.selection, expectedSelection, 'Python placeholder selection failed for ' + candidate);
   };
-  await insertPythonCallCandidate('open(path, "r', 'rb', 'open(path, "rb');
-  await insertPythonCallCandidate('open(path, en', "encoding='…'", "open(path, encoding='…'", '…');
+  await insertPythonCallCandidate('open(path, "r', 'rb', 'open(path, "rb', '', /двоичн/i);
+  await insertPythonCallCandidate('open(path, en', "encoding='…'", "open(path, encoding='…'", '…', /кодиров/i);
 
   const runSqlAutocomplete = async (code, expected) => {
     await htmlEditor.evaluate((ed, source) => {
