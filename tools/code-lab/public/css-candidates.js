@@ -57,7 +57,7 @@
     let match;
     while ((match = pattern.exec(source))) names.add(match[1]);
     return Array.from(names)
-      .filter(name => name.toLowerCase().startsWith(query))
+      .filter(name => name.startsWith(String(prefix || '').trim()))
       .sort()
       .map(name => ({
         code: name,
