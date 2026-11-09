@@ -131,6 +131,39 @@ try {
 
     await cm.click();
     await page.keyboard.press('Control+A');
+    await page.keyboard.type('.card:has(> .ca');
+    await page.waitForFunction(() => {
+      const popup = document.querySelector('.ac-pop');
+      return popup && [...popup.querySelectorAll('.ac-r')].some(row => row.dataset.code === '.card');
+    }, undefined, { timeout: 10_000 });
+    assert.ok((await page.locator('.ac-pop .ac-r').evaluateAll(rows => rows.map(row => row.dataset.code))).includes('.card'),
+      'CSS :has() selector argument did not offer matching class selectors');
+    await page.keyboard.press('Escape');
+
+    await cm.click();
+    await page.keyboard.press('Control+A');
+    await page.keyboard.type(':is(di');
+    await page.waitForFunction(() => {
+      const popup = document.querySelector('.ac-pop');
+      return popup && [...popup.querySelectorAll('.ac-r')].some(row => row.dataset.code === 'div');
+    }, undefined, { timeout: 10_000 });
+    assert.ok((await page.locator('.ac-pop .ac-r').evaluateAll(rows => rows.map(row => row.dataset.code))).includes('div'),
+      'CSS :is() selector argument did not offer HTML type selectors');
+    await page.keyboard.press('Escape');
+
+    await cm.click();
+    await page.keyboard.press('Control+A');
+    await page.keyboard.type(':nth-child(od');
+    await page.waitForFunction(() => {
+      const popup = document.querySelector('.ac-pop');
+      return popup && [...popup.querySelectorAll('.ac-r')].some(row => row.dataset.code === 'odd');
+    }, undefined, { timeout: 10_000 });
+    assert.ok((await page.locator('.ac-pop .ac-r').evaluateAll(rows => rows.map(row => row.dataset.code))).includes('odd'),
+      'CSS :nth-child() did not offer matching formula arguments');
+    await page.keyboard.press('Escape');
+
+    await cm.click();
+    await page.keyboard.press('Control+A');
     await page.keyboard.type(':root { --gap: 1rem; } .card { gap: var(--ga');
     await page.waitForFunction(() => {
       const popup = document.querySelector('.ac-pop');
