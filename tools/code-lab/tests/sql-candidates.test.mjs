@@ -21,7 +21,7 @@ test('SQL candidate lists are scoped to the active clause and prefix', () => {
   const result = SQLCandidates.candidates(dictionary, {
     kind: 'sql-select-list', expected: 'column-or-expression', prefix: 'co'
   });
-  assert.deepEqual(result.map(item => item.code), ['COALESCE']);
+  assert.deepEqual(result.map(item => item.code), ['COUNT', 'COALESCE']);
   assert.equal(result[0].note, 'первое значение не NULL');
   assert.deepEqual(result[0].contexts, ['sql-select-list']);
 });
