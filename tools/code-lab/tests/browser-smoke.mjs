@@ -99,6 +99,23 @@ try {
 
     await cm.click();
     await page.keyboard.press('Control+A');
+    await page.keyboard.type('.card { d');
+    await page.waitForFunction(() => {
+      const popup = document.querySelector('.ac-pop');
+      return popup && [...popup.querySelectorAll('.ac-r')].some(row => row.dataset.code === 'display');
+    }, undefined, { timeout: 10_000 });
+    const propertyRows = await page.locator('.ac-pop .ac-r').evaluateAll(rows =>
+      rows.filter(row => row.dataset.code).map(row => ({
+        code: row.dataset.code,
+        note: row.querySelector('.ac-d')?.textContent || ''
+      }))
+    );
+    assert.ok(propertyRows.some(row => row.code === 'display' && /раскладк/i.test(row.note)),
+      'CSS declaration context did not offer the Russian-explained display property');
+    await page.keyboard.press('Escape');
+
+    await cm.click();
+    await page.keyboard.press('Control+A');
     await page.keyboard.type('.card { place-items: center; }');
     await cssEditor.evaluate(ed => {
       const ta = ed.querySelector('textarea');
