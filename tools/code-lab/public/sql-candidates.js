@@ -27,13 +27,22 @@
     return [...new Set(found)];
   }
 
-  function scope(code) {
+  function scope(code, targetDepth = 0) {
     const source = visibleSql(code);
     const reserved = new Set(['where','join','left','right','inner','outer','full','cross','on','group','order',
       'having','limit','offset','set','values','union','except','intersect','as']);
     const refs = [];
     const re = /\b(?:from|join|update|into)\s+([\p{L}_][\p{L}\p{N}_$]*(?:\.[\p{L}_][\p{L}\p{N}_$]*)?)(?:\s+(?:as\s+)?([\p{L}_][\p{L}\p{N}_$]*))?/giu;
+    const depthAt = offset => {
+      let depth = 0;
+      for (let i = 0; i < offset; i++) {
+        if (source[i] === '(') depth++;
+        else if (source[i] === ')') depth = Math.max(0, depth - 1);
+      }
+      return depth;
+    };
     for (const match of source.matchAll(re)) {
+      if (depthAt(match.index) !== targetDepth) continue;
       const table = match[1];
       const possibleAlias = match[2] || '';
       const alias = possibleAlias && !reserved.has(possibleAlias.toLowerCase()) ? possibleAlias : '';
@@ -49,7 +58,7 @@
     if (!context || !choices[context.kind]) return [];
     const entries = dictionary && dictionary.langs && dictionary.langs.sql || {};
     const prefix = String(context.prefix || '').toLowerCase();
-    const queryScope = scope(code);
+    const queryScope = scope(code, Number(context.constraints && context.constraints.depth) || 0);
     const items = choices[context.kind].map(key => ({ key, code: key.toUpperCase() }));
     if (context.kind === 'sql-table-source') {
       items.unshift(...queryScope.ctes.map(name => ({ key: name.toLowerCase(), code: name, cte: true })));
