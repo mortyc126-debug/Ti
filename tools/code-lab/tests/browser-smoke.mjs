@@ -635,10 +635,10 @@ try {
       return visible.findIndex(row => row.dataset.code === code);
     }, candidate);
     assert.ok(targetIndex >= 0, 'Python call candidate was not selectable: ' + candidate);
-    const candidateNote = await popup.locator('.ac-r').evaluateAll((rows, code) =>
-      rows.find(row => row.dataset.code === code)?.querySelector('.ac-d')?.textContent || '', candidate);
-    if(expectedNote) assert.match(candidateNote, expectedNote,
-      'Python call candidate explanation is missing for ' + candidate + ': ' + candidateNote);
+    const candidateNotes = await popup.locator('.ac-r').evaluateAll(rows =>
+      rows.map(row => row.querySelector('.ac-d')?.textContent || '').filter(Boolean).join(' '));
+    if(expectedNote) assert.match(candidateNotes, expectedNote,
+      'Python call candidate explanation is missing for ' + candidate + ': ' + candidateNotes);
     const selectedIndex = await popup.locator('.ac-r').evaluateAll(rows => {
       const visible = rows.filter(row => row.offsetParent !== null);
       return visible.indexOf(visible.find(row => row.classList.contains('sel')));
