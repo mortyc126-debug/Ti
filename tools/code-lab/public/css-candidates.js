@@ -46,7 +46,32 @@
       }));
   }
 
-  const api = { properties, selectors, cleanExplanation };
+  function variables(code, prefix) {
+    const query = String(prefix || '').trim().toLowerCase();
+    if (!query.startsWith('--')) return [];
+    const source = String(code || '')
+      .replace(/\\/\\*[\\s\\S]*?\\*\\//g, ' ')
+      .replace(/(["'])(?:\\\\.|(?!\\1)[^\\\\])*?\\1/g, ' ');
+    const names = new Set();
+    const pattern = /(--[a-z0-9_-]+)\\s*:/gi;
+    let match;
+    while ((match = pattern.exec(source))) names.add(match[1]);
+    return Array.from(names)
+      .filter(name => name.toLowerCase().startsWith(query))
+      .sort()
+      .map(name => ({
+        code: name,
+        lang: 'css',
+        label: 'переменная CSS',
+        note: 'пользовательское свойство, объявленное в текущем коде',
+        expected: 'function-argument',
+        contexts: ['css-function-argument'],
+        languages: ['css'],
+        children: []
+      }));
+  }
+
+  const api = { properties, selectors, variables, cleanExplanation };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.CSSCandidates = api;
 })(typeof window !== 'undefined' ? window : globalThis);
