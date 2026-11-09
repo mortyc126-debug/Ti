@@ -191,7 +191,7 @@
   }
   function cssShorthandPreview(selection){
     if(!window.CSSShorthands || !selection) return '';
-    const match = String(selection).trim().match(/^(place-items|place-content|place-self)\\s*:\\s*([a-z-]+(?:\\s+[a-z-]+)?)\\s*;?$/i);
+    const match = String(selection).trim().match(/^(place-items|place-content|place-self)\s*:\s*([a-z-]+(?:\s+[a-z-]+)?)\s*;?$/i);
     if(!match) return '';
     const values = match[2].trim().split(/\s+/);
     const simple = new Set(['normal','stretch','center','start','end','self-start','self-end','flex-start','flex-end','baseline','space-between','space-around','space-evenly','left','right','auto']);
