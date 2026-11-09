@@ -892,7 +892,7 @@
     "fetch: можно options — { method, headers, body }",
     "addEventListener: обязательно type, listener — событие и функция-обработчик",
     "addEventListener: можно options — { once, passive, signal }",
-    "addEventListener[type]: значения click, input, change, submit, keydown, keyup, focus, blur, load, DOMContentLoaded, scroll, resize, mouseenter, mouseleave, pointerdown, pointerup, dblclick, contextmenu",
+    "addEventListener[type]: значения click, input, change, submit, keydown, keyup, focus, blur, load, DOMContentLoaded, scroll, resize, mouseenter, mouseleave, pointerdown, pointerup, dblclick, contextmenu — тип события DOM, которое нужно отслеживать",
     "removeEventListener: обязательно type, listener — та же функция, что при добавлении",
     "setTimeout: обязательно callback, delay — delay в миллисекундах",
     "setInterval: обязательно callback, delay — delay в миллисекундах",
