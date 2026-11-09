@@ -116,6 +116,20 @@ try {
 
     await cm.click();
     await page.keyboard.press('Control+A');
+    await page.keyboard.type('.card :ho');
+    await page.waitForFunction(() => {
+      const popup = document.querySelector('.ac-pop');
+      return popup && [...popup.querySelectorAll('.ac-r')].some(row => row.dataset.code === ':hover');
+    }, undefined, { timeout: 10_000 });
+    const selectorRows = await page.locator('.ac-pop .ac-r').evaluateAll(rows =>
+      rows.filter(row => row.dataset.code).map(row => row.dataset.code)
+    );
+    assert.ok(selectorRows.includes(':hover'),
+      'CSS selector context did not offer the matching pseudo-class');
+    await page.keyboard.press('Escape');
+
+    await cm.click();
+    await page.keyboard.press('Control+A');
     await page.keyboard.type('.card { place-items: center; }');
     await cssEditor.evaluate(ed => {
       const ta = ed.querySelector('textarea');
