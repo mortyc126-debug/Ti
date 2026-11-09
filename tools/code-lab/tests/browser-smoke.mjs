@@ -554,6 +554,38 @@ try {
   );
   assert.ok(jsCallRows.length && pythonCallRows.length && sqlCallRows.length,
     'shared call argument UI returned no candidate rows for one of the tested languages');
+  const runSqlAutocomplete = async (code, expected) => {
+    await htmlEditor.evaluate((ed, source) => {
+      const cm = ed.querySelector('textarea')?.__cm;
+      ed.__f.lang = 'sql';
+      cm.setValue(source);
+      const line = cm.lastLine();
+      cm.setCursor({ line, ch: cm.getLine(line).length });
+      cm.focus();
+    }, code);
+    await page.keyboard.press('Control+Space');
+    await page.waitForSelector('.ac-pop', { timeout: 10_000 });
+    const rows = await page.locator('.ac-pop .ac-r').evaluateAll(items =>
+      items.map(item => ({
+        code: item.dataset.code || '',
+        note: item.querySelector('.ac-d')?.textContent || ''
+      }))
+    );
+    assert.ok(rows.some(expected), 'SQL clause suggestions missing for «' + code + '»: ' + JSON.stringify(rows));
+    await page.keyboard.press('Escape');
+    return rows;
+  };
+  const sqlSelectRows = await runSqlAutocomplete('SELECT co', row =>
+    row.code === 'COALESCE' && /первое значение не NULL/.test(row.note)
+  );
+  const sqlConditionRows = await runSqlAutocomplete('SELECT * FROM users WHERE is', row =>
+    row.code === 'IS' && /проверка значения/.test(row.note)
+  );
+  const sqlSourceRows = await runSqlAutocomplete('SELECT * FROM users JOIN ', row =>
+    row.code === 'JOIN' && /соединяет строки двух таблиц/.test(row.note)
+  );
+  assert.ok(sqlSelectRows.length && sqlConditionRows.length && sqlSourceRows.length,
+    'SQL clause candidate lists unexpectedly returned no rows');
   await htmlEditor.evaluate(ed => { ed.__f.lang = 'html'; });
 
   assert.deepEqual(pageErrors, [], 'browser page raised uncaught errors: ' + pageErrors.join('; '));
