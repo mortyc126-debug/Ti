@@ -230,8 +230,8 @@
     const result = window.CSSShorthands.collapseRange(parent.name, source, full, offset);
     if(!result.ok) return '';
     const replacement = result.shorthand + ': ' + result.value + ';';
-    const leading = source.match(/^\\s*/)?.[0] || '';
-    const trailing = source.match(/\\s*$/)?.[0] || '';
+    const leading = source.match(/^\s*/)?.[0] || '';
+    const trailing = source.match(/\s*$/)?.[0] || '';
     if(canApply) pendingCssTransform = { source, full, start: offset, end: offset + source.length,
       replacement: leading + replacement + trailing };
     return '<div class="se-transform"><b>краткая форма (предпросмотр)</b><pre>' + esc(replacement) + '</pre>' +
