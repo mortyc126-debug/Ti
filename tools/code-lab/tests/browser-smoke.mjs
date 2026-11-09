@@ -477,6 +477,32 @@ try {
     'HTML tag context did not offer the Russian-explained div element');
   await page.keyboard.press('Escape');
 
+  const runHtmlAutocomplete = async (source, expected) => {
+    await htmlEditor.evaluate((ed, code) => {
+      const cm = ed.querySelector('textarea')?.__cm;
+      ed.__f.lang = 'html';
+      cm.setValue(code);
+      const line = cm.lastLine();
+      cm.setCursor({ line, ch: cm.getLine(line).length });
+      cm.focus();
+    }, source);
+    await page.keyboard.press('Control+Space');
+    await page.waitForSelector('.ac-pop', { timeout: 10_000 });
+    const rows = await page.locator('.ac-pop .ac-r').evaluateAll(items =>
+      items.map(item => ({
+        code: item.dataset.code || '',
+        note: item.querySelector('.ac-d')?.textContent || ''
+      }))
+    );
+    assert.ok(rows.some(expected), 'HTML attribute suggestions missing for «' + source + '»: ' + JSON.stringify(rows));
+    await page.keyboard.press('Escape');
+    return rows;
+  };
+  const htmlAttributeRows = await runHtmlAutocomplete('<button dis', row => row.code === 'disabled');
+  const htmlValueRows = await runHtmlAutocomplete('<button type="su', row => row.code === 'submit');
+  assert.ok(htmlAttributeRows.length && htmlValueRows.length,
+    'HTML attribute name or value candidates unexpectedly returned no rows');
+
   const callContexts = await htmlEditor.evaluate(ed => {
     const cm = ed.querySelector('textarea')?.__cm;
     if(!cm) return null;
