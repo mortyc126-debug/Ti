@@ -28,8 +28,7 @@
   function selectors(dictionary, prefix) {
     const query = String(prefix || '').trim().toLowerCase();
     if (!query) return [];
-    const source = dictionary && dictionary.langs && dictionary.langs.css;
-    if (!source || typeof source !== 'object') return [];
+    const source = Object.assign({}, dictionary && dictionary.words || {}, dictionary && dictionary.langs && dictionary.langs.css || {});
     const selectorPattern = /^(?:@[a-z][\w-]*|::?[a-z][\w-]*(?:\([^)]*\))?|[.#][\w-]+|\[[^\]]+\])$/i;
     return Object.entries(source)
       .filter(([name, explanation]) => selectorPattern.test(name) &&
