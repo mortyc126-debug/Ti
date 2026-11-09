@@ -616,6 +616,46 @@ try {
   );
   assert.ok(jsCallRows.length && pythonCallRows.length && sqlCallRows.length,
     'shared call argument UI returned no candidate rows for one of the tested languages');
+
+  const insertPythonCallCandidate = async (source, candidate, expectedSource, expectedSelection = '') => {
+    await htmlEditor.evaluate((ed, code) => {
+      const cm = ed.querySelector('textarea')?.__cm;
+      ed.__f.lang = 'python';
+      cm.setValue(code);
+      const line = cm.lastLine();
+      cm.setCursor({ line, ch: cm.getLine(line).length });
+      cm.focus();
+    }, source);
+    await page.keyboard.press('Control+Space');
+    await page.waitForFunction(code => [...document.querySelectorAll('.ac-pop .ac-r')]
+      .some(row => row.dataset.code === code), candidate, { timeout: 10_000 });
+    const popup = page.locator('.ac-pop');
+    const targetIndex = await popup.locator('.ac-r').evaluateAll((rows, code) => {
+      const visible = rows.filter(row => row.offsetParent !== null);
+      return visible.findIndex(row => row.dataset.code === code);
+    }, candidate);
+    assert.ok(targetIndex >= 0, 'Python call candidate was not selectable: ' + candidate);
+    const selectedIndex = await popup.locator('.ac-r').evaluateAll(rows => {
+      const visible = rows.filter(row => row.offsetParent !== null);
+      return visible.indexOf(visible.find(row => row.classList.contains('sel')));
+    });
+    assert.ok(selectedIndex >= 0, 'Python call popup has no keyboard selection');
+    const delta = targetIndex - selectedIndex;
+    for (let i = 0; i < Math.abs(delta); i++) {
+      await page.keyboard.press(delta > 0 ? 'ArrowDown' : 'ArrowUp');
+    }
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => !document.querySelector('.ac-pop'));
+    const result = await htmlEditor.evaluate(ed => ({
+      code: ed.__f.code,
+      selection: ed.querySelector('textarea')?.__cm?.getSelection() || ''
+    }));
+    assert.equal(result.code, expectedSource, 'Python call candidate insertion failed for ' + candidate);
+    assert.equal(result.selection, expectedSelection, 'Python placeholder selection failed for ' + candidate);
+  };
+  await insertPythonCallCandidate('open(path, "r', 'rb', 'open(path, "rb');
+  await insertPythonCallCandidate('open(path, en', "encoding='…'", "open(path, encoding='…'", '…');
+
   const runSqlAutocomplete = async (code, expected) => {
     await htmlEditor.evaluate((ed, source) => {
       const cm = ed.querySelector('textarea')?.__cm;
