@@ -191,7 +191,8 @@
   }
   function cssShorthandPreview(selection, fullCode, cursor){
     if(!window.CSSShorthands || !selection) return '';
-    const text = String(selection).trim();
+    const source = String(selection);
+    const text = source.trim();
     const shorthand = text.match(/^(place-items|place-content|place-self)\s*:\s*([a-z-]+(?:\s+[a-z-]+)?)\s*;?$/i);
     if(shorthand){
       const name = shorthand[1].toLowerCase(), values = shorthand[2].trim().split(/\s+/);
@@ -205,7 +206,7 @@
       return '<div class="se-transform"><b>развёрнутый вариант (предпросмотр)</b><pre>' + esc(preview) + '</pre></div>';
     }
 
-    const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    const lines = source.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
     if(lines.length !== 2 || !window.CSSContext || !cursor) return '';
     const first = lines[0].match(/^([a-z-]+)\s*:\s*([a-z-]+)\s*;?$/i);
     const second = lines[1].match(/^([a-z-]+)\s*:\s*([a-z-]+)\s*;?$/i);
@@ -215,7 +216,7 @@
     if(!parent || parent.components[0] !== p1 || parent.components[1] !== p2) return '';
     const full = String(fullCode || '');
     const offset = window.CSSContext.offsetAt(full, cursor);
-    const result = window.CSSShorthands.collapseRange(parent.name, text, full, offset);
+    const result = window.CSSShorthands.collapseRange(parent.name, source, full, offset);
     if(!result.ok) return '';
     return '<div class="se-transform"><b>краткая форма (предпросмотр)</b><pre>' +
       esc(result.shorthand + ': ' + result.value + ';') + '</pre></div>';
