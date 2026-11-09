@@ -68,8 +68,8 @@ test('collapse only emits a shorthand after all safety checks pass', () => {
 
 
 test('collapseRange previews only an adjacent pair in one declaration block', () => {
-  const code = '.card {\\n  align-items: center;\\n  justify-items: end;\\n}';
-  const selection = 'align-items: center;\\n  justify-items: end;';
+  const code = '.card {\n  align-items: center;\n  justify-items: end;\n}';
+  const selection = 'align-items: center;\n  justify-items: end;';
   const result = CSSShorthands.collapseRange('place-items', selection, code, code.indexOf('align-items'));
   assert.equal(result.ok, true);
   assert.equal(result.value, 'center end');
