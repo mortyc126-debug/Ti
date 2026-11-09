@@ -21,7 +21,7 @@
     for (let i = 0; i < before.length; i++) {
       const c = before[i], next = before[i + 1];
       if (lineComment) {
-        if (c === '\\n' || c === '\\r') lineComment = false;
+        if (c === '\n' || c === '\r') lineComment = false;
         else continue;
       }
       if (blockComment) {
