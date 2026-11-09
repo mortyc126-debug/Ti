@@ -211,8 +211,10 @@
       const start = window.CSSContext && cursor ? window.CSSContext.offsetAt(String(fullCode || ''), cursor) : -1;
       const leading = source.slice(0, source.indexOf(text));
       const trailing = source.slice(source.indexOf(text) + text.length);
+      const indent = leading.slice(leading.lastIndexOf('\n') + 1);
+      const formattedPreview = preview.split('\n').join('\n' + indent);
       if(canApply && start >= 0) pendingCssTransform = { source, full: String(fullCode || ''), start, end: start + source.length,
-        replacement: leading + preview + trailing };
+        replacement: leading + formattedPreview + trailing };
       return '<div class="se-transform"><b>развёрнутый вариант (предпросмотр)</b><pre>' + esc(preview) + '</pre>' +
         (pendingCssTransform ? '<button type="button" data-css-apply>Применить в редакторе</button>' : '') + '</div>';
     }
