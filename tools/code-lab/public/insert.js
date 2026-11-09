@@ -348,7 +348,7 @@
       ? window.CodeLabContext.resolve(snapshot)
       : null;
     if(resolved && resolved.suppressAutocomplete){ hide(); return; }
-    if(resolved && resolved.kind === 'css-selector' && /^[:@.#\\[]/.test(resolved.prefix || '')){
+    if(resolved && resolved.kind === 'css-selector' && [':', '@', '.', '#', '['].some(mark => String(resolved.prefix || '').startsWith(mark))){
       const mySelector = ++seq, roots = await cssSelectorRoots(resolved);
       if(mySelector !== seq) return;
       if(roots.length){
