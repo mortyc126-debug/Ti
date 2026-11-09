@@ -33,10 +33,13 @@
     const source = input || {};
     const language = normalizeLanguage(source.language || source.lang);
     const code = String(source.code == null ? '' : source.code);
-    const cursor = source.cursor && Number.isInteger(source.cursor.line) && Number.isInteger(source.cursor.ch)
-      ? { line: Math.max(0, source.cursor.line), ch: Math.max(0, source.cursor.ch) }
+    const lines = code.split(/\\r\\n|\\n|\\r/);
+    const cursorLine = source.cursor && Number.isInteger(source.cursor.line)
+      ? Math.min(lines.length - 1, Math.max(0, source.cursor.line))
       : null;
-    const lines = code.split(/\r?\n/);
+    const cursor = cursorLine !== null && Number.isInteger(source.cursor.ch)
+      ? { line: cursorLine, ch: Math.max(0, Math.min(String(lines[cursorLine] || '').length, source.cursor.ch)) }
+      : null;
     const currentLine = cursor ? String(lines[cursor.line] || '') : String(source.currentLine || '');
     const beforeCursor = cursor ? currentLine.slice(0, cursor.ch) : String(source.beforeCursor || '');
     const afterCursor = cursor ? currentLine.slice(cursor.ch) : String(source.afterCursor || '');
