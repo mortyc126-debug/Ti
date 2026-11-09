@@ -54,3 +54,8 @@ test('CSS var() candidates come from declarations and ignore comments and string
   assert.deepEqual(result.map(item => item.code), ['--gap']);
   assert.equal(result[0].expected, 'function-argument');
 });
+
+test('CSS custom property matching preserves case sensitivity', () => {
+  const code = ':root { --Theme: dark; --theme: light; }';
+  assert.deepEqual(CSSCandidates.variables(code, '--Th').map(item => item.code), ['--Theme']);
+});
