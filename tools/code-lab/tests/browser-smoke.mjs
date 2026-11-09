@@ -130,6 +130,23 @@ try {
 
     await cm.click();
     await page.keyboard.press('Control+A');
+    await page.keyboard.type(':root { --gap: 1rem; } .card { gap: var(--ga');
+    await page.waitForFunction(() => {
+      const popup = document.querySelector('.ac-pop');
+      return popup && [...popup.querySelectorAll('.ac-r')].some(row => row.dataset.code === '--gap');
+    }, undefined, { timeout: 10_000 });
+    const variableNotes = await page.locator('.ac-pop .ac-r').evaluateAll(rows =>
+      rows.filter(row => row.dataset.code).map(row => ({
+        code: row.dataset.code,
+        note: row.querySelector('.ac-d')?.textContent || ''
+      }))
+    );
+    assert.ok(variableNotes.some(row => row.code === '--gap' && /пользовательское свойство/.test(row.note)),
+      'CSS var() did not suggest a declared custom property with an explanation');
+    await page.keyboard.press('Escape');
+
+    await cm.click();
+    await page.keyboard.press('Control+A');
     await page.keyboard.type('.card { place-items: center; }');
     await cssEditor.evaluate(ed => {
       const ta = ed.querySelector('textarea');
