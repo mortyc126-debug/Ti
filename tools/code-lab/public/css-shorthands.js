@@ -114,24 +114,23 @@
     const item = registry[String(name || '').trim().toLowerCase()];
     if (!item || !Number.isInteger(componentIndex) || componentIndex < 0 || componentIndex >= item.components.length) return false;
     const token = String(value || '').trim().toLowerCase();
-    return !!token && !/\\s/.test(token) && componentValues[item.components[componentIndex]]?.has(token) === true;
+    return !!token && !/\s/.test(token) && componentValues[item.components[componentIndex]]?.has(token) === true;
   }
 
-  // Маскируем комментарии и строки, чтобы скобки и имена внутри них не влияли на разбор.
   function maskCss(source) {
     const chars = String(source || '').split('');
     let quote = '', comment = false, escaped = false;
     for (let i = 0; i < chars.length; i++) {
       const ch = chars[i], next = chars[i + 1];
       if (comment) {
-        if (ch !== '\\n' && ch !== '\\r') chars[i] = ' ';
+        if (ch !== '\n' && ch !== '\r') chars[i] = ' ';
         if (ch === '*' && next === '/') { chars[i + 1] = ' '; i++; comment = false; }
         continue;
       }
       if (quote) {
-        if (ch !== '\\n' && ch !== '\\r') chars[i] = ' ';
+        if (ch !== '\n' && ch !== '\r') chars[i] = ' ';
         if (escaped) { escaped = false; continue; }
-        if (ch === '\\\\') { escaped = true; continue; }
+        if (ch === '\\') { escaped = true; continue; }
         if (ch === quote) quote = '';
         continue;
       }
@@ -150,17 +149,12 @@
         full.slice(startOffset, startOffset + source.length) !== source) {
       return { ok: false, reason: 'selection-mismatch' };
     }
-    if (/\\/\\*/.test(source)) return { ok: false, reason: 'comments-in-selection' };
+    if (/\/\*/.test(source)) return { ok: false, reason: 'comments-in-selection' };
 
-    const [firstProperty, secondProperty] = item.components;
-    const escaped = value => value.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\  const api = { get, forLonghand, expand, collapse };');
-    const pair = new RegExp('^\\\\s*' + escaped(firstProperty) +
-      '\\\\s*:\\\\s*([a-z-]+)\\\\s*;\\\\s*' + escaped(secondProperty) +
-      '\\\\s*:\\\\s*([a-z-]+)\\\\s*;?\\\\s*
-  if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  if (root) root.CSSShorthands = api;
-})(typeof window !== 'undefined' ? window : globalThis);
-, 'i').exec(source);
+    const firstProperty = item.components[0], secondProperty = item.components[1];
+    const pair = new RegExp('^\\s*' + firstProperty +
+      '\\s*:\\s*([a-z-]+)\\s*;\\s*' + secondProperty +
+      '\\s*:\\s*([a-z-]+)\\s*;?\\s*$', 'i').exec(source);
     if (!pair) return { ok: false, reason: 'not-adjacent-component-pair' };
     if (!isAllowed(item.name, 0, pair[1]) || !isAllowed(item.name, 1, pair[2])) {
       return { ok: false, reason: 'unsupported-component-value' };
@@ -180,15 +174,17 @@
 
     const block = masked.slice(containing[0] + 1, containing[1]);
     const count = property => {
-      const re = new RegExp('(?:^|[;\\s])' + escaped(property) + '\\\\s*:', 'gi');
+      const re = new RegExp('(?:^|[;\\s])' + property + '\\s*:', 'gi');
       return [...block.matchAll(re)].length;
     };
     if (count(firstProperty) !== 1 || count(secondProperty) !== 1 || count(item.name) !== 0) {
       return { ok: false, reason: 'duplicate-or-existing-shorthand' };
     }
 
-    const declarations = { [firstProperty]: pair[1], [secondProperty]: pair[2] };
-    return collapse(item.name, declarations, {
+    return collapse(item.name, {
+      [firstProperty]: pair[1],
+      [secondProperty]: pair[2]
+    }, {
       commentsPreserved: true,
       noDuplicates: true,
       cascadePreserved: true,
@@ -198,6 +194,7 @@
   }
 
   const api = { get, forLonghand, expand, collapse, collapseRange, isAllowed };
+
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.CSSShorthands = api;
 })(typeof window !== 'undefined' ? window : globalThis);
