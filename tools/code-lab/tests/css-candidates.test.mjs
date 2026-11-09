@@ -41,3 +41,16 @@ test('CSS selector candidates include pseudo-classes with their punctuation', ()
   assert.deepEqual(result.map(item => item.code), [':hover']);
   assert.match(result[0].note, /наведении/);
 });
+
+test('CSS var() candidates come from declarations and ignore comments and strings', () => {
+  const code = `:root {
+    --gap: 1rem;
+    --color-main: #123;
+    /* --ghost: red; */
+    content: "--fake: value";
+  }
+  .card { gap: var(--ga); }`;
+  const result = CSSCandidates.variables(code, '--ga');
+  assert.deepEqual(result.map(item => item.code), ['--gap']);
+  assert.equal(result[0].expected, 'function-argument');
+});
