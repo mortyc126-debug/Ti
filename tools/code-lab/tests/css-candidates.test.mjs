@@ -64,3 +64,11 @@ test('CSS custom property scan does not treat comment markers inside strings as 
   const code = ':root { content: "/* --fake: red"; --real: 1rem; }';
   assert.deepEqual(CSSCandidates.variables(code, '--').map(item => item.code), ['--real']);
 });
+
+test('CSS selector candidates include shared dictionary pseudo-classes', () => {
+  const result = CSSCandidates.selectors({
+    words: { ':hover': ':hover — когда на элемент навели мышь' },
+    langs: { css: { display: 'display — тип раскладки' } },
+  }, ':ho');
+  assert.deepEqual(result.map(item => item.code), [':hover']);
+});
