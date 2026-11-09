@@ -193,13 +193,13 @@
     if(!window.CSSShorthands || !selection) return '';
     const match = String(selection).trim().match(/^(place-items|place-content|place-self)\\s*:\\s*([a-z-]+(?:\\s+[a-z-]+)?)\\s*;?$/i);
     if(!match) return '';
-    const values = match[2].trim().split(/\\s+/);
+    const values = match[2].trim().split(/\s+/);
     const simple = new Set(['normal','stretch','center','start','end','self-start','self-end','flex-start','flex-end','baseline','space-between','space-around','space-evenly','left','right','auto']);
     if(values.some(value => !simple.has(value.toLowerCase()))) return '';
     const result = window.CSSShorthands.expand(match[1], values);
     if(!result.ok) return '';
     const preview = Object.entries(result.declarations)
-      .map(([property, value]) => property + ': ' + value + ';').join('\\n');
+      .map(([property, value]) => property + ': ' + value + ';').join('\n');
     return '<div class="se-transform"><b>развёрнутый вариант (предпросмотр)</b><pre>' + esc(preview) + '</pre></div>';
   }
 
