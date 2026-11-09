@@ -217,7 +217,7 @@ test('SQL function signatures are available through the shared structure rules',
     'substring: можно length',
     'round: обязательно numeric',
     'round: можно precision'
-  ].join('\\n'));
+  ].join('\n'));
   assert.equal(sqlRules.bad.length, 0);
   const coalesce = StructureRules.attrsFor('COALESCE', sqlRules.rules);
   assert.deepEqual(coalesce.required.map(item => item.name), ['expression', 'fallback']);
