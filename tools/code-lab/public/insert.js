@@ -263,6 +263,18 @@
     });
   }
 
+  if(window.CodeLabContext && window.SQLContext){
+    window.CodeLabContext.register({
+      id: 'sql-syntax',
+      languages: ['sql'],
+      contexts: ['sql-statement', 'sql-select-list', 'sql-table-source', 'sql-condition',
+        'sql-join-condition', 'sql-group-order', 'sql-assignment', 'sql-values', 'sql-limit',
+        'sql-comment', 'sql-string'],
+      priority: 105,
+      resolve: snapshot => window.SQLContext.resolve(snapshot)
+    });
+  }
+
   if(window.CodeLabContext){
     window.CodeLabContext.register({
       id: 'html-tags',
@@ -352,6 +364,12 @@
     return window.HTMLCandidates.tags(dictionary, context && context.prefix);
   }
 
+  async function sqlRoots(context, code){
+    if(!window.SQLCandidates || !window.codelabKwDict) return [];
+    const dictionary = await window.codelabKwDict('sql');
+    return window.SQLCandidates.candidates(dictionary, context, code);
+  }
+
   // запасной путь: слова словаря по началу («quer» → querySelector), если дерева нет
   function flatFallback(word, d, lang){
     const lq = word.toLowerCase(); const out = []; const seen = new Set();
@@ -395,6 +413,16 @@
       ? window.CodeLabContext.resolve(snapshot)
       : null;
     if(resolved && resolved.suppressAutocomplete){ hide(); return; }
+    if(resolved && /^sql-/.test(resolved.kind)){
+      const mySql = ++seq, roots = await sqlRoots(resolved, snapshot.code);
+      if(mySql !== seq) return;
+      if(roots.length){
+        const actions = editorActions(ed, resolved.prefix);
+        ctx = Object.assign({}, c || {}, actions, { ed, syntaxContext: resolved });
+        render(ctx, rankRoots(roots, resolved));
+        return;
+      }
+    }
     if(resolved && resolved.kind === 'html-tag' && resolved.prefix){
       const myTag = ++seq, roots = await htmlTagRoots(resolved);
       if(myTag !== seq) return;
