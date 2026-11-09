@@ -161,7 +161,7 @@
     const pre = tc.prefix.toLowerCase(), fit = n => n.toLowerCase().startsWith(pre);
     if(tc.mode === 'value'){
       const v = A.values(tc.attr); if(!v) return [];
-      return v.list.filter(fit).map((x, i) => ({ code: x, lang: 'html', note: i === 0 && v.note ? v.note : '', label: '', children: [] }));
+      return v.list.filter(fit).map(x => ({ code: x, lang: 'html', note: v.note || '', label: '', children: [] }));
     }
     const node = (r, label) => ({ code: BOOL.has(r.name) ? r.name : r.name + '="…"', lang: 'html', label, note: note(r.name, r.note), children: [] });
     const fresh = r => !tc.have.includes(r.name.toLowerCase()) && fit(r.name);
@@ -206,11 +206,11 @@
     if(!window.StructureRules) return [];
     const rules = await rulesFor(cc.lang), A = window.StructureRules.attrsFor(cc.fn, rules);
     const pre = cc.prefix.toLowerCase(), fit = x => String(x).toLowerCase().startsWith(pre);
-    if(cc.kind === 'css'){ const v = A.values(''); return v ? v.list.filter(fit).map((x, i) => ({ code: x, lang: 'css', note: i === 0 && v.note ? v.note : '', label: '', children: [] })) : []; }
+    if(cc.kind === 'css'){ const v = A.values(''); return v ? v.list.filter(fit).map(x => ({ code: x, lang: 'css', note: v.note || '', label: '', children: [] })) : []; }
     const params = A.required.map(p => Object.assign({ req: true }, p)).concat(A.optional);
     if(!params.length) return [];
     const p = params[cc.arg];
-    if(cc.inQuote){ const v = p && A.values(p.name); return v ? v.list.filter(fit).map((x, i) => ({ code: x, lang: cc.lang, note: i === 0 && v.note ? v.note : '', label: '', children: [] })) : []; }
+    if(cc.inQuote){ const v = p && A.values(p.name); return v ? v.list.filter(fit).map(x => ({ code: x, lang: cc.lang, note: v.note || '', label: '', children: [] })) : []; }
     const out = [];
     // подпись вызова — что куда передать (вставлять нечего, это справка)
     if(!pre){ const sig = cc.fn + '(' + params.map((x, i) => (i === cc.arg ? '›' : '') + x.name + (x.req ? '' : '?')).join(', ') + ')';
