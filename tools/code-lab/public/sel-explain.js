@@ -192,15 +192,12 @@
   function cssShorthandPreview(selection, fullCode, cursor){
     if(!window.CSSShorthands || !selection) return '';
     const text = String(selection).trim();
-    const allowed = {
-      'place-items': new Set(['normal','stretch','center','start','end','self-start','self-end','baseline','left','right']),
-      'place-content': new Set(['normal','stretch','center','start','end','flex-start','flex-end','baseline','space-between','space-around','space-evenly','left','right']),
-      'place-self': new Set(['auto','normal','stretch','center','start','end','self-start','self-end','baseline','left','right'])
-    };
     const shorthand = text.match(/^(place-items|place-content|place-self)\s*:\s*([a-z-]+(?:\s+[a-z-]+)?)\s*;?$/i);
     if(shorthand){
       const name = shorthand[1].toLowerCase(), values = shorthand[2].trim().split(/\s+/);
-      if(values.some(value => !allowed[name].has(value.toLowerCase()))) return '';
+      const info = window.CSSShorthands.get(name);
+      if(values.length === 1 ? !info.components.every((_, index) => window.CSSShorthands.isAllowed(name, index, values[0])) :
+          !values.every((value, index) => window.CSSShorthands.isAllowed(name, index, value))) return '';
       const result = window.CSSShorthands.expand(name, values);
       if(!result.ok) return '';
       const preview = Object.entries(result.declarations)
@@ -215,22 +212,10 @@
     if(!first || !second) return '';
     const p1 = first[1].toLowerCase(), p2 = second[1].toLowerCase();
     const parent = window.CSSShorthands.forLonghand(p1).find(item => item.components.includes(p2));
-    if(!parent) return '';
-    const allowedValues = allowed[parent.name];
-    if(!allowedValues || !allowedValues.has(first[2].toLowerCase()) || !allowedValues.has(second[2].toLowerCase())) return '';
+    if(!parent || parent.components[0] !== p1 || parent.components[1] !== p2) return '';
     const full = String(fullCode || '');
-    const count = property => (full.match(new RegExp('(?:^|[;{\\s])' + property + '\\s*:', 'gi')) || []).length;
-    if(count(p1) !== 1 || count(p2) !== 1) return '';
-    const position = window.CSSContext.resolve({ code: full, cursor });
-    if(!position || !position.constraints || position.constraints.declarationBlock !== true) return '';
-    const declarations = { [p1]: first[2], [p2]: second[2] };
-    const result = window.CSSShorthands.collapse(parent.name, declarations, {
-      commentsPreserved: !/\/\*/.test(text),
-      noDuplicates: true,
-      cascadePreserved: true,
-      resetEffectsReviewed: true,
-      grammarValidated: true
-    });
+    const offset = window.CSSContext.offsetAt(full, cursor);
+    const result = window.CSSShorthands.collapseRange(parent.name, text, full, offset);
     if(!result.ok) return '';
     return '<div class="se-transform"><b>краткая форма (предпросмотр)</b><pre>' +
       esc(result.shorthand + ': ' + result.value + ';') + '</pre></div>';
