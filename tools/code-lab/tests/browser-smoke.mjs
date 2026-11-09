@@ -216,7 +216,7 @@ try {
     await page.keyboard.type('.card {\n  align-items: center;\n  justify-items: end;\n  align-items: start;\n}');
     await cssEditor.evaluate(ed => {
       const editor = ed.querySelector('textarea')?.__cm;
-      editor.setSelection({ line: 1, ch: 2 }, { line: 2, ch: 21 });
+      editor.setSelection({ line: 1, ch: 0 }, { line: 2, ch: editor.getLine(2).length });
     });
     await page.evaluate(async () => { await window.codelabSelExplain.open(); });
     await page.waitForSelector('.se', { timeout: 10_000 });
