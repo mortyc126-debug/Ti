@@ -53,3 +53,15 @@ test('CTE discovery ignores names inside SQL comments and string literals', () =
   const code = "-- WITH fake_cte AS (SELECT 1)\nWITH active_users AS (SELECT 'WITH fake_text AS (' AS note) SELECT * FROM active";
   assert.deepEqual(SQLCandidates.ctes(code), ['active_users']);
 });
+
+
+test('SQL scope extracts table aliases and offers qualified source candidates', () => {
+  const code = 'SELECT u.id FROM users AS u JOIN orders o ON u.id = o.user_id WHERE u.';
+  const scope = SQLCandidates.scope(code);
+  assert.deepEqual(scope.sources.map(item => item.qualifier), ['u', 'o']);
+  const result = SQLCandidates.candidates(dictionary, {
+    kind: 'sql-condition', expected: 'sql-condition', prefix: 'u.'
+  }, code);
+  assert.deepEqual(result.map(item => item.code), ['u.']);
+  assert.match(result[0].note, /users/);
+});
