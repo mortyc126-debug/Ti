@@ -238,12 +238,13 @@ try {
     await page.locator('.se .se-h button').click();
 
     const collapseSource = '.card {\n  align-items: center;\n  justify-items: end;\n}';
-    await cm.click();
-    await page.keyboard.press('Control+A');
-    await page.keyboard.type(collapseSource);
+    await cssEditor.evaluate((ed, source) => {
+      const editor = ed.querySelector('textarea')?.__cm;
+      editor.setValue(source);
+      editor.setSelection({ line: 1, ch: 2 }, { line: 2, ch: 21 });
+    }, collapseSource);
     const collapseDiagnostic = await cssEditor.evaluate(ed => {
       const editor = ed.querySelector('textarea')?.__cm;
-      editor.setSelection({ line: 1, ch: 2 }, { line: 2, ch: 21 });
       const full = editor.getValue(), source = editor.getSelection();
       const offset = window.CSSContext.offsetAt(full, editor.getCursor('from'));
       return { source, offset, result: window.CSSShorthands.collapseRange('place-items', source, full, offset) };
