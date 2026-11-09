@@ -47,3 +47,9 @@ test('unknown SQL contexts do not produce generic candidates', () => {
     kind: 'sql-string', expected: 'none', prefix: ''
   }), []);
 });
+
+
+test('CTE discovery ignores names inside SQL comments and string literals', () => {
+  const code = "-- WITH fake_cte AS (SELECT 1)\\nWITH active_users AS (SELECT 'WITH fake_text AS (' AS note) SELECT * FROM active";
+  assert.deepEqual(SQLCandidates.ctes(code), ['active_users']);
+});
