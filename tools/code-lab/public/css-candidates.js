@@ -30,7 +30,7 @@
     if (!query) return [];
     const source = dictionary && dictionary.langs && dictionary.langs.css;
     if (!source || typeof source !== 'object') return [];
-    const selectorPattern = /^(?:@[a-z][\\w-]*|::?[a-z][\\w-]*(?:\\([^)]*\\))?|[.#][\\w-]+|\\[[^\\]]+\\])$/i;
+    const selectorPattern = /^(?:@[a-z][\w-]*|::?[a-z][\w-]*(?:\([^)]*\))?|[.#][\w-]+|\[[^\]]+\])$/i;
     return Object.entries(source)
       .filter(([name, explanation]) => selectorPattern.test(name) &&
         name.toLowerCase().startsWith(query) && typeof explanation === 'string')
