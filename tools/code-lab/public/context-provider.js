@@ -33,7 +33,7 @@
     const source = input || {};
     const language = normalizeLanguage(source.language || source.lang);
     const code = String(source.code == null ? '' : source.code);
-    const lines = code.split(/\\r\\n|\\n|\\r/);
+    const lines = code.split(/\r\n|\n|\r/);
     const cursorLine = source.cursor && Number.isInteger(source.cursor.line)
       ? Math.min(lines.length - 1, Math.max(0, source.cursor.line))
       : null;
@@ -51,7 +51,7 @@
       beforeCursor,
       afterCursor,
       selectedText: String(source.selectedText || ''),
-      prefix: String(source.prefix == null ? (beforeCursor.match(/[\w$-]*$/) || [''])[0] : source.prefix)
+      prefix: String(source.prefix == null ? (beforeCursor.match(/[\p{L}\p{N}_$-]*$/u) || [''])[0] : source.prefix)
     });
   }
 
