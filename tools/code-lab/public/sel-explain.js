@@ -189,28 +189,59 @@
     btn.style.left = Math.min(x + 8, innerWidth - 120) + 'px'; btn.style.top = Math.min(y + 6, innerHeight - 40) + 'px';
     btn.onmousedown = e => e.preventDefault(); btn.onclick = open; document.body.appendChild(btn);
   }
-  function cssShorthandPreview(selection){
+  function cssShorthandPreview(selection, fullCode, cursor){
     if(!window.CSSShorthands || !selection) return '';
-    const match = String(selection).trim().match(/^(place-items|place-content|place-self)\s*:\s*([a-z-]+(?:\s+[a-z-]+)?)\s*;?$/i);
-    if(!match) return '';
-    const values = match[2].trim().split(/\s+/);
-    const simple = {
+    const text = String(selection).trim();
+    const allowed = {
       'place-items': new Set(['normal','stretch','center','start','end','self-start','self-end','baseline','left','right']),
       'place-content': new Set(['normal','stretch','center','start','end','flex-start','flex-end','baseline','space-between','space-around','space-evenly','left','right']),
       'place-self': new Set(['auto','normal','stretch','center','start','end','self-start','self-end','baseline','left','right'])
-    }[match[1].toLowerCase()];
-    if(!simple || values.some(value => !simple.has(value.toLowerCase()))) return '';
-    const result = window.CSSShorthands.expand(match[1], values);
+    };
+    const shorthand = text.match(/^(place-items|place-content|place-self)\s*:\s*([a-z-]+(?:\s+[a-z-]+)?)\s*;?$/i);
+    if(shorthand){
+      const name = shorthand[1].toLowerCase(), values = shorthand[2].trim().split(/\s+/);
+      if(values.some(value => !allowed[name].has(value.toLowerCase()))) return '';
+      const result = window.CSSShorthands.expand(name, values);
+      if(!result.ok) return '';
+      const preview = Object.entries(result.declarations)
+        .map(([property, value]) => property + ': ' + value + ';').join('\n');
+      return '<div class="se-transform"><b>развёрнутый вариант (предпросмотр)</b><pre>' + esc(preview) + '</pre></div>';
+    }
+
+    const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    if(lines.length !== 2 || !window.CSSContext || !cursor) return '';
+    const first = lines[0].match(/^([a-z-]+)\s*:\s*([a-z-]+)\s*;?$/i);
+    const second = lines[1].match(/^([a-z-]+)\s*:\s*([a-z-]+)\s*;?$/i);
+    if(!first || !second) return '';
+    const p1 = first[1].toLowerCase(), p2 = second[1].toLowerCase();
+    const parent = window.CSSShorthands.forLonghand(p1).find(item => item.components.includes(p2));
+    if(!parent) return '';
+    const allowedValues = allowed[parent.name];
+    if(!allowedValues || !allowedValues.has(first[2].toLowerCase()) || !allowedValues.has(second[2].toLowerCase())) return '';
+    const full = String(fullCode || '');
+    const count = property => (full.match(new RegExp('(?:^|[;{\\s])' + property + '\\s*:', 'gi')) || []).length;
+    if(count(p1) !== 1 || count(p2) !== 1) return '';
+    const position = window.CSSContext.resolve({ code: full, cursor });
+    if(!position || !position.constraints || position.constraints.declarationBlock !== true) return '';
+    const declarations = { [p1]: first[2], [p2]: second[2] };
+    const result = window.CSSShorthands.collapse(parent.name, declarations, {
+      commentsPreserved: !/\/\*/.test(text),
+      noDuplicates: true,
+      cascadePreserved: true,
+      resetEffectsReviewed: true,
+      grammarValidated: true
+    });
     if(!result.ok) return '';
-    const preview = Object.entries(result.declarations)
-      .map(([property, value]) => property + ': ' + value + ';').join('\n');
-    return '<div class="se-transform"><b>развёрнутый вариант (предпросмотр)</b><pre>' + esc(preview) + '</pre></div>';
+    return '<div class="se-transform"><b>краткая форма (предпросмотр)</b><pre>' +
+      esc(result.shorthand + ': ' + result.value + ';') + '</pre></div>';
   }
 
   async function open(){
     hideBtn();
     const { cm, ta, lang } = activeCM();
     const selectedText = cm ? cm.getSelection() : (ta ? ta.value.slice(ta.selectionStart, ta.selectionEnd) : '');
+    const fullCode = cm ? cm.getValue() : (ta ? ta.value : '');
+    const selectionCursor = cm ? cm.getCursor('from') : null;
     let text = selectedText;
     let base = cm ? cm.getCursor('from').line : 0;
     if(!text.trim() && cm){ const c = cm.getCursor(); text = cm.getLine(c.line); base = c.line; }   // без выделения — текущая строка
@@ -252,7 +283,7 @@
         + (s.own && cm ? '<a data-go="' + s.own.line + '">к объявлению</a>' : '')
         + ruleOf(s.text).map(x => '<div class="r">' + esc(x) + '</div>').join('') + '</div>').join('');
     panel.innerHTML = '<div class="se-h"><b>что здесь</b><span>' + esc(lang.toUpperCase()) + '</span><button title="закрыть (Esc)">×</button></div>'
-      + '<div class="se-b">' + (all.length ? body + flow + '<div class="se-list">' + list + '</div>' : '<div class="se-none">в выделенном нет слов из словаря — выдели кусок побольше или добавь пояснения в словарь</div>') + cssShorthandPreview(selectedText) + '</div>';
+      + '<div class="se-b">' + (all.length ? body + flow + '<div class="se-list">' + list + '</div>' : '<div class="se-none">в выделенном нет слов из словаря — выдели кусок побольше или добавь пояснения в словарь</div>') + cssShorthandPreview(selectedText, fullCode, selectionCursor) + '</div>';
     document.body.appendChild(panel);
     layout(panel);
     panel.querySelector('.se-h button').onclick = () => { panel.remove(); panel = null; };
