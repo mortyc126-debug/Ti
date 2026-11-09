@@ -477,6 +477,50 @@ try {
     'HTML tag context did not offer the Russian-explained div element');
   await page.keyboard.press('Escape');
 
+  const callContexts = await htmlEditor.evaluate(ed => {
+    const cm = ed.querySelector('textarea')?.__cm;
+    if(!cm) return null;
+    const original = cm.getValue();
+    const resolve = (language, code) => {
+      cm.setValue(code);
+      const snapshot = window.CodeLabContext.createSnapshot({
+        editor: ed, language, code, cursor: { line: 0, ch: code.length }
+      });
+      const result = window.CodeLabContext.resolve(snapshot);
+      return result && {
+        provider: result.provider,
+        kind: result.kind,
+        expected: result.expected,
+        symbol: result.symbol,
+        argumentIndex: result.argumentIndex,
+        prefix: result.prefix,
+        inString: result.inString
+      };
+    };
+    try {
+      return {
+        javascript: resolve('javascript', 'fetch(url, signal'),
+        python: resolve('python', 'open(path, "r'),
+        sql: resolve('sql', 'COALESCE(price, 0')
+      };
+    } finally {
+      cm.setValue(original);
+    }
+  });
+  assert.ok(callContexts, 'CodeMirror editor was unavailable for cross-language context checks');
+  assert.deepEqual(callContexts.javascript, {
+    provider: 'call-arguments', kind: 'call-argument', expected: 'argument',
+    symbol: 'fetch', argumentIndex: 1, prefix: 'signal', inString: false
+  }, 'JavaScript call argument did not resolve through the shared context contract');
+  assert.deepEqual(callContexts.python, {
+    provider: 'call-arguments', kind: 'call-argument', expected: 'argument-value',
+    symbol: 'open', argumentIndex: 1, prefix: 'r', inString: true
+  }, 'Python quoted argument did not resolve through the shared context contract');
+  assert.deepEqual(callContexts.sql, {
+    provider: 'call-arguments', kind: 'call-argument', expected: 'argument',
+    symbol: 'COALESCE', argumentIndex: 1, prefix: '0', inString: false
+  }, 'SQL function argument did not resolve through the shared context contract');
+
   assert.deepEqual(pageErrors, [], 'browser page raised uncaught errors: ' + pageErrors.join('; '));
   console.log('Browser smoke passed: variant tree, expansion, keyboard insertion, IME and stale-template cancellation.');
 } finally {
