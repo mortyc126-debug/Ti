@@ -192,3 +192,16 @@ test('editor snapshot derives Unicode identifier prefixes and supports lone carr
   assert.equal(snapshot.currentLine, 'вторая переменная');
   assert.equal(snapshot.prefix, 'переменная');
 });
+
+
+test('candidate ranking keeps the highest-ranked duplicate instead of the first occurrence', () => {
+  const candidates = [
+    { code: 'end', label: 'значение', lang: 'css', priority: -10, note: 'устаревший вариант' },
+    { code: 'end', label: 'значение', lang: 'css', priority: 20, note: 'контекстный вариант' },
+  ];
+  const ranked = Context.rankCandidates(candidates, {
+    prefix: 'en', language: 'css', expected: 'property-value', kind: 'css-value',
+  });
+  assert.equal(ranked.length, 1);
+  assert.equal(ranked[0].note, 'контекстный вариант');
+});
