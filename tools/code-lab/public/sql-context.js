@@ -63,7 +63,7 @@
     const open = stack[stack.length - 1];
     if (open && open.word && !aliases.has(open.word)) return null;
 
-    const prefixMatch = before.match(/[\p{L}\p{N}_$]*$/u);
+    const prefixMatch = before.match(/[\p{L}\p{N}_$.]*$/u);
     const prefix = prefixMatch ? prefixMatch[0] : '';
     const tokenStart = offset - prefix.length;
     const currentDepth = depth;
