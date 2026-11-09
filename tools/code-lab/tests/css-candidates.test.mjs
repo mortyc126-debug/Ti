@@ -59,3 +59,8 @@ test('CSS custom property matching preserves case sensitivity', () => {
   const code = ':root { --Theme: dark; --theme: light; }';
   assert.deepEqual(CSSCandidates.variables(code, '--Th').map(item => item.code), ['--Theme']);
 });
+
+test('CSS custom property scan does not treat comment markers inside strings as comments', () => {
+  const code = ':root { content: "/* --fake: red"; --real: 1rem; }';
+  assert.deepEqual(CSSCandidates.variables(code, '--').map(item => item.code), ['--real']);
+});
