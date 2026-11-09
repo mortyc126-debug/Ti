@@ -503,6 +503,42 @@ try {
   assert.ok(htmlAttributeRows.length && htmlValueRows.length,
     'HTML attribute name or value candidates unexpectedly returned no rows');
 
+  const insertHtmlCandidate = async (source, candidate, expectedSource) => {
+    await htmlEditor.evaluate((ed, code) => {
+      const cm = ed.querySelector('textarea')?.__cm;
+      ed.__f.lang = 'html';
+      cm.setValue(code);
+      const line = cm.lastLine();
+      cm.setCursor({ line, ch: cm.getLine(line).length });
+      cm.focus();
+    }, source);
+    await page.keyboard.press('Control+Space');
+    await page.waitForFunction(code => [...document.querySelectorAll('.ac-pop .ac-r')]
+      .some(row => row.dataset.code === code), candidate, { timeout: 10_000 });
+    const popup = page.locator('.ac-pop');
+    const targetIndex = await popup.locator('.ac-r').evaluateAll((rows, code) => {
+      const visible = rows.filter(row => row.offsetParent !== null);
+      return visible.findIndex(row => row.dataset.code === code);
+    }, candidate);
+    assert.ok(targetIndex >= 0, 'HTML candidate was not selectable: ' + candidate);
+    const selectedIndex = await popup.locator('.ac-r').evaluateAll(rows => {
+      const visible = rows.filter(row => row.offsetParent !== null);
+      return visible.indexOf(visible.find(row => row.classList.contains('sel')));
+    });
+    assert.ok(selectedIndex >= 0, 'HTML autocomplete popup has no keyboard selection');
+    const delta = targetIndex - selectedIndex;
+    for (let i = 0; i < Math.abs(delta); i++) {
+      await page.keyboard.press(delta > 0 ? 'ArrowDown' : 'ArrowUp');
+    }
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => !document.querySelector('.ac-pop'));
+    const actual = await htmlEditor.evaluate(ed => ed.__f.code);
+    assert.equal(actual, expectedSource, 'HTML candidate insertion failed for ' + candidate);
+  };
+  await insertHtmlCandidate('<di', 'div', '<div');
+  await insertHtmlCandidate('<button dis', 'disabled', '<button disabled');
+  await insertHtmlCandidate('<button type="su', 'submit', '<button type="submit');
+
   const callContexts = await htmlEditor.evaluate(ed => {
     const cm = ed.querySelector('textarea')?.__cm;
     if(!cm) return null;
