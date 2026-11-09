@@ -65,3 +65,17 @@ test('SQL scope extracts table aliases and offers qualified source candidates', 
   assert.deepEqual(result.map(item => item.code), ['u.']);
   assert.match(result[0].note, /users/);
 });
+
+
+test('SQL source aliases stay within their query nesting level', () => {
+  const code = 'WITH ActiveUsers AS (SELECT id FROM users) SELECT au.id FROM ActiveUsers au WHERE au.';
+  const outer = SQLCandidates.scope(code, 0);
+  const inner = SQLCandidates.scope(code, 1);
+  assert.deepEqual(outer.sources.map(item => item.qualifier), ['au']);
+  assert.deepEqual(inner.sources.map(item => item.qualifier), ['users']);
+  const result = SQLCandidates.candidates(dictionary, {
+    kind: 'sql-condition', expected: 'sql-condition', prefix: 'users.',
+    constraints: { depth: 0 }
+  }, code);
+  assert.deepEqual(result, []);
+});
