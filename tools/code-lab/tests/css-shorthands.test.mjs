@@ -65,3 +65,50 @@ test('collapse only emits a shorthand after all safety checks pass', () => {
     components: ['align-items', 'justify-items'],
   });
 });
+
+
+test('collapseRange previews only an adjacent pair in one declaration block', () => {
+  const code = '.card {\\n  align-items: center;\\n  justify-items: end;\\n}';
+  const selection = 'align-items: center;\\n  justify-items: end;';
+  const result = CSSShorthands.collapseRange('place-items', selection, code, code.indexOf('align-items'));
+  assert.equal(result.ok, true);
+  assert.equal(result.value, 'center end');
+});
+
+test('collapseRange rejects duplicate declarations and an existing shorthand', () => {
+  const duplicate = '.card { align-items: center; justify-items: end; align-items: start; }';
+  const selected = 'align-items: center; justify-items: end;';
+  assert.equal(
+    CSSShorthands.collapseRange('place-items', selected, duplicate, duplicate.indexOf('align-items')).ok,
+    false
+  );
+
+  const existing = '.card { place-items: normal; align-items: center; justify-items: end; }';
+  assert.equal(
+    CSSShorthands.collapseRange('place-items', selected, existing, existing.indexOf('align-items')).ok,
+    false
+  );
+});
+
+test('collapseRange rejects non-adjacent declarations and values invalid for a component', () => {
+  const separated = '.card { align-items: center; gap: 1rem; justify-items: end; }';
+  assert.equal(
+    CSSShorthands.collapseRange('place-items', 'align-items: center; gap: 1rem; justify-items: end;', separated, separated.indexOf('align-items')).ok,
+    false
+  );
+
+  const invalid = '.card { align-items: left; justify-items: center; }';
+  assert.equal(
+    CSSShorthands.collapseRange('place-items', 'align-items: left; justify-items: center;', invalid, invalid.indexOf('align-items')).ok,
+    false
+  );
+});
+
+test('component value validation is specific to each longhand property', () => {
+  assert.equal(CSSShorthands.isAllowed('place-items', 0, 'left'), false);
+  assert.equal(CSSShorthands.isAllowed('place-items', 1, 'left'), true);
+  assert.equal(CSSShorthands.isAllowed('place-content', 0, 'flex-start'), true);
+  assert.equal(CSSShorthands.isAllowed('place-content', 1, 'flex-start'), true);
+  assert.equal(CSSShorthands.isAllowed('place-self', 0, 'auto'), true);
+  assert.equal(CSSShorthands.isAllowed('place-self', 1, 'auto'), true);
+});
