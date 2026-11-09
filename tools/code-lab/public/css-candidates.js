@@ -50,10 +50,10 @@
     const query = String(prefix || '').trim().toLowerCase();
     if (!query.startsWith('--')) return [];
     const source = String(code || '')
-      .replace(/\\/\\*[\\s\\S]*?\\*\\//g, ' ')
-      .replace(/(["'])(?:\\\\.|(?!\\1)[^\\\\])*?\\1/g, ' ');
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g, ' ');
     const names = new Set();
-    const pattern = /(--[a-z0-9_-]+)\\s*:/gi;
+    const pattern = /(--[a-z0-9_-]+)\s*:/gi;
     let match;
     while ((match = pattern.exec(source))) names.add(match[1]);
     return Array.from(names)
