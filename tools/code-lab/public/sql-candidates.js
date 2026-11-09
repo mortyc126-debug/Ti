@@ -32,7 +32,7 @@
       seen.add(key);
       return true;
     }).map(key => {
-      const note = entries[key] || (ctes(code).includes(key) ? 'Объявленный CTE — именованный результат запроса.' : '');
+      const note = entries[key] || (ctes(code).some(name => name.toLowerCase() === key) ? 'Объявленный CTE — именованный результат запроса.' : '');
       const isFunction = ['count','sum','avg','min','max','coalesce','nullif','concat','lower','upper','length','substring','round'].includes(key);
       return {
         code: key.toUpperCase(),
