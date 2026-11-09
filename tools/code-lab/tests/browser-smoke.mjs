@@ -203,6 +203,42 @@ try {
     assert.equal(await page.locator('.se-transform').count(), 0,
       'CSS shorthand expansion preview accepted a value invalid for align-items');
     await page.locator('.se .se-h button').click();
+
+    const collapseSource = '.card {\\n  align-items: center;\\n  justify-items: end;\\n}';
+    await cm.click();
+    await page.keyboard.press('Control+A');
+    await page.keyboard.type(collapseSource);
+    await cssEditor.evaluate(ed => {
+      const editor = ed.querySelector('textarea')?.__cm;
+      editor.setSelection({ line: 1, ch: 2 }, { line: 2, ch: 21 });
+    });
+    await page.evaluate(async () => { await window.codelabSelExplain.open(); });
+    await page.waitForSelector('.se-transform [data-css-apply]', { timeout: 10_000 });
+    await page.locator('.se-transform [data-css-apply]').click();
+    let transformed = await cssEditor.evaluate(ed => ed.querySelector('textarea')?.__cm.getValue());
+    assert.match(transformed, /place-items: center end;/,
+      'explicit CSS shorthand action did not replace the selected longhand pair');
+    await cssEditor.evaluate(ed => ed.querySelector('textarea')?.__cm.undo());
+    assert.equal(await cssEditor.evaluate(ed => ed.querySelector('textarea')?.__cm.getValue()), collapseSource,
+      'CSS shorthand collapse could not be undone in CodeMirror history');
+
+    const expandSource = '.card { place-items: center; }';
+    await cm.click();
+    await page.keyboard.press('Control+A');
+    await page.keyboard.type(expandSource);
+    await cssEditor.evaluate(ed => {
+      const editor = ed.querySelector('textarea')?.__cm;
+      editor.setSelection({ line: 0, ch: 8 }, { line: 0, ch: 28 });
+    });
+    await page.evaluate(async () => { await window.codelabSelExplain.open(); });
+    await page.waitForSelector('.se-transform [data-css-apply]', { timeout: 10_000 });
+    await page.locator('.se-transform [data-css-apply]').click();
+    transformed = await cssEditor.evaluate(ed => ed.querySelector('textarea')?.__cm.getValue());
+    assert.match(transformed, /align-items: center;\\s*justify-items: center;/,
+      'explicit CSS shorthand expansion did not replace the selected declaration');
+    await cssEditor.evaluate(ed => ed.querySelector('textarea')?.__cm.undo());
+    assert.equal(await cssEditor.evaluate(ed => ed.querySelector('textarea')?.__cm.getValue()), expandSource,
+      'CSS shorthand expansion could not be undone in CodeMirror history');
   }
   if (await cm.count() && await cm.isVisible()) {
     await cm.click();
