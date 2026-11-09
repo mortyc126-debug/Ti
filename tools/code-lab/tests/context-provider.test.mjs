@@ -169,3 +169,26 @@ test('editor snapshot handles multiline code and clamps negative cursor position
   assert.equal(snapshot.beforeCursor, '');
   assert.equal(snapshot.afterCursor, 'second line');
 });
+
+
+test('editor snapshot clamps cursor line and column to the actual source', () => {
+  const snapshot = Context.createSnapshot({
+    language: 'js',
+    code: 'first line\\r\\nsecond line',
+    cursor: { line: 99, ch: 99 },
+  });
+  assert.deepEqual(snapshot.cursor, { line: 1, ch: 11 });
+  assert.equal(snapshot.currentLine, 'second line');
+  assert.equal(snapshot.beforeCursor, 'second line');
+  assert.equal(snapshot.afterCursor, '');
+});
+
+test('editor snapshot derives Unicode identifier prefixes and supports lone carriage returns', () => {
+  const snapshot = Context.createSnapshot({
+    language: 'python',
+    code: 'первая строка\\rвторая переменная',
+    cursor: { line: 1, ch: 17 },
+  });
+  assert.equal(snapshot.currentLine, 'вторая переменная');
+  assert.equal(snapshot.prefix, 'переменная');
+});
