@@ -617,6 +617,51 @@ try {
   assert.ok(jsCallRows.length && pythonCallRows.length && sqlCallRows.length,
     'shared call argument UI returned no candidate rows for one of the tested languages');
 
+  const insertJavaScriptCallCandidate = async (source, candidate, expectedSource, expectedNote) => {
+    await htmlEditor.evaluate((ed, code) => {
+      const cm = ed.querySelector('textarea')?.__cm;
+      ed.__f.lang = 'js';
+      cm.setValue(code);
+      const line = cm.lastLine();
+      cm.setCursor({ line, ch: cm.getLine(line).length });
+      cm.focus();
+    }, source);
+    await page.keyboard.press('Control+Space');
+    await page.waitForFunction(code => [...document.querySelectorAll('.ac-pop .ac-r')]
+      .some(row => row.dataset.code === code), candidate, { timeout: 10_000 });
+    const popup = page.locator('.ac-pop');
+    const details = await popup.locator('.ac-r').evaluateAll((rows, code) => {
+      const row = rows.find(item => item.dataset.code === code);
+      return {
+        note: row?.querySelector('.ac-d')?.textContent || '',
+        visible: Boolean(row && row.offsetParent !== null)
+      };
+    }, candidate);
+    assert.ok(details.visible, 'JavaScript call candidate was not selectable: ' + candidate);
+    assert.match(details.note, expectedNote,
+      'JavaScript call candidate explanation is missing for ' + candidate + ': ' + details.note);
+    const targetIndex = await popup.locator('.ac-r').evaluateAll((rows, code) => {
+      const visible = rows.filter(row => row.offsetParent !== null);
+      return visible.findIndex(row => row.dataset.code === code);
+    }, candidate);
+    const selectedIndex = await popup.locator('.ac-r').evaluateAll(rows => {
+      const visible = rows.filter(row => row.offsetParent !== null);
+      return visible.indexOf(visible.find(row => row.classList.contains('sel')));
+    });
+    assert.ok(selectedIndex >= 0, 'JavaScript call popup has no keyboard selection');
+    const delta = targetIndex - selectedIndex;
+    for(let i = 0; i < Math.abs(delta); i++) {
+      await page.keyboard.press(delta > 0 ? 'ArrowDown' : 'ArrowUp');
+    }
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => !document.querySelector('.ac-pop'));
+    const actual = await htmlEditor.evaluate(ed => ed.__f.code);
+    assert.equal(actual, expectedSource, 'JavaScript call candidate insertion failed for ' + candidate);
+  };
+  await insertJavaScriptCallCandidate(
+    "button.addEventListener('cl", 'click', "button.addEventListener('click", /тип события DOM/i
+  );
+
   const insertPythonCallCandidate = async (source, candidate, expectedSource, expectedSelection = '', expectedNote = null) => {
     await htmlEditor.evaluate((ed, code) => {
       const cm = ed.querySelector('textarea')?.__cm;
