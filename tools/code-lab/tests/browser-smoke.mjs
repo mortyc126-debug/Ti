@@ -204,7 +204,7 @@ try {
       'CSS shorthand expansion preview accepted a value invalid for align-items');
     await page.locator('.se .se-h button').click();
 
-    const collapseSource = '.card {\\n  align-items: center;\\n  justify-items: end;\\n}';
+    const collapseSource = '.card {\n  align-items: center;\n  justify-items: end;\n}';
     await cm.click();
     await page.keyboard.press('Control+A');
     await page.keyboard.type(collapseSource);
@@ -234,7 +234,7 @@ try {
     await page.waitForSelector('.se-transform [data-css-apply]', { timeout: 10_000 });
     await page.locator('.se-transform [data-css-apply]').click();
     transformed = await cssEditor.evaluate(ed => ed.querySelector('textarea')?.__cm.getValue());
-    assert.match(transformed, /align-items: center;\\s*justify-items: center;/,
+    assert.match(transformed, /align-items: center;\s*justify-items: center;/,
       'explicit CSS shorthand expansion did not replace the selected declaration');
     await cssEditor.evaluate(ed => ed.querySelector('textarea')?.__cm.undo());
     assert.equal(await cssEditor.evaluate(ed => ed.querySelector('textarea')?.__cm.getValue()), expandSource,
