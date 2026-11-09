@@ -34,11 +34,11 @@ test('SQL condition candidates contain operators rather than table clauses', () 
 });
 
 test('SQL table-source candidates include declared CTE names with explanations', () => {
-  const code = 'WITH active_users AS (SELECT id FROM users) SELECT * FROM act';
+  const code = 'WITH Active_Users AS (SELECT id FROM users) SELECT * FROM act';
   const result = SQLCandidates.candidates(dictionary, {
     kind: 'sql-table-source', expected: 'table-or-cte', prefix: 'act'
   }, code);
-  assert.deepEqual(result.map(item => item.code), ['ACTIVE_USERS']);
+  assert.deepEqual(result.map(item => item.code), ['Active_Users']);
   assert.match(result[0].note, /CTE/);
 });
 
