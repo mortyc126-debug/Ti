@@ -47,6 +47,9 @@
   .se-it .r{font:11.5px ui-monospace,monospace;color:var(--str,#52F2C9);margin:1px 0 0 14px;white-space:pre-wrap}
   .se-it .p{color:var(--text2,#cbc2ea)}
   .se-none{color:var(--text3,#9c90c4);font-size:12.5px}
+  .se-transform{margin-top:10px;border-top:1px solid var(--border,#3a2f55);padding-top:8px;font-size:12.5px}
+  .se-transform pre{white-space:pre-wrap;margin:6px 0;color:var(--name,#3dd9ff)}
+  .se-transform button{background:var(--bg,#10091d);color:var(--text,#eee);border:1px solid var(--name,#3dd9ff);border-radius:5px;padding:5px 9px;cursor:pointer}
   `;
   document.head.appendChild(st);
 
@@ -189,7 +192,9 @@
     btn.style.left = Math.min(x + 8, innerWidth - 120) + 'px'; btn.style.top = Math.min(y + 6, innerHeight - 40) + 'px';
     btn.onmousedown = e => e.preventDefault(); btn.onclick = open; document.body.appendChild(btn);
   }
+  let pendingCssTransform = null;
   function cssShorthandPreview(selection, fullCode, cursor){
+    pendingCssTransform = null;
     if(!window.CSSShorthands || !selection) return '';
     const source = String(selection);
     const text = source.trim();
@@ -203,7 +208,13 @@
       if(!result.ok) return '';
       const preview = Object.entries(result.declarations)
         .map(([property, value]) => property + ': ' + value + ';').join('\n');
-      return '<div class="se-transform"><b>развёрнутый вариант (предпросмотр)</b><pre>' + esc(preview) + '</pre></div>';
+      const start = window.CSSContext.offsetAt(String(fullCode || ''), cursor);
+      const leading = source.slice(0, source.indexOf(text));
+      const trailing = source.slice(source.indexOf(text) + text.length);
+      pendingCssTransform = { source, full: String(fullCode || ''), start, end: start + source.length,
+        replacement: leading + preview, trailing };
+      return '<div class="se-transform"><b>развёрнутый вариант (предпросмотр)</b><pre>' + esc(preview) +
+        '</pre><button type="button" data-css-apply>Применить в редакторе</button></div>';
     }
 
     const lines = source.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
@@ -218,8 +229,13 @@
     const offset = window.CSSContext.offsetAt(full, cursor);
     const result = window.CSSShorthands.collapseRange(parent.name, source, full, offset);
     if(!result.ok) return '';
+    const replacement = result.shorthand + ': ' + result.value + ';';
+    const leading = source.match(/^\\s*/)?.[0] || '';
+    const trailing = source.match(/\\s*$/)?.[0] || '';
+    pendingCssTransform = { source, full, start: offset, end: offset + source.length,
+      replacement: leading + replacement + trailing };
     return '<div class="se-transform"><b>краткая форма (предпросмотр)</b><pre>' +
-      esc(result.shorthand + ': ' + result.value + ';') + '</pre></div>';
+      esc(replacement) + '</pre><button type="button" data-css-apply>Применить в редакторе</button></div>';
   }
 
   async function open(){
@@ -275,6 +291,22 @@
     panel.querySelector('.se-h button').onclick = () => { panel.remove(); panel = null; };
     panel.querySelector('.se-b').addEventListener('click', e => {
       if(!cm) return;
+      const applyCss = e.target.closest('[data-css-apply]');
+      if(applyCss){
+        const pending = pendingCssTransform;
+        if(!pending || cm.getValue() !== pending.full || cm.getSelection() !== pending.source ||
+            cm.indexFromPos(cm.getCursor('from')) !== pending.start ||
+            cm.indexFromPos(cm.getCursor('to')) !== pending.end){
+          applyCss.disabled = true;
+          applyCss.textContent = 'Выделение изменилось — открой предпросмотр заново';
+          return;
+        }
+        cm.replaceRange(pending.replacement, cm.posFromIndex(pending.start), cm.posFromIndex(pending.end), '+css-shorthand');
+        cm.focus();
+        if(panel){ panel.remove(); panel = null; }
+        pendingCssTransform = null;
+        return;
+      }
       const fix = e.target.closest('[data-fix]');
       // исправить — все вхождения в файле как отдельного слова (после точки — только методы, иначе только имена)
       if(fix){ const w = fix.dataset.fix, to = fix.dataset.to, src = cm.getValue();
