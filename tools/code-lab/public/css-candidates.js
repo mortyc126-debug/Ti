@@ -102,11 +102,8 @@
     const query = String(prefix || '').trim().toLowerCase();
     const source = Object.assign({}, dictionary && dictionary.cssVals || {},
       dictionary && dictionary.langs && dictionary.langs.css || {});
-    const pattern = new RegExp('^:' + name.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\  const api = { properties, selectors, variables, cleanExplanation };') + '\\(([^()]*)\\)
-  if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  if (root) root.CSSCandidates = api;
-})(typeof window !== 'undefined' ? window : globalThis);
-, 'i');
+    // Имя функции берётся только из фиксированного списка, поэтому его можно безопасно вставить в шаблон.
+    const pattern = new RegExp('^:' + name + '\\(([^()]*)\\)$', 'i');
     return Object.entries(source)
       .map(([key, explanation]) => {
         const match = key.match(pattern);
