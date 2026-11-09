@@ -15,8 +15,12 @@
 
   function ctes(code) {
     const found = [];
+    const source = String(code || '')
+      .replace(/--[^\r\n]*/g, ' ')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/'(?:''|[^'])*'/g, ' ');
     const re = /\b(?:with|,)\s*([\p{L}_][\p{L}\p{N}_$]*)\s+as\s*\(/giu;
-    for (const match of String(code || '').matchAll(re)) found.push(match[1]);
+    for (const match of source.matchAll(re)) found.push(match[1]);
     return [...new Set(found)];
   }
 
