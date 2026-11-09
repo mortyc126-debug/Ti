@@ -305,6 +305,11 @@
     return window.CSSCandidates.selectors(dictionary, context && context.prefix);
   }
 
+  async function cssVariableRoots(context, code){
+    if(!window.CSSCandidates) return [];
+    return window.CSSCandidates.variables(code, context && context.prefix);
+  }
+
   // запасной путь: слова словаря по началу («quer» → querySelector), если дерева нет
   function flatFallback(word, d, lang){
     const lq = word.toLowerCase(); const out = []; const seen = new Set();
@@ -348,6 +353,16 @@
       ? window.CodeLabContext.resolve(snapshot)
       : null;
     if(resolved && resolved.suppressAutocomplete){ hide(); return; }
+    if(resolved && resolved.kind === 'css-function-argument' && String(resolved.functionName || '').toLowerCase() === 'var'){
+      const myVariable = ++seq, roots = await cssVariableRoots(resolved, snapshot.code);
+      if(myVariable !== seq) return;
+      if(roots.length){
+        const actions = editorActions(ed, resolved.prefix);
+        ctx = Object.assign({}, c || {}, actions, { ed, syntaxContext: resolved });
+        render(ctx, rankRoots(roots, resolved));
+        return;
+      }
+    }
     if(resolved && resolved.kind === 'css-selector' && [':', '@', '.', '#', '['].some(mark => String(resolved.prefix || '').startsWith(mark))){
       const mySelector = ++seq, roots = await cssSelectorRoots(resolved);
       if(mySelector !== seq) return;
