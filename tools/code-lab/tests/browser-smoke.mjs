@@ -645,7 +645,7 @@ try {
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => !document.querySelector('.ac-pop'));
   const sqlAfterAliasInsert = await htmlEditor.evaluate(ed => ed.__f.code);
-  assert.match(sqlAfterAliasInsert, /WHERE\\s+u\\.$/,
+  assert.match(sqlAfterAliasInsert, /WHERE\s+u\.$/,
     'Selecting the explained SQL alias candidate did not insert its qualifier');
 
   await htmlEditor.evaluate(ed => { ed.__f.lang = 'html'; });
