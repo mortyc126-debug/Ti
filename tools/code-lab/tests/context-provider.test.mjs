@@ -205,3 +205,42 @@ test('candidate ranking keeps the highest-ranked duplicate instead of the first 
   assert.equal(ranked.length, 1);
   assert.equal(ranked[0].note, 'контекстный вариант');
 });
+
+
+test('provider context declarations reject unsupported results and fall through', () => {
+  const removeWrong = Context.register({
+    id: 'context-filter-wrong',
+    priority: 20,
+    contexts: ['css-value'],
+    resolve: () => ({ kind: 'html-tag', expected: 'tag-name' }),
+  });
+  const removeRight = Context.register({
+    id: 'context-filter-right',
+    priority: 10,
+    contexts: ['html-tag'],
+    resolve: () => ({ kind: 'html-tag', expected: 'tag-name' }),
+  });
+  try {
+    const result = Context.resolve({ language: 'html' });
+    assert.equal(result.provider, 'context-filter-right');
+    assert.equal(result.kind, 'html-tag');
+  } finally {
+    removeWrong();
+    removeRight();
+  }
+});
+
+test('provider context declarations accept the legacy mode field', () => {
+  const remove = Context.register({
+    id: 'context-filter-mode',
+    contexts: ['call-argument'],
+    resolve: () => ({ mode: 'call-argument', fn: 'fetch' }),
+  });
+  try {
+    const result = Context.resolve({ language: 'js' });
+    assert.equal(result.provider, 'context-filter-mode');
+    assert.equal(result.kind, 'call-argument');
+  } finally {
+    remove();
+  }
+});
