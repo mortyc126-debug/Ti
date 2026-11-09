@@ -100,7 +100,104 @@
     };
   }
 
-  const api = { get, forLonghand, expand, collapse };
+
+  const componentValues = Object.freeze({
+    'align-items': new Set(['normal','stretch','center','start','end','self-start','self-end','flex-start','flex-end','baseline']),
+    'justify-items': new Set(['normal','stretch','center','start','end','self-start','self-end','left','right','baseline']),
+    'align-content': new Set(['normal','stretch','center','start','end','flex-start','flex-end','space-between','space-around','space-evenly','baseline']),
+    'justify-content': new Set(['normal','center','start','end','flex-start','flex-end','left','right','space-between','space-around','space-evenly']),
+    'align-self': new Set(['auto','normal','stretch','center','start','end','self-start','self-end','flex-start','flex-end','baseline']),
+    'justify-self': new Set(['auto','normal','stretch','center','start','end','self-start','self-end','left','right'])
+  });
+
+  function isAllowed(name, componentIndex, value) {
+    const item = registry[String(name || '').trim().toLowerCase()];
+    if (!item || !Number.isInteger(componentIndex) || componentIndex < 0 || componentIndex >= item.components.length) return false;
+    const token = String(value || '').trim().toLowerCase();
+    return !!token && !/\\s/.test(token) && componentValues[item.components[componentIndex]]?.has(token) === true;
+  }
+
+  // Маскируем комментарии и строки, чтобы скобки и имена внутри них не влияли на разбор.
+  function maskCss(source) {
+    const chars = String(source || '').split('');
+    let quote = '', comment = false, escaped = false;
+    for (let i = 0; i < chars.length; i++) {
+      const ch = chars[i], next = chars[i + 1];
+      if (comment) {
+        if (ch !== '\\n' && ch !== '\\r') chars[i] = ' ';
+        if (ch === '*' && next === '/') { chars[i + 1] = ' '; i++; comment = false; }
+        continue;
+      }
+      if (quote) {
+        if (ch !== '\\n' && ch !== '\\r') chars[i] = ' ';
+        if (escaped) { escaped = false; continue; }
+        if (ch === '\\\\') { escaped = true; continue; }
+        if (ch === quote) quote = '';
+        continue;
+      }
+      if (ch === '/' && next === '*') { chars[i] = chars[i + 1] = ' '; i++; comment = true; continue; }
+      if (ch === '"' || ch === "'") { chars[i] = ' '; quote = ch; }
+    }
+    return chars.join('');
+  }
+
+  function collapseRange(name, selection, fullCode, startOffset) {
+    const item = registry[String(name || '').trim().toLowerCase()];
+    if (!item) return { ok: false, reason: 'unknown-shorthand' };
+    const source = String(selection || '');
+    const full = String(fullCode || '');
+    if (!Number.isInteger(startOffset) || startOffset < 0 ||
+        full.slice(startOffset, startOffset + source.length) !== source) {
+      return { ok: false, reason: 'selection-mismatch' };
+    }
+    if (/\\/\\*/.test(source)) return { ok: false, reason: 'comments-in-selection' };
+
+    const [firstProperty, secondProperty] = item.components;
+    const escaped = value => value.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\  const api = { get, forLonghand, expand, collapse };');
+    const pair = new RegExp('^\\\\s*' + escaped(firstProperty) +
+      '\\\\s*:\\\\s*([a-z-]+)\\\\s*;\\\\s*' + escaped(secondProperty) +
+      '\\\\s*:\\\\s*([a-z-]+)\\\\s*;?\\\\s*
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (root) root.CSSShorthands = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+, 'i').exec(source);
+    if (!pair) return { ok: false, reason: 'not-adjacent-component-pair' };
+    if (!isAllowed(item.name, 0, pair[1]) || !isAllowed(item.name, 1, pair[2])) {
+      return { ok: false, reason: 'unsupported-component-value' };
+    }
+
+    const masked = maskCss(full);
+    const pairs = [], stack = [];
+    for (let i = 0; i < masked.length; i++) {
+      if (masked[i] === '{') stack.push(i);
+      else if (masked[i] === '}' && stack.length) pairs.push([stack.pop(), i]);
+    }
+    const selectionEnd = startOffset + source.length;
+    const containing = pairs
+      .filter(([open, close]) => open < startOffset && close >= selectionEnd)
+      .sort((a, b) => (a[1] - a[0]) - (b[1] - b[0]))[0];
+    if (!containing) return { ok: false, reason: 'selection-not-in-rule-block' };
+
+    const block = masked.slice(containing[0] + 1, containing[1]);
+    const count = property => {
+      const re = new RegExp('(?:^|[;\\s])' + escaped(property) + '\\\\s*:', 'gi');
+      return [...block.matchAll(re)].length;
+    };
+    if (count(firstProperty) !== 1 || count(secondProperty) !== 1 || count(item.name) !== 0) {
+      return { ok: false, reason: 'duplicate-or-existing-shorthand' };
+    }
+
+    const declarations = { [firstProperty]: pair[1], [secondProperty]: pair[2] };
+    return collapse(item.name, declarations, {
+      commentsPreserved: true,
+      noDuplicates: true,
+      cascadePreserved: true,
+      resetEffectsReviewed: true,
+      grammarValidated: true
+    });
+  }
+
+  const api = { get, forLonghand, expand, collapse, collapseRange, isAllowed };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.CSSShorthands = api;
 })(typeof window !== 'undefined' ? window : globalThis);
