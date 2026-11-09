@@ -117,7 +117,7 @@ try {
 
     await cm.click();
     await page.keyboard.press('Control+A');
-    await page.keyboard.type('.card { align-items: center;\\n  justify-items: end; }');
+    await page.keyboard.type('.card { align-items: center;\n  justify-items: end; }');
     await cssEditor.evaluate(ed => {
       const editor = ed.querySelector('textarea')?.__cm;
       editor.setSelection({ line: 0, ch: 8 }, { line: 1, ch: 21 });
