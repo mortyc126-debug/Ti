@@ -58,3 +58,9 @@ test('CSS distinguishes property-name and selector positions', () => {
   assert.equal(selector.kind, 'css-selector');
   assert.equal(selector.expected, 'selector');
 });
+
+test('CSS selector context retains pseudo-class punctuation in the completion prefix', () => {
+  const result = CSSContext.resolve(atEnd('.card :ho'));
+  assert.equal(result.kind, 'css-selector');
+  assert.equal(result.prefix, ':ho');
+});
