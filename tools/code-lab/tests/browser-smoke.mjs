@@ -576,7 +576,7 @@ try {
     return rows;
   };
   const sqlSelectRows = await runSqlAutocomplete('SELECT co', row =>
-    row.code === 'COALESCE' && /первое значение не NULL/.test(row.note)
+    row.code === 'COALESCE' && /первое значение из списка/.test(row.note)
   );
   const sqlConditionRows = await runSqlAutocomplete('SELECT * FROM users WHERE is', row =>
     row.code === 'IS' && /проверка значения/.test(row.note)
