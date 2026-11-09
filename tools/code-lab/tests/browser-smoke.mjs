@@ -239,6 +239,25 @@ try {
     await cssEditor.evaluate(ed => ed.querySelector('textarea')?.__cm.undo());
     assert.equal(await cssEditor.evaluate(ed => ed.querySelector('textarea')?.__cm.getValue()), expandSource,
       'CSS shorthand expansion could not be undone in CodeMirror history');
+
+    await cm.click();
+    await page.keyboard.press('Control+A');
+    await page.keyboard.type(expandSource);
+    await cssEditor.evaluate(ed => {
+      const editor = ed.querySelector('textarea')?.__cm;
+      editor.setSelection({ line: 0, ch: 8 }, { line: 0, ch: 28 });
+    });
+    await page.evaluate(async () => { await window.codelabSelExplain.open(); });
+    await page.waitForSelector('.se-transform [data-css-apply]', { timeout: 10_000 });
+    await cssEditor.evaluate(ed => {
+      ed.querySelector('textarea')?.__cm.setSelection({ line: 0, ch: 0 }, { line: 0, ch: 5 });
+    });
+    await page.locator('.se-transform [data-css-apply]').click();
+    assert.equal(await cssEditor.evaluate(ed => ed.querySelector('textarea')?.__cm.getValue()), expandSource,
+      'stale CSS preview changed code after the editor selection moved');
+    assert.equal(await page.locator('.se-transform [data-css-apply]').isDisabled(), true,
+      'stale CSS preview did not disable its apply action');
+    await page.locator('.se .se-h button').click();
   }
   if (await cm.count() && await cm.isVisible()) {
     await cm.click();
