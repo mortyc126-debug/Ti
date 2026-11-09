@@ -367,7 +367,10 @@
   async function sqlRoots(context, code){
     if(!window.SQLCandidates || !window.codelabKwDict) return [];
     const dictionary = await window.codelabKwDict('sql');
-    return window.SQLCandidates.candidates(dictionary, context, code);
+    const source = String(code || '').slice(0,
+      Number.isInteger(context && context.sourceRange && context.sourceRange.to)
+        ? context.sourceRange.to : String(code || '').length);
+    return window.SQLCandidates.candidates(dictionary, context, source);
   }
 
   // запасной путь: слова словаря по началу («quer» → querySelector), если дерева нет
