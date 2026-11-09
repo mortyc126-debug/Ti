@@ -208,3 +208,24 @@ test('команда удаления не отображается как от�
   const result = buildVariants({ q: 'ul', lang: 'html', dict, rows: [], synonyms: {} });
   assert.equal(result.roots.some(root => root.children.some(child => child.relation === 'удалить')), false);
 });
+
+
+test('SQL function signatures are available through the shared structure rules', () => {
+  const sqlRules = StructureRules.parse([
+    'coalesce: обязательно expression, fallback — два или больше выражений; возвращает первое не NULL',
+    'substring: обязательно text, start',
+    'substring: можно length',
+    'round: обязательно numeric',
+    'round: можно precision'
+  ].join('\\n'));
+  assert.equal(sqlRules.bad.length, 0);
+  const coalesce = StructureRules.attrsFor('COALESCE', sqlRules.rules);
+  assert.deepEqual(coalesce.required.map(item => item.name), ['expression', 'fallback']);
+  assert.match(coalesce.required[0].note, /первое не NULL/);
+  const substring = StructureRules.attrsFor('substring', sqlRules.rules);
+  assert.deepEqual(substring.required.map(item => item.name), ['text', 'start']);
+  assert.deepEqual(substring.optional.map(item => item.name), ['length']);
+  const round = StructureRules.attrsFor('round', sqlRules.rules);
+  assert.deepEqual(round.required.map(item => item.name), ['numeric']);
+  assert.deepEqual(round.optional.map(item => item.name), ['precision']);
+});
