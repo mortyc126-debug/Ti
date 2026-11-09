@@ -680,8 +680,10 @@ try {
       return visible.findIndex(row => row.dataset.code === code);
     }, candidate);
     assert.ok(targetIndex >= 0, 'Python call candidate was not selectable: ' + candidate);
-    const candidateNotes = await popup.locator('.ac-r').evaluateAll(rows =>
-      rows.map(row => row.querySelector('.ac-d')?.textContent || '').filter(Boolean).join(' '));
+    const candidateNotes = await popup.locator('.ac-r').evaluateAll((rows, code) => {
+      const row = rows.find(item => item.dataset.code === code);
+      return row?.querySelector('.ac-d')?.textContent || '';
+    }, candidate);
     if(expectedNote) assert.match(candidateNotes, expectedNote,
       'Python call candidate explanation is missing for ' + candidate + ': ' + candidateNotes);
     const selectedIndex = await popup.locator('.ac-r').evaluateAll(rows => {
