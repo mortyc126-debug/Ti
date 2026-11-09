@@ -521,6 +521,41 @@ try {
     symbol: 'COALESCE', argumentIndex: 1, prefix: '0', inString: false
   }, 'SQL function argument did not resolve through the shared context contract');
 
+  const runCallAutocomplete = async (language, code, expected) => {
+    await htmlEditor.evaluate((ed, data) => {
+      const cm = ed.querySelector('textarea')?.__cm;
+      ed.__f.lang = data.language;
+      cm.setValue(data.code);
+      const line = cm.lastLine();
+      cm.setCursor({ line, ch: cm.getLine(line).length });
+      cm.focus();
+    }, { language, code });
+    await page.keyboard.press('Control+Space');
+    await page.waitForSelector('.ac-pop', { timeout: 10_000 });
+    const rows = await page.locator('.ac-pop .ac-r').evaluateAll(items =>
+      items.map(item => ({
+        code: item.dataset.code || '',
+        text: item.querySelector('.ac-c')?.textContent || '',
+        note: item.querySelector('.ac-d')?.textContent || ''
+      }))
+    );
+    assert.ok(rows.some(row => expected(row)), language + ' call argument suggestions were not rendered: ' + JSON.stringify(rows));
+    await page.keyboard.press('Escape');
+    return rows;
+  };
+  const jsCallRows = await runCallAutocomplete('js', 'fetch(url, ', row =>
+    /fetch\(url,\s*›options\?\)/.test(row.text)
+  );
+  const pythonCallRows = await runCallAutocomplete('python', 'open(path, "r', row =>
+    row.code === 'r' || row.code === 'rb'
+  );
+  const sqlCallRows = await runCallAutocomplete('sql', 'COALESCE(price, ', row =>
+    /COALESCE\(expression,\s*›fallback\)/i.test(row.text)
+  );
+  assert.ok(jsCallRows.length && pythonCallRows.length && sqlCallRows.length,
+    'shared call argument UI returned no candidate rows for one of the tested languages');
+  await htmlEditor.evaluate(ed => { ed.__f.lang = 'html'; });
+
   assert.deepEqual(pageErrors, [], 'browser page raised uncaught errors: ' + pageErrors.join('; '));
   console.log('Browser smoke passed: variant tree, expansion, keyboard insertion, IME and stale-template cancellation.');
 } finally {
