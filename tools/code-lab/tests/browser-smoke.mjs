@@ -241,10 +241,15 @@ try {
     await cm.click();
     await page.keyboard.press('Control+A');
     await page.keyboard.type(collapseSource);
-    await cssEditor.evaluate(ed => {
+    const collapseDiagnostic = await cssEditor.evaluate(ed => {
       const editor = ed.querySelector('textarea')?.__cm;
       editor.setSelection({ line: 1, ch: 2 }, { line: 2, ch: 21 });
+      const full = editor.getValue(), source = editor.getSelection();
+      const offset = window.CSSContext.offsetAt(full, editor.getCursor('from'));
+      return { source, offset, result: window.CSSShorthands.collapseRange('place-items', source, full, offset) };
     });
+    assert.equal(collapseDiagnostic.result.ok, true,
+      'CSS collapse preflight rejected browser selection: ' + JSON.stringify(collapseDiagnostic));
     await page.evaluate(async () => { await window.codelabSelExplain.open(); });
     await page.waitForSelector('.se-transform [data-css-apply]', { timeout: 10_000 });
     await page.locator('.se-transform [data-css-apply]').click();
