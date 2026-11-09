@@ -44,6 +44,7 @@
         continue;
       }
       if (c === ')') { depth = Math.max(0, depth - 1); stack.pop(); continue; }
+      if (c === ';') { statementBreaks.push({ depth, offset: i }); continue; }
       if (/[\p{L}_]/u.test(c)) {
         const start = i;
         while (i + 1 < before.length && /[\p{L}\p{N}_$]/u.test(before[i + 1])) i++;
