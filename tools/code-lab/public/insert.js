@@ -299,6 +299,12 @@
     return window.CSSCandidates.properties(dictionary, context && context.prefix);
   }
 
+  async function cssSelectorRoots(context){
+    if(!window.CSSCandidates || !window.codelabKwDict) return [];
+    const dictionary = await window.codelabKwDict('css');
+    return window.CSSCandidates.selectors(dictionary, context && context.prefix);
+  }
+
   // запасной путь: слова словаря по началу («quer» → querySelector), если дерева нет
   function flatFallback(word, d, lang){
     const lq = word.toLowerCase(); const out = []; const seen = new Set();
@@ -342,6 +348,16 @@
       ? window.CodeLabContext.resolve(snapshot)
       : null;
     if(resolved && resolved.suppressAutocomplete){ hide(); return; }
+    if(resolved && resolved.kind === 'css-selector' && /^[:@.#\\[]/.test(resolved.prefix || '')){
+      const mySelector = ++seq, roots = await cssSelectorRoots(resolved);
+      if(mySelector !== seq) return;
+      if(roots.length){
+        const actions = editorActions(ed, resolved.prefix);
+        ctx = Object.assign({}, c || {}, actions, { ed, syntaxContext: resolved });
+        render(ctx, rankRoots(roots, resolved));
+        return;
+      }
+    }
     if(resolved && resolved.kind === 'css-property' && resolved.prefix){
       const myCss = ++seq, roots = await cssPropertyRoots(resolved);
       if(myCss !== seq) return;
