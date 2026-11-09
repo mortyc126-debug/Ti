@@ -103,6 +103,9 @@
         if (input.onProviderError) input.onProviderError(error, provider.id);
         continue;
       }
+      if (!raw) continue;
+      const rawKind = String(raw.kind || raw.mode || 'token');
+      if (provider.contexts && !provider.contexts.has(rawKind)) continue;
       const context = normalizeContext(provider.id, raw, input);
       if (context) return context;
     }
