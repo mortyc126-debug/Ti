@@ -24,15 +24,17 @@
     if (!context || !choices[context.kind]) return [];
     const entries = dictionary && dictionary.langs && dictionary.langs.sql || {};
     const prefix = String(context.prefix || '').toLowerCase();
+    const cteNames = context.kind === 'sql-table-source' ? ctes(code) : [];
     const keys = [...choices[context.kind]];
-    if (context.kind === 'sql-table-source') keys.unshift(...ctes(code).map(name => name.toLowerCase()));
+    if (cteNames.length) keys.unshift(...cteNames.map(name => name.toLowerCase()));
     const seen = new Set();
     return keys.filter(key => {
-      if (seen.has(key) || (prefix && !key.toLowerCase().startsWith(prefix))) return false;
+      const hasExplanation = Boolean(entries[key]) || cteNames.some(name => name.toLowerCase() === key);
+      if (!hasExplanation || seen.has(key) || (prefix && !key.toLowerCase().startsWith(prefix))) return false;
       seen.add(key);
       return true;
     }).map(key => {
-      const note = entries[key] || (ctes(code).some(name => name.toLowerCase() === key) ? 'Объявленный CTE — именованный результат запроса.' : '');
+      const note = entries[key] || 'Объявленный CTE — именованный результат запроса.';
       const isFunction = ['count','sum','avg','min','max','coalesce','nullif','concat','lower','upper','length','substring','round'].includes(key);
       return {
         code: key.toUpperCase(),
