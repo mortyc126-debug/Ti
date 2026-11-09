@@ -72,3 +72,38 @@ test('CSS selector candidates include shared dictionary pseudo-classes', () => {
   }, ':ho');
   assert.deepEqual(result.map(item => item.code), [':hover']);
 });
+
+
+test('CSS selector candidates include HTML tag names inside selector-list functions', () => {
+  const result = CSSCandidates.selectors({
+    htmlTags: { div: 'div — блочный элемент.', button: 'button — кнопка.' },
+    langs: { css: { display: 'display — тип раскладки.' } },
+  }, 'di');
+  assert.deepEqual(result.map(item => item.code), ['div']);
+  assert.ok(result[0].contexts.includes('css-selector-argument'));
+});
+
+test('CSS pseudo-function candidates come from matching dictionary examples', () => {
+  const dictionary = {
+    langs: { css: {
+      ':nth-child(odd)': 'выбрать нечётные дочерние элементы',
+      ':nth-child(even)': 'выбрать чётные дочерние элементы',
+      ':nth-child(2n + 1)': 'выбрать элементы по формуле',
+      ':dir(rtl)': 'выбрать элементы с письмом справа налево',
+      ':lang(ru)': 'выбрать элементы по языку содержимого',
+    } },
+  };
+  assert.deepEqual(
+    CSSCandidates.functionArguments(dictionary, 'nth-child', 'od').map(item => item.code),
+    ['odd']
+  );
+  assert.deepEqual(
+    CSSCandidates.functionArguments(dictionary, 'nth-child', '2n').map(item => item.code),
+    ['2n + 1']
+  );
+  assert.deepEqual(
+    CSSCandidates.functionArguments(dictionary, 'dir', 'rt').map(item => item.code),
+    ['rtl']
+  );
+  assert.equal(CSSCandidates.functionArguments(dictionary, 'calc', '1').length, 0);
+});
