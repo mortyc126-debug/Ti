@@ -3,9 +3,9 @@
 
   const choices = Object.freeze({
     'sql-statement': ['select', 'with', 'insert', 'update', 'delete', 'create'],
-    'sql-select-list': ['distinct', 'count', 'sum', 'avg', 'min', 'max', 'coalesce', 'nullif', 'concat', 'lower', 'upper', 'length', 'substring', 'round', 'case', 'from'],
-    'sql-table-source': ['join', 'left', 'right', 'inner', 'outer', 'full', 'cross', 'on', 'where'],
-    'sql-condition': ['and', 'or', 'not', 'in', 'is', 'null', 'between', 'like', 'exists', 'group', 'order', 'limit'],
+    'sql-select-list': ['distinct', 'as', 'count', 'sum', 'avg', 'min', 'max', 'coalesce', 'nullif', 'concat', 'lower', 'upper', 'length', 'substring', 'round', 'case', 'from'],
+    'sql-table-source': ['join', 'left', 'right', 'inner', 'outer', 'full', 'cross', 'on', 'where', 'group', 'order', 'limit', 'offset'],
+    'sql-condition': ['and', 'or', 'not', 'in', 'is', 'null', 'between', 'like', 'exists', 'group', 'order', 'having', 'limit', 'offset'],
     'sql-join-condition': ['and', 'or', 'not', 'in', 'is', 'null', 'between', 'like'],
     'sql-group-order': ['having', 'order', 'asc', 'desc', 'limit', 'offset'],
     'sql-assignment': ['default', 'null', 'where'],
