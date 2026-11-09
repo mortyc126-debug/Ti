@@ -11,7 +11,7 @@
     const lines = code.split(/\r\n|\n|\r/);
     const line = Math.max(0, Math.min(lines.length - 1, cursor.line || 0));
     const ch = Math.max(0, Math.min(String(lines[line] || '').length, cursor.ch || 0));
-    const separators = code.match(/\\r\\n|\\n|\\r/g) || [];
+    const separators = code.match(/\r\n|\n|\r/g) || [];
     const offset = lines.slice(0, line).reduce((sum, part, index) =>
       sum + part.length + (separators[index] || '').length, 0) + ch;
     const before = code.slice(0, offset);
