@@ -28,3 +28,16 @@ test('CSS property candidates preserve stable dictionary order for common prefix
   const result = CSSCandidates.properties(dictionary, 'j');
   assert.deepEqual(result.map(item => item.code), ['justify-content']);
 });
+
+test('CSS selector candidates include pseudo-classes with their punctuation', () => {
+  const result = CSSCandidates.selectors({
+    langs: { css: {
+      ':hover': ':hover — элемент при наведении указателя.',
+      '::before': '::before — псевдоэлемент перед содержимым.',
+      'display': 'display — тип раскладки.',
+      ':focus-visible': ':focus-visible — видимый клавиатурный фокус.',
+    } },
+  }, ':ho');
+  assert.deepEqual(result.map(item => item.code), [':hover']);
+  assert.match(result[0].note, /наведении/);
+});
