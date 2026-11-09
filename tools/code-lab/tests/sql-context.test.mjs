@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import SQLContext from '../public/sql-context.js';
 
 function resolve(code, language = 'sql') {
-  const lines = code.split(/\\r\\n|\\n|\\r/);
+  const lines = code.split(/\r\n|\n|\r/);
   const line = lines.length - 1;
   return SQLContext.resolve({
     language,
@@ -38,10 +38,10 @@ test('SQL context suppresses suggestions inside strings and comments', () => {
 });
 
 test('SQL line comments end at a newline and CRLF offsets remain correct', () => {
-  const result = resolve('SELECT name -- comment\\r\\nFROM users');
+  const result = resolve('SELECT name -- comment\r\nFROM users');
   assert.equal(result.kind, 'sql-table-source');
   assert.equal(result.prefix, 'users');
-  assert.equal(result.sourceRange.to, 'SELECT name -- comment\\r\\nFROM users'.length);
+  assert.equal(result.sourceRange.to, 'SELECT name -- comment\r\nFROM users'.length);
 });
 
 test('SQL context ignores non-SQL languages', () => {
