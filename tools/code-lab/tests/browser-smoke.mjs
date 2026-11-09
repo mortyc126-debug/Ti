@@ -114,6 +114,20 @@ try {
     assert.match(shorthandPreview, /align-items: center;/);
     assert.match(shorthandPreview, /justify-items: center;/);
     await page.locator('.se .se-h button').click();
+
+    await cm.click();
+    await page.keyboard.press('Control+A');
+    await page.keyboard.type('.card { align-items: center;\\n  justify-items: end; }');
+    await cssEditor.evaluate(ed => {
+      const editor = ed.querySelector('textarea')?.__cm;
+      editor.setSelection({ line: 0, ch: 8 }, { line: 1, ch: 21 });
+    });
+    await page.evaluate(async () => { await window.codelabSelExplain.open(); });
+    await page.waitForFunction(() => {
+      const preview = document.querySelector('.se-transform pre');
+      return preview && /place-items: center end;/.test(preview.textContent || '');
+    }, undefined, { timeout: 10_000 });
+    await page.locator('.se .se-h button').click();
   }
   if (await cm.count() && await cm.isVisible()) {
     await cm.click();
