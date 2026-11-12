@@ -777,8 +777,10 @@ try {
 
   // Живой preview перезапускал HTML iframe на каждом изменении CSS и шумел ошибкой тестового скрипта.
   // Для этого сценария проверяем только autocomplete, поэтому отключаем preview до изменения редактора.
-  const livePreview = page.locator('#sbLive');
-  if(await livePreview.isChecked()) await livePreview.uncheck();
+  await page.evaluate(() => {
+    const livePreview = document.querySelector('#sbLive');
+    if(livePreview && livePreview.checked) livePreview.click();
+  });
   // Связь проверяем в CSS-редакторе: не подменяем HTML-код, который исполняется в превью iframe.
   await page.locator('#sbTabs .sb-tab').filter({ hasText: 'style.css' }).first().click();
   await cssEditor.waitFor({ state: 'visible' });
