@@ -834,10 +834,21 @@ try {
   await page.locator('#edgeTypeSelect').waitFor({ state: 'visible' });
   const edgeTypeOptions = await page.locator('#edgeTypeSelect option').evaluateAll(options => options.map(option => option.value));
   assert.ok(edgeTypeOptions.includes('calls'), 'edge inspector does not expose CODE_RELATIONS types');
+  const callsLabel = await page.locator('#edgeTypeSelect option[value="calls"]').textContent();
+  assert.ok(callsLabel && callsLabel.trim() !== 'calls', 'edge type is shown as an unexplained English id');
   await page.locator('#edgeTypeSelect').selectOption('calls');
+  const callsDescription = await page.locator('#inspector .muted').textContent();
+  assert.ok(callsDescription && callsDescription.trim(), 'edge type explanation is missing');
   const [selectedEdgeStroke, expectedEdgeStroke] = await Promise.all([
-    page.locator('#edges path.sel').first().evaluate(path => path.style.stroke),
-    page.evaluate(() => window.relationColor('calls'))
+    page.locator('#edges path.sel').first().evaluate(path => getComputedStyle(path).stroke),
+    page.evaluate(() => {
+      const probe = document.createElement('div');
+      probe.style.color = window.relationColor('calls');
+      document.body.appendChild(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    })
   ]);
   assert.equal(selectedEdgeStroke, expectedEdgeStroke, 'changing edge type did not update its relation color');
 
