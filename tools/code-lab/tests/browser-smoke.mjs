@@ -827,7 +827,10 @@ try {
   // Проверяем, что тип ребра можно выбрать в инспекторе и он меняет отрисовку.
   await page.evaluate(() => document.querySelector('#example')?.click());
   await page.waitForFunction(() => document.querySelectorAll('.gnode').length >= 4 && document.querySelectorAll('#edges .edge-hit').length >= 3);
-  await page.locator('#edges .edge-hit').first().click({ force: true });
+  await page.evaluate(() => {
+    const edge = document.querySelector('#edges .edge-hit');
+    edge?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }));
+  });
   await page.locator('#edgeTypeSelect').waitFor({ state: 'visible' });
   const edgeTypeOptions = await page.locator('#edgeTypeSelect option').evaluateAll(options => options.map(option => option.value));
   assert.ok(edgeTypeOptions.includes('calls'), 'edge inspector does not expose CODE_RELATIONS types');
