@@ -32,13 +32,15 @@ const dict = {
       li: 'элемент списка', ul: 'маркированный список', ol: 'нумерованный список',
       p: 'абзац', div: 'контейнер', summary: 'заголовок раскрывающегося блока',
       details: 'раскрывающийся блок', img: 'изображение', 'button[type]': 'тип кнопки',
-      id: 'идентификатор', header: 'шапка страницы', script: 'скрипт', button: 'кнопка'
+      id: 'идентификатор', header: 'шапка страницы', script: 'скрипт', button: 'кнопка',
+      'meta[name]': 'метатег с именем', content: 'содержимое метатега'
     },
     css: {
       gap: 'расстояние между элементами', display: 'тип раскладки элемента',
       'justify-content': 'выравнивание по главной оси', 'align-items': 'выравнивание по поперечной оси',
       'flex-direction': 'направление главной оси', 'grid-template-columns': 'колонки сетки',
-      flex: 'flex-раскладка', grid: 'grid-раскладка', '#*': 'селектор по id'
+      flex: 'flex-раскладка', grid: 'grid-раскладка',
+      'animation-name': 'имя анимации', 'animation-duration': 'длительность анимации', '#*': 'селектор по id'
     },
     js: {
       if: 'условная конструкция', elif: 'дополнительное условие',
@@ -48,7 +50,7 @@ const dict = {
     }
   },
   words: { getelementbyid: 'поиск элемента' },
-  structure: { html: rules.slice(0, 3).concat(rules.slice(8, 12), rules.slice(13, 14)), css: [rules[7], 'justify-content: требует display: flex | grid', 'align-items: требует display: flex | grid', 'flex-direction: требует display: flex', 'grid-template-columns: требует display: grid'], js: rules.slice(3, 8).concat(rules.slice(12, 13), rules.slice(14)) }
+  structure: { html: rules.slice(0, 3).concat(rules.slice(8, 12), rules.slice(13, 14), ['meta[name]: требует content']), css: [rules[7], 'justify-content: требует display: flex | grid', 'align-items: требует display: flex | grid', 'flex-direction: требует display: flex', 'grid-template-columns: требует display: grid', 'animation-name: требует animation-duration'], js: rules.slice(3, 8).concat(rules.slice(12, 13), rules.slice(14)) }
 };
 
 function groupFor(result, term, label) {
@@ -254,6 +256,22 @@ test('CSS dependency is navigable in reverse from display to dependent propertie
   const gap = group.children.find(x => x.term === 'gap');
   assert.match(gap.show, /requires|требует/);
   assert.match(gap.show, /flex \| grid/);
+});
+
+test('CSS requirements without a value qualifier are navigable in both directions', () => {
+  const forward = buildVariants({ q: 'animation-name', lang: 'css', dict, rows: [], synonyms: {} });
+  const required = groupFor(forward, 'animation-name', 'Зависимости');
+  assert.ok(required.children.some(x => x.term === 'animation-duration'));
+
+  const reverse = buildVariants({ q: 'animation-duration', lang: 'css', dict, rows: [], synonyms: {} });
+  const dependents = groupFor(reverse, 'animation-duration', 'Зависимые свойства');
+  assert.ok(dependents.children.some(x => x.term === 'animation-name'));
+});
+
+test('plain requirements are navigable in reverse for HTML too', () => {
+  const result = buildVariants({ q: 'content', lang: 'html', dict, rows: [], synonyms: {} });
+  const group = groupFor(result, 'content', 'Зависимые конструкции');
+  assert.ok(group.children.some(x => x.term === 'meta[name]'));
 });
 
 test('CSS requirement values expose only dependents compatible with the selected value', () => {

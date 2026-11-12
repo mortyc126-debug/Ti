@@ -775,6 +775,37 @@ try {
   assert.match(sqlAfterAliasInsert, /WHERE\s+u\.$/,
     'Selecting the explained SQL alias candidate did not insert its qualifier');
 
+  // Связь «display → свойства, которым нужна раскладка» должна быть видна в самом дереве подсказок.
+  await htmlEditor.evaluate(ed => {
+    ed.__f.lang = 'css';
+    const cm = ed.querySelector('textarea')?.__cm;
+    cm.setValue('display');
+    cm.setCursor({ line: 0, ch: 7 });
+    cm.focus();
+  });
+  await page.keyboard.press('Control+Space');
+  await page.waitForSelector('.ac-pop', { timeout: 10_000 });
+  const displayPopup = page.locator('.ac-pop');
+  const displayRootIndex = await displayPopup.locator('.ac-r').evaluateAll(rows =>
+    rows.findIndex(row => (row.querySelector('.ac-c')?.textContent || '').trim().startsWith('display'))
+  );
+  assert.ok(displayRootIndex >= 0, 'CSS display root candidate was not rendered');
+  await displayPopup.locator('.ac-r').nth(displayRootIndex).locator('.ac-t').click();
+  await page.waitForFunction(() => [...document.querySelectorAll('.ac-pop .ac-r')]
+    .some(row => row.textContent.includes('Зависимые свойства')));
+  const displayRelations = displayPopup.locator('.ac-r').filter({ hasText: 'Зависимые свойства' }).first();
+  assert.equal(await displayRelations.count(), 1, 'CSS display suggestions did not expose the reverse dependency group');
+  await displayRelations.locator('.ac-t').click();
+  await page.waitForFunction(() => [...document.querySelectorAll('.ac-pop .ac-r')]
+    .some(row => (row.querySelector('.ac-c')?.textContent || '').trim().startsWith('gap') && row.offsetParent !== null));
+  const gapRelation = await displayPopup.locator('.ac-r').evaluateAll(rows => {
+    const row = rows.find(item => (item.querySelector('.ac-c')?.textContent || '').trim().startsWith('gap') && item.offsetParent !== null);
+    return row && { code: row.dataset.code, note: row.querySelector('.ac-d')?.textContent || '' };
+  });
+  assert.ok(gapRelation, 'display dependency group did not reveal the gap property');
+  assert.match(gapRelation.note, /flex|grid/i, 'gap relation lost its display value constraint');
+  await page.keyboard.press('Escape');
+
   await htmlEditor.evaluate(ed => { ed.__f.lang = 'html'; });
 
   assert.deepEqual(pageErrors, [], 'browser page raised uncaught errors: ' + pageErrors.join('; '));
