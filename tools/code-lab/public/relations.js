@@ -1,7 +1,7 @@
 // Единый словарь видов взаимодействия частей кода. Используется и импортом связей
 // из текста, и отрисовкой рёбер в конструкторе, и Описью. Глобальный CODE_RELATIONS.
 // Поле kw — синонимы для текстового формата; стрелка '->' всегда = поток данных.
-(function(){
+(function(root){
   const C = {
     flow:'#3DD9FF',   // поток данных — голубой
     ctrl:'#B45CFF',   // управление/вызовы — фиолетовый
@@ -61,8 +61,18 @@
   const kwIndex = [];
   R.forEach(r => r.kw.forEach(k => kwIndex.push({ k: k.toLowerCase(), r })));
   kwIndex.sort((a, b) => b.k.length - a.k.length);
-  window.CODE_RELATIONS = R;
-  window.relationById = id => byId[id] || byId.data;
-  window.relationColor = id => (byId[id] || byId.data).color;
-  window.relationKwIndex = kwIndex;   // [{k, r}] отсортировано по длине ключа
-})();
+  const relationById = id => byId[id] || byId.data;
+  const relationColor = id => relationById(id).color;
+  // Каноническое поле ребра — type; rel и kind читаются для старых сохранённых схем.
+  const edgeType = edge => {
+    const value = edge && (edge.type || edge.rel || edge.kind);
+    return String(value == null ? '' : value).trim() || 'data';
+  };
+  root.CODE_RELATIONS = R;
+  root.relationById = relationById;
+  root.relationColor = relationColor;
+  root.relationKwIndex = kwIndex;   // [{k, r}] отсортировано по длине ключа
+  root.edgeType = edgeType;
+  if(typeof module !== 'undefined' && module.exports)
+    module.exports = { CODE_RELATIONS: R, relationById, relationColor, edgeType };
+})(typeof window !== 'undefined' ? window : globalThis);

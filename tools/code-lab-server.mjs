@@ -37,6 +37,7 @@ import { analyzeNames } from './code-lab/lib/code-names.mjs';   // свои им
 import { createRequire } from 'node:module';
 // эти два файла общие со страницей: правила разбираются одним и тем же кодом и тут, и в браузере
 const Links = createRequire(import.meta.url)('./code-lab/public/code-links.js');   // связи: когда, если, откуда…
+const FlowRelations = createRequire(import.meta.url)('./code-lab/public/relations.js'); // тип ребра: type (старые rel/kind читаются)
 const Struct = createRequire(import.meta.url)('./code-lab/public/structure-rules.js');   // правила структуры
 import { createSections, treeToText, treeFromText, suggestSections, placeInTree } from './code-lab/lib/sections.mjs';   // дерево разделов
 
@@ -1829,9 +1830,9 @@ const server = http.createServer(async (req, res) => {
         const nodes = (g.graph && g.graph.nodes) || [], edges = (g.graph && g.graph.edges) || [];
         const map = {}; nodes.forEach(n => { map[n.id] = { title: (n.src && n.src.title) || n.title || '', pid: (n.src && n.src.id) || null }; });
         const isMe = nd => nd && ((pid && nd.pid === pid) || (meTitle && low(nd.title) === meTitle));
-        edges.forEach(ed => { const a = map[ed.from], c = map[ed.to]; if(!a || !c) return; const rel = ed.rel || 'data';
-          if(isMe(a)) rels.push({ dir: 'out', rel, other: c.title, scheme: g.name || fn });
-          else if(isMe(c)) rels.push({ dir: 'in', rel, other: a.title, scheme: g.name || fn }); });
+        edges.forEach(ed => { const a = map[ed.from], c = map[ed.to]; if(!a || !c) return; const rel = FlowRelations.edgeType(ed);
+          if(isMe(a)) rels.push({ dir: 'out', rel, type: rel, other: c.title, scheme: g.name || fn });
+          else if(isMe(c)) rels.push({ dir: 'in', rel, type: rel, other: a.title, scheme: g.name || fn }); });
       }
       // схлопнуть одинаковые рёбра (одна и та же связь в одноимённых схемах)
       const seen = new Set(), uniq = [];

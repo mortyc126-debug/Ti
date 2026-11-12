@@ -762,14 +762,14 @@ function autoConnect(nd){
   if(!graph.edges.some(e => e.to === nd.id)){
     for(const r of myC.requires){
       const src = others.find(o => nodeContract(o).provides.has(r));
-      if(src){ graph.edges.push({ from: src.id, to: nd.id }); made++; break; }
+      if(src){ graph.edges.push({ from: src.id, to: nd.id, type: 'data' }); made++; break; }
     }
   }
   // 2) что даю я — цепляю к тем, кому это нужно и у кого ещё нет входа
   for(const o of others){
     if(graph.edges.some(e => e.to === o.id)) continue;
     const oc = nodeContract(o);
-    if(oc.requires.some(r => myC.provides.has(r))){ graph.edges.push({ from: nd.id, to: o.id }); made++; }
+    if(oc.requires.some(r => myC.provides.has(r))){ graph.edges.push({ from: nd.id, to: o.id, type: 'data' }); made++; }
   }
   return made;
 }
@@ -921,7 +921,7 @@ function addEdge(from, to){
   // сходятся, связь всё равно создаётся, но с предупреждением; узел-получатель
   // остаётся помеченным «нужен вход», пока вход реально не подойдёт.
   graph.edges = graph.edges.filter(e => e.to !== to);
-  graph.edges.push({ from, to });
+  graph.edges.push({ from, to, type: 'data' });
   if(!result.ok){ try { bindEdge(a, b); } catch(_){} }   // всё равно пробуем подставить имя
   drawEdges(); persist(); renderCode(); renderInspector(b); markNeeds();
   showEdgeMessage(result.ok ? result.text : ('' + result.reason + ' Связь создана — проверь вход.'), result.ok ? (result.level === 'info' ? 'warn' : 'ok') : 'warn');
@@ -956,7 +956,8 @@ function drawEdges(){
     const a = portXY(e.from, 'out'), b = portXY(e.to, 'in'); const d = bez(a.x, a.y, b.x, b.y);
     const p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('d', d);
     // цвет ребра по виду связи (kind), если словарь загружен
-    if(e.kind && window.relationColor){ const col = window.relationColor(e.kind); if(e.kind !== 'data') p.style.stroke = col; }
+    const edgeKind = window.edgeType ? window.edgeType(e) : (e.type || e.rel || e.kind || 'data');
+    if(edgeKind && window.relationColor){ const col = window.relationColor(edgeKind); if(edgeKind !== 'data') p.style.stroke = col; }
     // типы не стыкуются — красное пунктирное ребро
     if(edgeTypeStatus(e) === 'bad'){ p.classList.add('edge-bad'); }
     if(sameEdge(selectedEdge, e)) p.setAttribute('class', 'sel');
@@ -1893,7 +1894,7 @@ function addPieces(parts){
   parts.forEach((pc, i) => {
     const nd = makeNode('raw', { fields: { code: pc.code }, title: pc.title, x: startX, y: 50 + i * 150 });
     graph.nodes.push(nd);
-    if(prev) graph.edges.push({ from: prev.id, to: nd.id });
+    if(prev) graph.edges.push({ from: prev.id, to: nd.id, type: 'sequence' });
     prev = nd;
   });
   renderCanvas(); renderCode(); persist();
@@ -1909,7 +1910,7 @@ function explodeNode(nd){
   graph.edges = graph.edges.filter(e => e.from !== nd.id && e.to !== nd.id);
   graph.nodes = graph.nodes.filter(n => n.id !== nd.id);
   let prev = null;
-  parts.forEach((pc, i) => { const node = makeNode('raw', { fields: { code: pc.code }, title: pc.title, x, y: y + i * 150 }); graph.nodes.push(node); if(prev) graph.edges.push({ from: prev.id, to: node.id }); prev = node; });
+  parts.forEach((pc, i) => { const node = makeNode('raw', { fields: { code: pc.code }, title: pc.title, x, y: y + i * 150 }); graph.nodes.push(node); if(prev) graph.edges.push({ from: prev.id, to: node.id, type: 'sequence' }); prev = node; });
   selectedId = null; renderCanvas(); renderInspector(); renderCode(); persist();
   showEdgeMessage('Разложено на ' + parts.length + ' блок(ов).', 'ok');
 }
@@ -2017,7 +2018,7 @@ $('#example').onclick = () => {
     { id:b, blockId:'reduce', fields:{ name:'сумма', list:'числа', expr:'acc + x' }, x:70,  y:230 },
     { id:c, blockId:'calc',   fields:{ name:'среднее', expr:'сумма / числа.length' }, x:70, y:400 },
     { id:d, blockId:'bars',   fields:{ values:'40, 70, 30, 90, 55' }, x:360, y:230 },
-  ], edges: [ { from:a, to:b }, { from:b, to:c }, { from:a, to:d } ] };
+  ], edges: [ { from:a, to:b, type:'data' }, { from:b, to:c, type:'data' }, { from:a, to:d, type:'data' } ] };
   selectedId = null; renderCanvas(); renderInspector(); renderCode(); persist();
 };
 
