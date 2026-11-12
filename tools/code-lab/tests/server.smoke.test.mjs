@@ -16,7 +16,7 @@ await fs.copyFile(path.join(TOOLS, 'code-lab-server.mjs'), path.join(T, 'code-la
 await fs.cp(path.join(TOOLS, 'code-lab', 'lib'), path.join(L, 'lib'), { recursive: true });
 await fs.writeFile(path.join(L, 'public', 'index.html'), '<!doctype html><title>t</title>');
 await fs.copyFile(path.join(TOOLS, 'code-lab', 'public', 'tasks-format.js'), path.join(L, 'public', 'tasks-format.js'));   // общий формат задач (сервер и браузер)
-for(const f of ['code-links.js', 'structure-rules.js']) await fs.copyFile(path.join(TOOLS, 'code-lab', 'public', f), path.join(L, 'public', f));   // связи и правила структуры — общие для сервера и страницы
+for(const f of ['code-links.js', 'structure-rules.js', 'relations.js']) await fs.copyFile(path.join(TOOLS, 'code-lab', 'public', f), path.join(L, 'public', f));   // связи, типы рёбер и правила структуры — общие для сервера и страницы
 for(const f of ['concepts.html', 'concepts.js', 'style.css', 'shell.js']) await fs.copyFile(path.join(TOOLS, 'code-lab', 'public', f), path.join(L, 'public', f));   // страница пользовательских конструкций и её оболочка
 await fs.writeFile(path.join(L, 'public', 'keyword-dict.json'), JSON.stringify({ words: { print: 'print — вывод', fetch: 'fetch — получить данные с сервера' }, cssProps: { 'font-weight': 'font-weight — жирность шрифта', 'font-size': 'font-size — размер шрифта' } }));
 await fs.mkdir(path.join(L, 'public', 'dict'), { recursive: true });
