@@ -38,6 +38,7 @@ try {
     localStorage.setItem('codelab_mode', 'sandbox');
     localStorage.setItem('codelab_ac', 'on');
     localStorage.setItem('codelab_ac_speed', 'instant');
+    localStorage.setItem('codelab_sandbox_live', '0');
   });
   const page = await context.newPage();
   const pageErrors = [];
@@ -777,10 +778,6 @@ try {
 
   // Живой preview перезапускал HTML iframe на каждом изменении CSS и шумел ошибкой тестового скрипта.
   // Для этого сценария проверяем только autocomplete, поэтому отключаем preview до изменения редактора.
-  await page.evaluate(() => {
-    const livePreview = document.querySelector('#sbLive');
-    if(livePreview && livePreview.checked) livePreview.click();
-  });
   // Связь проверяем в CSS-редакторе: не подменяем HTML-код, который исполняется в превью iframe.
   await page.locator('#sbTabs .sb-tab').filter({ hasText: 'style.css' }).first().click();
   await cssEditor.waitFor({ state: 'visible' });
