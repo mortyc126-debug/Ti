@@ -273,7 +273,35 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
         r.args.forEach(a => add('первым в', term + ' должен быть первым в ' + a, r, a, L, true));
       if(r.verb === 'первым в' && refs.includes(key) && exists(r.term))
         add('первым в', r.term + ' должен быть первым в ' + term, r, r.term, L, true);
-      if(own && ['требует','обязательно','можно','значения','заметка'].includes(r.verb))
+      if(r.verb === 'требует'){
+        // CSS-зависимость хранится как «display: flex | grid». Разбираем её на
+        // свойство и допустимые значения, чтобы обе стороны связи были навигационными.
+        const requirements = r.args.map(raw => {
+          const match = L === 'css' && String(raw).match(/^\s*([a-z-]+)\s*:\s*(.*?)\s*$/i);
+          return match
+            ? { raw, property: match[1].toLowerCase(), values: match[2].split(/\s*\|\s*/).map(value => value.trim()).filter(Boolean) }
+            : { raw, property: '', values: [] };
+        });
+        if(own) requirements.forEach(requirement => {
+          if(requirement.property){
+            const show = requirement.property + (requirement.values.length ? ': ' + requirement.values.join(' | ') : '');
+            add('требует', show, r, requirement.property, L, exists(requirement.property, L), 'Зависимости');
+          } else {
+            add('требует', 'требует: ' + requirement.raw, r, requirement.raw);
+          }
+        });
+        if(L === 'css') requirements.forEach(requirement => {
+          if(!requirement.property) return;
+          const matchesProperty = requirement.property === key;
+          const matchesValue = requirement.values.some(value => norm(value) === key);
+          if(!matchesProperty && !matchesValue) return;
+          const label = matchesProperty ? 'Зависимые свойства' : 'Свойства для значения «' + term + '»';
+          const values = requirement.values.length ? ': ' + requirement.values.join(' | ') : '';
+          const show = r.term + ' требует ' + requirement.property + values;
+          add('требует', show, r, r.term, L, exists(r.term, L), label);
+        });
+      }
+      if(own && ['обязательно','можно','значения','заметка'].includes(r.verb))
         r.args.forEach(a => add(r.verb, r.verb + ': ' + a, r, a));
       if(own && ['связывает','читает'].includes(r.verb)){
         r.args.forEach(a => {

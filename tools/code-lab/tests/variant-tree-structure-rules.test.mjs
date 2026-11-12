@@ -34,7 +34,12 @@ const dict = {
       details: 'раскрывающийся блок', img: 'изображение', 'button[type]': 'тип кнопки',
       id: 'идентификатор', header: 'шапка страницы', script: 'скрипт', button: 'кнопка'
     },
-    css: { gap: 'расстояние между элементами', '#*': 'селектор по id' },
+    css: {
+      gap: 'расстояние между элементами', display: 'тип раскладки элемента',
+      'justify-content': 'выравнивание по главной оси', 'align-items': 'выравнивание по поперечной оси',
+      'flex-direction': 'направление главной оси', 'grid-template-columns': 'колонки сетки',
+      flex: 'flex-раскладка', grid: 'grid-раскладка', '#*': 'селектор по id'
+    },
     js: {
       if: 'условная конструкция', elif: 'дополнительное условие',
       try: 'обработка ошибок', catch: 'перехват ошибки', finally: 'завершение',
@@ -43,7 +48,7 @@ const dict = {
     }
   },
   words: { getelementbyid: 'поиск элемента' },
-  structure: { html: rules.slice(0, 3).concat(rules.slice(8, 12), rules.slice(13, 14)), css: [rules[7]], js: rules.slice(3, 8).concat(rules.slice(12, 13), rules.slice(14)) }
+  structure: { html: rules.slice(0, 3).concat(rules.slice(8, 12), rules.slice(13, 14)), css: [rules[7], 'justify-content: требует display: flex | grid', 'align-items: требует display: flex | grid', 'flex-direction: требует display: flex', 'grid-template-columns: требует display: grid'], js: rules.slice(3, 8).concat(rules.slice(12, 13), rules.slice(14)) }
 };
 
 function groupFor(result, term, label) {
@@ -228,4 +233,34 @@ test('SQL function signatures are available through the shared structure rules',
   const round = StructureRules.attrsFor('round', sqlRules.rules);
   assert.deepEqual(round.required.map(item => item.name), ['numeric']);
   assert.deepEqual(round.optional.map(item => item.name), ['precision']);
+});
+
+test('CSS dependency points to the required property and preserves its allowed values', () => {
+  const result = buildVariants({ q: 'gap', lang: 'css', dict, rows: [], synonyms: {} });
+  const group = groupFor(result, 'gap', 'Зависимости');
+  const display = group.children.find(x => x.term === 'display');
+  assert.ok(display, 'gap must link to the actionable display property');
+  assert.match(display.code, /^display:/);
+  assert.match(display.show, /^display: flex \| grid$/);
+});
+
+test('CSS dependency is navigable in reverse from display to dependent properties', () => {
+  const result = buildVariants({ q: 'display', lang: 'css', dict, rows: [], synonyms: {} });
+  const group = groupFor(result, 'display', 'Зависимые свойства');
+  const terms = new Set(group.children.map(x => x.term));
+  for (const term of ['gap', 'justify-content', 'align-items', 'flex-direction', 'grid-template-columns']) {
+    assert.ok(terms.has(term), 'display must link back to dependent property ' + term);
+  }
+  const gap = group.children.find(x => x.term === 'gap');
+  assert.match(gap.show, /requires|требует/);
+  assert.match(gap.show, /flex \| grid/);
+});
+
+test('CSS requirement values expose only dependents compatible with the selected value', () => {
+  const flex = buildVariants({ q: 'flex', lang: 'css', dict, rows: [], synonyms: {} });
+  const group = groupFor(flex, 'flex', 'Свойства для значения «flex»');
+  const terms = new Set(group.children.map(x => x.term));
+  assert.ok(terms.has('gap'));
+  assert.ok(terms.has('flex-direction'));
+  assert.ok(!terms.has('grid-template-columns'));
 });
