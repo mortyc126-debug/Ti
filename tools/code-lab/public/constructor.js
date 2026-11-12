@@ -946,7 +946,7 @@ function sameEdge(a, b){ return a && b && a.from === b.from && a.to === b.to; }
 function removeEdge(ed){
   graph.edges = graph.edges.filter(e => !(e.from === ed.from && e.to === ed.to));
   if(sameEdge(selectedEdge, ed)) selectedEdge = null;
-  drawEdges(); persist(); renderCode(); markNeeds();
+  drawEdges(); persist(); renderCode(); markNeeds(); renderInspector();
   showEdgeMessage('Связь удалена.', 'ok');
 }
 function drawEdges(){
@@ -1008,7 +1008,7 @@ document.addEventListener('keydown', e => {
 // ── инспектор ─────────────────────────────────────────────────────────────────
 let spaceHeld = false;
 const multi = new Set();   // множественное выделение узлов
-function select(nd){ selectedId = nd.id; markSel(); renderInspector(nd); persist(); }
+function select(nd){ selectedEdge = null; selectedId = nd.id; markSel(); renderInspector(nd); persist(); }
 function markSel(){ canvas.querySelectorAll('.gnode').forEach(el => el.classList.toggle('sel', el.dataset.id === selectedId || multi.has(el.dataset.id))); }
 function updateCard(nd){
   const el = canvas.querySelector('.gnode[data-id="' + cssEsc(nd.id) + '"]'); if(!el) return;
@@ -1016,9 +1016,59 @@ function updateCard(nd){
   el.querySelector('.gnode-prev').textContent = nodePreview(nd);
   drawEdges(); markNeeds();
 }
+function renderEdgeInspector(host, selected){
+  const edge = graph.edges.find(e => sameEdge(e, selected));
+  if(!edge){ selectedEdge = null; host.innerHTML = '<div class="insp-body"><div class="insp-empty">Связь больше не существует.</div></div>'; return; }
+  host.innerHTML = '';
+  const body = el('div', 'insp-body');
+  body.appendChild(el('div', 'insp-title', 'Связь'));
+  const from = byId(edge.from), to = byId(edge.to);
+  body.appendChild(el('div', 'insp-kind', (from ? nodeLabel(from) : edge.from) + ' → ' + (to ? nodeLabel(to) : edge.to)));
+  const current = window.edgeType ? window.edgeType(edge) : (edge.type || edge.rel || edge.kind || 'data');
+  const types = Array.isArray(window.CODE_RELATIONS) ? window.CODE_RELATIONS.slice() : [];
+  if(!types.some(item => item.id === current)) types.unshift({ id: current, label: current, desc: '' });
+  const field = el('div', 'insp-field');
+  field.appendChild(el('label', '', 'Тип связи'));
+  const select = document.createElement('select');
+  select.id = 'edgeTypeSelect';
+  select.style.cssText = 'width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--name);font-size:13px';
+  types.forEach(item => {
+    const option = document.createElement('option');
+    option.value = item.id;
+    option.textContent = item.label || item.id;
+    select.appendChild(option);
+  });
+  select.value = current;
+  field.appendChild(select);
+  body.appendChild(field);
+  const description = el('div', 'muted');
+  description.style.cssText = 'font-size:11px;line-height:1.45;margin:-4px 0 12px';
+  const updateDescription = () => {
+    const item = window.relationById ? window.relationById(select.value) : null;
+    description.textContent = item && item.desc ? item.desc : '';
+  };
+  updateDescription();
+  select.onchange = () => {
+    edge.type = select.value;
+    drawEdges();
+    persist();
+    updateDescription();
+    showEdgeMessage('Тип связи сохранён.', 'ok');
+  };
+  body.appendChild(description);
+  const acts = el('div', 'insp-acts');
+  const remove = el('button', 'insp-act', 'удалить связь');
+  remove.title = 'Удалить это ребро';
+  remove.onclick = () => removeEdge(edge);
+  acts.appendChild(remove);
+  body.appendChild(acts);
+  host.appendChild(body);
+}
+
 function renderInspector(nd){
   const host = $('#inspector'); if(!host) return;
   nd = nd || (selectedId ? byId(selectedId) : null);
+  if(!nd && selectedEdge){ renderEdgeInspector(host, selectedEdge); return; }
   if(!nd){ host.innerHTML = '<div class="insp-body"><div class="insp-empty">Выбери узел на холсте — сверху его код, под ним описание. Настройки и разбор — в свёрнутых разделах.<br><br>Пусто? Слева выбери компонент.</div></div>'; return; }
   const b = BLOCKS[nd.blockId];
   if(inspTab === 'why') inspTab = 'learn';   // было 3 вкладки, стало 2 — переносим старое состояние

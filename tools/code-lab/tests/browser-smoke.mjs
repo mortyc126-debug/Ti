@@ -814,6 +814,29 @@ try {
   await htmlEditor.waitFor({ state: 'visible' });
   await htmlEditor.evaluate(ed => { ed.__f.lang = 'html'; });
 
+  const edgeTypes = await page.evaluate(() => ({
+    canonical: window.edgeType({ type: 'calls', rel: 'data' }),
+    legacyRel: window.edgeType({ rel: 'depends' }),
+    legacyKind: window.edgeType({ kind: 'sequence' }),
+    fallback: window.edgeType({ from: 'a', to: 'b' })
+  }));
+  assert.deepEqual(edgeTypes, { canonical: 'calls', legacyRel: 'depends', legacyKind: 'sequence', fallback: 'data' },
+    'browser relation registry does not read canonical and legacy edge types');
+
+  // Проверяем, что тип ребра можно выбрать в инспекторе и он меняет отрисовку.
+  await page.evaluate(() => document.querySelector('#example')?.click());
+  await page.waitForFunction(() => document.querySelectorAll('#edges .edge-hit').length >= 3);
+  await page.locator('#edges .edge-hit').first().click({ force: true });
+  await page.locator('#edgeTypeSelect').waitFor({ state: 'visible' });
+  const edgeTypeOptions = await page.locator('#edgeTypeSelect option').evaluateAll(options => options.map(option => option.value));
+  assert.ok(edgeTypeOptions.includes('calls'), 'edge inspector does not expose CODE_RELATIONS types');
+  await page.locator('#edgeTypeSelect').selectOption('calls');
+  const [selectedEdgeStroke, expectedEdgeStroke] = await Promise.all([
+    page.locator('#edges path.sel').first().evaluate(path => path.style.stroke),
+    page.evaluate(() => window.relationColor('calls'))
+  ]);
+  assert.equal(selectedEdgeStroke, expectedEdgeStroke, 'changing edge type did not update its relation color');
+
   assert.deepEqual(pageErrors, [], 'browser page raised uncaught errors: ' + pageErrors.join('; '));
   console.log('Browser smoke passed: variant tree, expansion, keyboard insertion, IME and stale-template cancellation.');
 } finally {
