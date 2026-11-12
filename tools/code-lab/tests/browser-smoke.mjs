@@ -775,6 +775,10 @@ try {
   assert.match(sqlAfterAliasInsert, /WHERE\s+u\.$/,
     'Selecting the explained SQL alias candidate did not insert its qualifier');
 
+  // Живой preview перезапускал HTML iframe на каждом изменении CSS и шумел ошибкой тестового скрипта.
+  // Для этого сценария проверяем только autocomplete, поэтому отключаем preview до изменения редактора.
+  const livePreview = page.locator('#sbLive');
+  if(await livePreview.isChecked()) await livePreview.uncheck();
   // Связь проверяем в CSS-редакторе: не подменяем HTML-код, который исполняется в превью iframe.
   await page.locator('#sbTabs .sb-tab').filter({ hasText: 'style.css' }).first().click();
   await cssEditor.waitFor({ state: 'visible' });
