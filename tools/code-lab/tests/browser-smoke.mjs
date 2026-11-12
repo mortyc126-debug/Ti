@@ -39,6 +39,7 @@ try {
     localStorage.setItem('codelab_ac', 'on');
     localStorage.setItem('codelab_ac_speed', 'instant');
     localStorage.setItem('codelab_sandbox_live', '0');
+    localStorage.setItem('codelab_canvas_collapsed', '0');
   });
   const page = await context.newPage();
   const pageErrors = [];
@@ -825,7 +826,7 @@ try {
 
   // Проверяем, что тип ребра можно выбрать в инспекторе и он меняет отрисовку.
   await page.evaluate(() => document.querySelector('#example')?.click());
-  await page.waitForFunction(() => document.querySelectorAll('#edges .edge-hit').length >= 3);
+  await page.waitForFunction(() => document.querySelectorAll('.gnode').length >= 4 && document.querySelectorAll('#edges .edge-hit').length >= 3);
   await page.locator('#edges .edge-hit').first().click({ force: true });
   await page.locator('#edgeTypeSelect').waitFor({ state: 'visible' });
   const edgeTypeOptions = await page.locator('#edgeTypeSelect option').evaluateAll(options => options.map(option => option.value));
