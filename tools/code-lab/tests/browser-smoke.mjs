@@ -775,9 +775,10 @@ try {
   assert.match(sqlAfterAliasInsert, /WHERE\s+u\.$/,
     'Selecting the explained SQL alias candidate did not insert its qualifier');
 
-  // Связь «display → свойства, которым нужна раскладка» должна быть видна в самом дереве подсказок.
-  await htmlEditor.evaluate(ed => {
-    ed.__f.lang = 'css';
+  // Связь проверяем в CSS-редакторе: не подменяем HTML-код, который исполняется в превью iframe.
+  await page.locator('#sbTabs .sb-tab').filter({ hasText: 'style.css' }).first().click();
+  await cssEditor.waitFor({ state: 'visible' });
+  await cssEditor.evaluate(ed => {
     const cm = ed.querySelector('textarea')?.__cm;
     cm.setValue('display');
     cm.setCursor({ line: 0, ch: 7 });
@@ -806,6 +807,8 @@ try {
   assert.match(gapRelation.note, /flex|grid/i, 'gap relation lost its display value constraint');
   await page.keyboard.press('Escape');
 
+  await page.locator('#sbTabs .sb-tab').filter({ hasText: 'index.html' }).first().click();
+  await htmlEditor.waitFor({ state: 'visible' });
   await htmlEditor.evaluate(ed => { ed.__f.lang = 'html'; });
 
   assert.deepEqual(pageErrors, [], 'browser page raised uncaught errors: ' + pageErrors.join('; '));
