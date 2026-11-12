@@ -41,7 +41,7 @@ try {
   });
   const page = await context.newPage();
   const pageErrors = [];
-  page.on('pageerror', error => pageErrors.push(error.message));
+  page.on('pageerror', error => pageErrors.push(error.stack || error.message));
   await page.goto(origin + '/constructor.html', { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#sbEds .sb-ed', { timeout: 30_000 });
   await page.waitForFunction(() => {
